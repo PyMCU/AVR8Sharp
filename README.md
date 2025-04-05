@@ -1,4 +1,4 @@
-## AVR8Sharp
+# AVR8Sharp
 
 ![Build Status](https://github.com/begeistert/AVR8Sharp/actions/workflows/build-nugets.yml/badge.svg)
 [![NuGet](https://img.shields.io/nuget/v/AVR8Sharp.svg)](https://www.nuget.org/packages/AVR8Sharp)
@@ -29,7 +29,7 @@ graph LR
     D <--> E[Simulation State Display for the User]
 ```
 
-### Installation
+## Installation
 
 To install the library, you can use the NuGet package manager or the .NET CLI.
 
@@ -43,7 +43,7 @@ or
 Install-Package AVR8Sharp
 ```
 
-### Usage
+## Usage
 
 The library is designed with ease of use in mind, leveraging the **Builder pattern** 
 for intuitive configuration. Below is an example demonstrating how to create a new 
@@ -115,7 +115,7 @@ void loop() {
 }
 ```
 
-### Chips Supported
+## Chips Supported
 
 As a port of the [avr8js](https://github.com/wokwi/avr8js) library, **AVR8Sharp** 
 primarily focuses on simulating the ATmega328p microcontroller. However, thanks
@@ -123,7 +123,7 @@ to its highly modular and configurable design, the library is capable of simulat
 a wide range of microcontrollers within the AVR-8 family, including the ATmega2560 
 and the ATtiny series.
 
-### Testing
+## Testing
 
 The library is tested using the NUnit testing framework. To run the tests, you can
 use the following command:
@@ -132,12 +132,12 @@ use the following command:
 dotnet test
 ```
 
-### Roadmap
+## Roadmap
 
 The following features are planned for future releases:
 - [ ] Support for TWI (I2C) Slave mode
 
-### License
+## License
 
 Copyright (c) 2019-2023 Uri Shaked.
 
