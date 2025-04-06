@@ -32,7 +32,7 @@ public class AvrUsart
 	const int UCSRC_UCPOL = 0x01; // Clock Polarity
 	
 	
-	public static AvrUsartConfig Usart0Config = new AvrUsartConfig {
+	public static readonly AvrUsartConfig Usart0Config = new AvrUsartConfig {
 		RxCompleteInterrupt = 0x24,
 		DataRegisterEmptyInterrupt = 0x26,
 		TxCompleteInterrupt = 0x28,
@@ -43,7 +43,7 @@ public class AvrUsart
 		UBRRH = 0xc5,
 		UDR = 0xc6,
 	};
-	public static Dictionary<int, int> RxMasks = new Dictionary<int, int> {
+	public static Dictionary<int, int> RxMasks { get; } = new Dictionary<int, int> {
 		{ 5, 0x1f },
 		{ 6, 0x3f },
 		{ 7, 0x7f },
@@ -51,17 +51,17 @@ public class AvrUsart
 		{ 9, 0xff },
 	};
 	
-	private Cpu.Cpu _cpu;
-	private AvrUsartConfig _config;
-	private uint _freqHz;
+	private readonly Cpu.Cpu _cpu;
+	private readonly AvrUsartConfig _config;
+	private readonly uint _freqHz;
 	
 	private bool _rxBusyValue = false;
 	private byte _rxByte = 0;
-	private StringBuilder _lineBuffer = new StringBuilder();
+	private readonly StringBuilder _lineBuffer = new StringBuilder();
 	
-	private AvrInterruptConfig _rxc;
-	private AvrInterruptConfig _udre;
-	private AvrInterruptConfig _txc;
+	private readonly AvrInterruptConfig _rxc;
+	private readonly AvrInterruptConfig _udre;
+	private readonly AvrInterruptConfig _txc;
 	
 	public Action<byte>? OnByteTransmit { get; set; } = null;
 	public Action<string>? OnLineTransmit { get; set; } = null;
@@ -204,7 +204,6 @@ public class AvrUsart
 		};
 		
 		_cpu.ReadHooks[_config.UDR] = _ => {
-			// var mask = RxMasks.GetValueOrDefault (BitsPerChar, 0xff);
 			var mask = RxMasks.TryGetValue (BitsPerChar, out var m) ? m : 0xff;
 			var result = _rxByte & mask;
 			_rxByte = 0;
@@ -278,14 +277,14 @@ public class AvrUsart
 
 public class AvrUsartConfig
 {
-	public byte RxCompleteInterrupt;
-	public byte DataRegisterEmptyInterrupt;
-	public byte TxCompleteInterrupt;
+	public byte RxCompleteInterrupt { get; set; }
+	public byte DataRegisterEmptyInterrupt { get; set; }
+	public byte TxCompleteInterrupt { get; set; }
 	
-	public byte UCSRA;
-	public byte UCSRB;
-	public byte UCSRC;
-	public byte UBRRL;
-	public byte UBRRH;
-	public byte UDR;
+	public byte UCSRA { get; set; }
+	public byte UCSRB { get; set; }
+	public byte UCSRC { get; set; }
+	public byte UBRRL { get; set; }
+	public byte UBRRH { get; set; }
+	public byte UDR { get; set; }
 }

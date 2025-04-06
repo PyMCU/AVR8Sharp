@@ -1,4 +1,5 @@
 #nullable enable
+using System.Text.RegularExpressions;
 using LabelTable = System.Collections.Generic.Dictionary<string, int>;
 using OpCodeHandler = System.Func<string, string, int, System.Collections.Generic.Dictionary<string, int>, object>;
 
@@ -6,6 +7,7 @@ namespace AVR8Sharp.Utils;
 
 public partial class AvrAssembler
 {
+	const string Z_OPERAND_ERROR = "First operand must be Z";
 	
 	// Create an alias for the dictionary type
 	static Dictionary<string, OpCodeHandler> OpTable = new Dictionary<string, OpCodeHandler>  {
@@ -285,31 +287,31 @@ public partial class AvrAssembler
 		}},
 		{ "LAC", (a, b, _, _) => {
 			if (a != "Z") {
-				throw new Exception("First operand must be Z");
+				throw new Exception(Z_OPERAND_ERROR);
 			}
 			var r = 0x9206 | DestRIndex(b);
 			return ZeroPad (r);
 		}},
 		{ "LAS", (a, b, _, _) => {
 			if (a != "Z") {
-				throw new Exception("First operand must be Z");
+				throw new Exception(Z_OPERAND_ERROR);
 			}
 			var r = 0x9205 | DestRIndex(b);
 			return ZeroPad (r);
 		}},
 		{ "LAT", (a, b, _, _) => {
 			if (a != "Z") {
-				throw new Exception("First operand must be Z");
+				throw new Exception(Z_OPERAND_ERROR);
 			}
 			var r = 0x9207 | DestRIndex(b);
 			return ZeroPad (r);
 		}},
 		{ "LD", (a, b, _, _) => {
-			var r = 0x0000 | DestRIndex(a) | StldXyz(b);
+			var r = DestRIndex(a) | StldXyz(b);
 			return ZeroPad (r);
 		}},
 		{ "LDD", (a, b, _, _) => {
-			var r = 0x0000 | DestRIndex(a) | StldYzQ(b);
+			var r = DestRIndex(a) | StldYzQ(b);
 			return ZeroPad (r);
 		}},
 		{ "LDI", (a, b, _, _) => {
@@ -558,16 +560,16 @@ public partial class AvrAssembler
 		}}
 	};
 	
-	static readonly System.Text.RegularExpressions.Regex RIndexRegex = new System.Text.RegularExpressions.Regex(@"[Rr](\d{1,2})");
-	static readonly System.Text.RegularExpressions.Regex RrIndexRegex = new System.Text.RegularExpressions.Regex(@"[Rr](24|26|28|30)");
-	static readonly System.Text.RegularExpressions.Regex YzQRegex = new System.Text.RegularExpressions.Regex(@"([YZ])\+(\d+)");
-	static readonly System.Text.RegularExpressions.Regex CommentsRegex = new System.Text.RegularExpressions.Regex("[#;].*$");
-	static readonly System.Text.RegularExpressions.Regex LabelRegex = new System.Text.RegularExpressions.Regex(@"^(\w+):");
-	static readonly System.Text.RegularExpressions.Regex CodeRegex = new System.Text.RegularExpressions.Regex(@"^\s*(\w+)(?:\s+([^,]+)(?:,\s*(\S+))?)?\s*$");
+	static readonly System.Text.RegularExpressions.Regex RIndexRegex = new System.Text.RegularExpressions.Regex(@"[Rr](\d{1,2})", RegexOptions.CultureInvariant, TimeSpan.FromSeconds (1));
+	static readonly System.Text.RegularExpressions.Regex RrIndexRegex = new System.Text.RegularExpressions.Regex(@"[Rr](24|26|28|30)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds (1));
+	static readonly System.Text.RegularExpressions.Regex YzQRegex = new System.Text.RegularExpressions.Regex(@"([YZ])\+(\d+)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds (1));
+	static readonly System.Text.RegularExpressions.Regex CommentsRegex = new System.Text.RegularExpressions.Regex("[#;].*$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds (1));
+	static readonly System.Text.RegularExpressions.Regex LabelRegex = new System.Text.RegularExpressions.Regex(@"^(\w+):", RegexOptions.CultureInvariant, TimeSpan.FromSeconds (1));
+	static readonly System.Text.RegularExpressions.Regex CodeRegex = new System.Text.RegularExpressions.Regex(@"^\s*(\w+)(?:\s+([^,]+)(?:,\s*(\S+))?)?\s*$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds (1));
 	
-	private LabelTable _labels = new LabelTable();
-	private List<string> _errors = new List<string>();
-	private List<LineTablePassOne> _lines = new List<LineTablePassOne>();
+	private readonly LabelTable _labels = new LabelTable();
+	private readonly List<string> _errors = new List<string>();
+	private readonly List<LineTablePassOne> _lines = new List<LineTablePassOne>();
 	
 	public LabelTable Labels => _labels;
 	public List<string> Errors => _errors;
@@ -687,7 +689,7 @@ public partial class AvrAssembler
 						byteOffset += 2;
 						break;
 					case Func<LabelTable, object>:
-					case KeyValuePair<string, string> p:
+					case KeyValuePair<string, string>:
 						byteOffset += 4;
 						break;
 					default:
@@ -710,7 +712,7 @@ public partial class AvrAssembler
 		if (_lines.Count == 0) 
 			return [];
 		
-		var lastElement = _lines.Last();
+		var lastElement = _lines[_lines.Count - 1];
 		var byteSize = lastElement.BytesOffset + ElementSize(ref lastElement);
 		var resultTable = new byte[byteSize];
 		
@@ -777,7 +779,7 @@ public partial class AvrAssembler
 				return 4;
 			}
 		}
-		if (bytes is KeyValuePair<string, string> p2) {
+		if (bytes is KeyValuePair<string, string>) {
 			return 4;
 		}
 		return 2;

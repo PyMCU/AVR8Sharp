@@ -4,8 +4,7 @@ namespace AVR8Sharp;
 
 public class AvrBuilder (AvrRunner @base, int flashSize = AvrRunner.FLASH)
 {
-	AvrRunner @base = @base;
-	int flashSize = AvrRunner.FLASH;
+	readonly AvrRunner @base = @base;
 	public static AvrBuilder Create (int flashSize = AvrRunner.FLASH, int ramSize = 8192)
 	{
 		return new AvrBuilder (new AvrRunner (new byte[flashSize], ramSize), flashSize);

@@ -4,8 +4,8 @@ public class AvrClock
 {
 	public const int CLKPCE = 128;
 
-	public static AvrClockConfig ClockConfig = new AvrClockConfig (0x61);
-	public static int[] Prescalers = [
+	public static readonly AvrClockConfig ClockConfig = new AvrClockConfig (0x61);
+	public static readonly int[] Prescalers = [
 		1, 2, 4, 8, 16, 32, 64, 128, 256, 
 		
 		// The following values are "reserved" according to the datasheet, so we measured
@@ -16,8 +16,8 @@ public class AvrClock
 	int _clockEnabledCycles = 0;
 	int _prescalerValue = 1;
 	int _cyclesDelta = 0;
-	uint _baseFreqHz = 0;
-	Cpu.Cpu _cpu;
+	readonly uint _baseFreqHz = 0;
+	readonly Cpu.Cpu _cpu;
 	
 	public uint Frequency {
 		get {

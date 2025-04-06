@@ -40,77 +40,89 @@ public class AvrUsi
 		enableMask: USIOIE
 	);
 	
-	private Cpu.Cpu _cpu;
-	private AvrIoPort _port;
-	private int _portPin;
-	private int _dataPin;
-	private int _clockPin;
+	private readonly Cpu.Cpu _cpu;
+	private readonly AvrIoPort _port;
+	private readonly int _dataPin;
+	private readonly int _clockPin;
 	
-	private ushort _PIN;
-	private ushort _PORT;
+	private readonly ushort _PIN;
+	private readonly ushort _PORT;
 
 	public AvrUsi (Cpu.Cpu cpu, AvrIoPort port, int portPin, int dataPin, int clockPin)
 	{
 		_cpu = cpu;
 		_port = port;
-		_portPin = portPin;
 		_dataPin = dataPin;
 		_clockPin = clockPin;
 
 		_PIN = (ushort)portPin;
 		_PORT = (ushort)(_PIN + 1);
 		
-		port.AddListener ((value, _) => {
-			var twoWire = (_cpu.Data[USICR] & USIWM1) == USIWM1;
-			if (twoWire) {
-				if ((value & (1 << _clockPin)) != 0 && (value & (1 << _dataPin)) == 0) {
-					// Start condition detected
-					_cpu.SetInterruptFlag (_start);
-				}
-				if ((value & (1 << _clockPin)) != 0 && (value & (1 << _dataPin)) != 0) {
-					// Stop condition detected
-					_cpu.Data[USISR] |= USIPF;
-				}
+		port.AddListener (DelegatePortListener);
+		
+		_cpu.WriteHooks[USISR] = DelegateWriteHookUsisr;
+		
+		_cpu.WriteHooks[USICR] = DelegateWriteHookUsicr;
+	}
+
+	private void DelegatePortListener (byte value, byte oldValue)
+	{
+		var twoWire = (_cpu.Data[USICR] & USIWM1) == USIWM1;
+		if (twoWire) {
+			if ((value & (1 << _clockPin)) != 0 && (value & (1 << _dataPin)) == 0) {
+				// Start condition detected
+				_cpu.SetInterruptFlag (_start);
 			}
-		});
-		
-		_cpu.WriteHooks[USISR] = (value, _, _, _) => {
-			var writeClearMask = USISIF | USIOIF | USIPF;
-			_cpu.Data[USISR] = (byte)((_cpu.Data[USISR] & writeClearMask & ~value) | (value & 0xf));
-			_cpu.ClearInterruptByFlag (_start, value);
-			_cpu.ClearInterruptByFlag (_overflow, value);
-			return true;
-		};
-		
-		_cpu.WriteHooks[USICR] = (value, _, _, _) => {
-			_cpu.Data[USICR] = (byte)(value & ~(USICLK | USITC));
-			_cpu.UpdateInterruptEnable (_start, value);
-			_cpu.UpdateInterruptEnable (_overflow, value);
-			var clockSrc = value & ((USICS1 | USICS0) >> 2);
-			var mode = value & ((USIWM1 | USIWM0) >> 4);
-			var usiClk = value & USICLK;
-			_port.OpenCollector = (byte)(mode >= 2 ? (1 << _dataPin) : 0);
-			var inputValue = (_cpu.Data[_PIN] & (1 << _dataPin)) != 0 ? 1 : 0;
-			if (usiClk != 0 && clockSrc == 0) {
+			if ((value & (1 << _clockPin)) != 0 && (value & (1 << _dataPin)) != 0) {
+				// Stop condition detected
+				_cpu.Data[USISR] |= USIPF;
+			}
+		}
+	}
+	
+	private bool DelegateWriteHookUsisr(byte value, byte oldValue, ushort address, byte mask)
+	{
+		var writeClearMask = USISIF | USIOIF | USIPF;
+		_cpu.Data[USISR] = (byte)((_cpu.Data[USISR] & writeClearMask & ~value) | (value & 0xf));
+		_cpu.ClearInterruptByFlag (_start, value);
+		_cpu.ClearInterruptByFlag (_overflow, value);
+		return true;
+	}
+	
+	private bool DelegateWriteHookUsicr(byte value, byte oldValue, ushort address, byte mask)
+	{
+		_cpu.Data[USICR] = (byte)(value & ~(USICLK | USITC));
+		_cpu.UpdateInterruptEnable (_start, value);
+		_cpu.UpdateInterruptEnable (_overflow, value);
+		var clockSrc = value & ((USICS1 | USICS0) >> 2);
+		var mode = value & ((USIWM1 | USIWM0) >> 4);
+		var usiClk = value & USICLK;
+		_port.OpenCollector = (byte)(mode >= 2 ? (1 << _dataPin) : 0);
+		var inputValue = (_cpu.Data[_PIN] & (1 << _dataPin)) != 0 ? 1 : 0;
+		if (usiClk != 0 && clockSrc == 0) {
+			Shift (inputValue);
+			Count ();
+		}
+		if ((value & USITC) != 0) {
+			return ProcessUsitcNotZero (ref usiClk, ref clockSrc, ref inputValue);
+		}
+		return false;
+	}
+
+	private bool ProcessUsitcNotZero (ref int usiClk, ref int clockSrc, ref int inputValue)
+	{
+		_cpu.WriteHooks[_PIN]?.Invoke((byte)(1 << _clockPin), _cpu.Data[_PIN], _PIN, 0xff);
+		var newValue = _cpu.Data[_PIN] & (1 << _clockPin);
+		if (usiClk != 0 && (clockSrc == 2 || clockSrc == 3)) {
+			if (clockSrc == 2 && newValue != 0) {
 				Shift (inputValue);
-				Count ();
 			}
-			if ((value & USITC) != 0) {
-				_cpu.WriteHooks[_PIN]?.Invoke((byte)(1 << _clockPin), _cpu.Data[_PIN], _PIN, 0xff);
-				var newValue = _cpu.Data[_PIN] & (1 << _clockPin);
-				if (usiClk != 0 && (clockSrc == 2 || clockSrc == 3)) {
-					if (clockSrc == 2 && newValue != 0) {
-						Shift (inputValue);
-					}
-					if (clockSrc == 3 && newValue == 0) {
-						Shift (inputValue);
-					}
-					Count ();
-				}
-				return true;
+			if (clockSrc == 3 && newValue == 0) {
+				Shift (inputValue);
 			}
-			return false;
-		};
+			Count ();
+		}
+		return true;
 	}
 	
 	private void UpdateOutput ()

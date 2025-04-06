@@ -11,7 +11,7 @@ public class AvrEeprom
 	public const byte EEPM1 = 1 << 5;
 	public const byte EECR_WRITE_MASK = EEPE | EEMPE | EERIE | EEPM0 | EEPM1;
 	
-	public static AvrEepromConfig EepromConfig = new AvrEepromConfig (
+	public static readonly AvrEepromConfig EepromConfig = new AvrEepromConfig (
 		eepromReadyInterrupt: 0x2c,
 		eecr: 0x3f,
 		eedr: 0x40,
@@ -23,14 +23,12 @@ public class AvrEeprom
 	
 	private uint _writeEnabledCycles = 0;
 	private uint _writeCompleteCycles = 0;
-	private AvrEepromConfig _config;
-	AvrInterruptConfig _eer;
-	Cpu.Cpu _cpu;
-	IEepromBackend _backend;
+	readonly AvrEepromConfig _config;
+	readonly AvrInterruptConfig _eer; 
+	readonly IEepromBackend _backend;
 
 	public AvrEeprom (Cpu.Cpu cpu, IEepromBackend backend, AvrEepromConfig? config = null)
 	{
-		_cpu = cpu;
 		_backend = backend;
 		_config = config ?? EepromConfig;
 		_eer = new AvrInterruptConfig (

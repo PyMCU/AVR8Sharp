@@ -5,21 +5,21 @@ namespace AVR8Sharp.Peripherals;
 
 public class AvrAdc
 {
-	public static ADCMuxConfiguration Atmega328Channels = new ADCMuxConfiguration {
-		{ 0, new AdcMuxInput (type: AdcMuxInputType.SingleEnded, channel: 0 ) },
-		{ 1, new AdcMuxInput (type: AdcMuxInputType.SingleEnded, channel: 1) },
-		{ 2, new AdcMuxInput (type: AdcMuxInputType.SingleEnded, channel: 2) },
-		{ 3, new AdcMuxInput (type: AdcMuxInputType.SingleEnded, channel: 3) },
-		{ 4, new AdcMuxInput (type: AdcMuxInputType.SingleEnded, channel: 4) },
-		{ 5, new AdcMuxInput (type: AdcMuxInputType.SingleEnded, channel: 5) },
-		{ 6, new AdcMuxInput (type: AdcMuxInputType.SingleEnded, channel: 6) },
-		{ 7, new AdcMuxInput (type: AdcMuxInputType.SingleEnded, channel: 7) },
-		{ 8, new AdcMuxInput (type: AdcMuxInputType.Temperature) },
-		{ 14, new AdcMuxInput (type: AdcMuxInputType.Constant, voltage: 1.1) },
+	public static ADCMuxConfiguration Atmega328Channels { get; } = new ADCMuxConfiguration {
+		{ 0, new AdcMuxInput (type: AdcMuxInputType.SingleEnded, channel: 0) }, 
+		{ 1, new AdcMuxInput (type: AdcMuxInputType.SingleEnded, channel: 1) }, 
+		{ 2, new AdcMuxInput (type: AdcMuxInputType.SingleEnded, channel: 2) }, 
+		{ 3, new AdcMuxInput (type: AdcMuxInputType.SingleEnded, channel: 3) }, 
+		{ 4, new AdcMuxInput (type: AdcMuxInputType.SingleEnded, channel: 4) }, 
+		{ 5, new AdcMuxInput (type: AdcMuxInputType.SingleEnded, channel: 5) }, 
+		{ 6, new AdcMuxInput (type: AdcMuxInputType.SingleEnded, channel: 6) }, 
+		{ 7, new AdcMuxInput (type: AdcMuxInputType.SingleEnded, channel: 7) }, 
+		{ 8, new AdcMuxInput (type: AdcMuxInputType.Temperature) }, 
+		{ 14, new AdcMuxInput (type: AdcMuxInputType.Constant, voltage: 1.1) }, 
 		{ 15, new AdcMuxInput (type: AdcMuxInputType.Constant, voltage: 0) },
 	};
-	public static AdcMuxInput FallbackMuxInput = new AdcMuxInput (type: AdcMuxInputType.Constant, voltage: 0);
-	public static AvrAdcConfig AdcConfig = new AvrAdcConfig (
+	public static readonly AdcMuxInput FallbackMuxInput = new AdcMuxInput (type: AdcMuxInputType.Constant, voltage: 0);
+	public static readonly AvrAdcConfig AdcConfig = new AvrAdcConfig (
 		admux: 0x7c,
 		adcsra: 0x7a,
 		adcsrb: 0x7b,
@@ -51,13 +51,13 @@ public class AvrAdc
 	public const int REFS_MASK = 0x3;
 	public const int REFS_SHIFT = 6;
 
-	Cpu.Cpu _cpu;
+	readonly Cpu.Cpu _cpu;
 	bool _converting = false;
 	int _conversionCycles = 25;
-	AvrAdcConfig _config;
-	AvrInterruptConfig _adc;
-	double avcc = 5.0;
-	double aref = 5.0;
+	readonly AvrAdcConfig _config;
+	readonly AvrInterruptConfig _adc;
+	readonly double avcc = 5.0;
+	readonly double aref = 5.0;
 	
 	public int SampleCycles { get { return _conversionCycles * Prescaler; } }
 	public int Prescaler {
@@ -235,6 +235,5 @@ public class AvrAdcConfig (byte admux, byte adcsra, byte adcsrb, byte adcl, byte
 	public readonly byte MuxInputMask = muxInputMask;
 	public readonly ADCMuxConfiguration MuxChannels = muxChannels;
 	public readonly AdcReference?[] AdcReferences = adcReferences;
-
 }
 

@@ -35,7 +35,7 @@ public class AvrTwi
 	// Slave states
 	// TODO: Implement slave states
 	
-	public static AvrTwiConfig TwiConfig = new AvrTwiConfig {
+	public static readonly AvrTwiConfig TwiConfig = new AvrTwiConfig {
 		TwiInterrupt = 0x30,
 		
 		TWBR = 0xb8,
@@ -46,11 +46,11 @@ public class AvrTwi
 		TWAMR = 0xbd
 	};
 	
-	private Cpu.Cpu _cpu;
-	private AvrTwiConfig _config;
-	private uint _freqHz;
+	private readonly  Cpu.Cpu _cpu;
+	private readonly AvrTwiConfig _config;
+	private readonly uint _freqHz;
 	
-	private AvrInterruptConfig _twi;
+	private readonly AvrInterruptConfig _twi;
 	
 	private bool _busy = false;
 	
@@ -67,7 +67,7 @@ public class AvrTwi
 				case 3:
 					return 64;
 				default:
-					throw new Exception ("Invalid prescaler value!");
+					return 0;
 			}
 		}
 	}
@@ -178,7 +178,7 @@ public class AvrTwi
 
 public class NoopTwiEventHandler : ITwiEventHandler
 {
-	private AvrTwi _twi;
+	private readonly AvrTwi _twi;
 	public NoopTwiEventHandler (AvrTwi twi)
 	{
 		_twi = twi;
@@ -207,14 +207,14 @@ public class NoopTwiEventHandler : ITwiEventHandler
 
 public class AvrTwiConfig
 {
-	public byte TwiInterrupt;
+	public byte TwiInterrupt { get; set; }
 	
-	public byte TWBR;
-	public byte TWCR;
-	public byte TWSR;
-	public byte TWDR;
-	public byte TWAR;
-	public byte TWAMR;
+	public byte TWBR { get; set; }
+	public byte TWCR { get; set; }
+	public byte TWSR { get; set; }
+	public byte TWDR { get; set; }
+	public byte TWAR { get; set; }
+	public byte TWAMR { get; set; }
 }
 
 public interface ITwiEventHandler

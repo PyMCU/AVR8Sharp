@@ -18,7 +18,7 @@ public class AvrWatchdog
 	
 	const int WDTCSR_PROTECT_MASK = WDTCSR_WDE | WDTCSR_WDP3 | WDTCSR_WDP210;
 	
-	public static AvrWatchdogConfig WatchdogConfig = new AvrWatchdogConfig {
+	public static readonly AvrWatchdogConfig WatchdogConfig = new AvrWatchdogConfig {
 		WatchdogInterrupt = 0x0c,
 		
 		MCUSR = 0x54,
@@ -27,16 +27,16 @@ public class AvrWatchdog
 	
 	readonly long _clockFrequency = 128_000;
 	
-	private Cpu.Cpu _cpu;
-	private AvrWatchdogConfig _config;
-	private AvrClock _clock;
+	private readonly Cpu.Cpu _cpu;
+	private readonly AvrWatchdogConfig _config;
+	private readonly AvrClock _clock;
 	
 	private int _changeEnabledCycles = 0;
 	private int _watchdogTimeout = 0;
 	private bool _enabledValue = false;
 	private bool _scheduled = false;
 	
-	private AvrInterruptConfig _watchdog;
+	private readonly AvrInterruptConfig _watchdog;
 	
 	public bool Enabled {
 		get {
@@ -135,8 +135,8 @@ public class AvrWatchdog
 
 public class AvrWatchdogConfig
 {
-	public byte WatchdogInterrupt;
+	public byte WatchdogInterrupt { get; set; }
 	
-	public byte MCUSR;
-	public byte WDTCSR;
+	public byte MCUSR { get; set; }
+	public byte WDTCSR { get; set; }
 }

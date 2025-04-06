@@ -8,12 +8,12 @@ public class AvrTimer
 	const int FOCB = 1 << 6;
 	const int FOCC = 1 << 5;
 	
-	const int TopOCRA = 1;
-	const int TopICR = 2;
+	const int TOP_OCRA = 1;
+	const int TOP_ICR = 2;
 	
-	const int OCToggle = 1;
+	const int OC_TOGGLE = 1;
 	
-	public static int[] Timer01Dividers = new[] {
+	public static readonly int[] Timer01Dividers = new[] {
 		0,
 		1,
 		8,
@@ -23,7 +23,7 @@ public class AvrTimer
 		0, // External clock - see ExternalClockMode
 		0, // Ditto
 	};
-	public static AvrTimerConfig DefaultTimerBits = new AvrTimerConfig (
+	public static readonly AvrTimerConfig DefaultTimerBits = new AvrTimerConfig (
 		// TIFR bits
 		tov: 1,
 		ocfa: 2,
@@ -36,7 +36,7 @@ public class AvrTimer
 		ocieb: 4,
 		ociec: 0 // Unused
 	);
-	public static AvrTimerConfig Timer0Config = new AvrTimerConfig (
+	public static readonly AvrTimerConfig Timer0Config = new AvrTimerConfig (
 		bits: 8,
 		dividers: Timer01Dividers,
 		captureInterrupt: 0, // Not Available
@@ -72,7 +72,7 @@ public class AvrTimer
 		ocieb: DefaultTimerBits.OCIEB,
 		ociec: DefaultTimerBits.OCIEC
 	);
-	public static AvrTimerConfig Timer1Config = new AvrTimerConfig (
+	public static readonly AvrTimerConfig Timer1Config = new AvrTimerConfig (
 		bits: 16,
 		dividers: Timer01Dividers,
 		captureInterrupt: 0x14,
@@ -108,7 +108,7 @@ public class AvrTimer
 		ocieb: DefaultTimerBits.OCIEB,
 		ociec: DefaultTimerBits.OCIEC
 	);
-	public static AvrTimerConfig Timer2Config = new AvrTimerConfig (
+	public static readonly AvrTimerConfig Timer2Config = new AvrTimerConfig (
 		bits: 8,
 		dividers: [
 			0,
@@ -153,39 +153,39 @@ public class AvrTimer
 		ocieb: DefaultTimerBits.OCIEB,
 		ociec: DefaultTimerBits.OCIEC
 	);
-	public static WgmConfig[] WgmModes8Bit = [
-		new WgmConfig (mode:TimerMode.Normal, timerTopValue: 0xff, ocrUpdateMode: OCRUpdateMode.Immediate, tovUpdateMode: TOVUpdateMode.Max, flags: 0),
-		new WgmConfig (mode:TimerMode.PWMPhaseCorrect, timerTopValue: 0xff, ocrUpdateMode: OCRUpdateMode.Top, tovUpdateMode: TOVUpdateMode.Bottom, flags: 0),
-		new WgmConfig (mode:TimerMode.CTC, timerTopValue: TopOCRA, ocrUpdateMode: OCRUpdateMode.Immediate, tovUpdateMode: TOVUpdateMode.Max, flags: 0),
-		new WgmConfig (mode:TimerMode.FastPWM, timerTopValue: 0xff, ocrUpdateMode: OCRUpdateMode.Bottom, tovUpdateMode: TOVUpdateMode.Max, flags: 0),
-		new WgmConfig (mode:TimerMode.Reserved, timerTopValue: 0xff, ocrUpdateMode: OCRUpdateMode.Immediate, tovUpdateMode: TOVUpdateMode.Max, flags: 0),
-		new WgmConfig (mode:TimerMode.PWMPhaseCorrect, timerTopValue: TopOCRA, ocrUpdateMode: OCRUpdateMode.Top, tovUpdateMode: TOVUpdateMode.Bottom, flags: OCToggle),
-		new WgmConfig (mode:TimerMode.Reserved, timerTopValue: 0xff, ocrUpdateMode: OCRUpdateMode.Immediate,tovUpdateMode: TOVUpdateMode.Max, flags: 0),
-		new WgmConfig (mode:TimerMode.FastPWM, timerTopValue: TopOCRA, ocrUpdateMode: OCRUpdateMode.Bottom, tovUpdateMode: TOVUpdateMode.Top, flags: OCToggle),
+	public static readonly WgmConfig[] WgmModes8Bit = [
+		new WgmConfig (mode:TimerMode.Normal, timerTopValue: 0xff, ocrUpdateMode: OcrUpdateMode.Immediate, tovUpdateMode: TovUpdateMode.Max, flags: 0),
+		new WgmConfig (mode:TimerMode.PWMPhaseCorrect, timerTopValue: 0xff, ocrUpdateMode: OcrUpdateMode.Top, tovUpdateMode: TovUpdateMode.Bottom, flags: 0),
+		new WgmConfig (mode:TimerMode.CTC, timerTopValue: TOP_OCRA, ocrUpdateMode: OcrUpdateMode.Immediate, tovUpdateMode: TovUpdateMode.Max, flags: 0),
+		new WgmConfig (mode:TimerMode.FastPWM, timerTopValue: 0xff, ocrUpdateMode: OcrUpdateMode.Bottom, tovUpdateMode: TovUpdateMode.Max, flags: 0),
+		new WgmConfig (mode:TimerMode.Reserved, timerTopValue: 0xff, ocrUpdateMode: OcrUpdateMode.Immediate, tovUpdateMode: TovUpdateMode.Max, flags: 0),
+		new WgmConfig (mode:TimerMode.PWMPhaseCorrect, timerTopValue: TOP_OCRA, ocrUpdateMode: OcrUpdateMode.Top, tovUpdateMode: TovUpdateMode.Bottom, flags: OC_TOGGLE),
+		new WgmConfig (mode:TimerMode.Reserved, timerTopValue: 0xff, ocrUpdateMode: OcrUpdateMode.Immediate,tovUpdateMode: TovUpdateMode.Max, flags: 0),
+		new WgmConfig (mode:TimerMode.FastPWM, timerTopValue: TOP_OCRA, ocrUpdateMode: OcrUpdateMode.Bottom, tovUpdateMode: TovUpdateMode.Top, flags: OC_TOGGLE),
 	];
-	public static WgmConfig[] WgmModes16Bits = [
-		new WgmConfig (mode:TimerMode.Normal, timerTopValue: 0xffff, ocrUpdateMode: OCRUpdateMode.Immediate, tovUpdateMode: TOVUpdateMode.Max, flags: 0),
-		new WgmConfig (mode:TimerMode.PWMPhaseCorrect, timerTopValue: 0x00ff, ocrUpdateMode: OCRUpdateMode.Top, tovUpdateMode: TOVUpdateMode.Bottom, flags: 0),
-		new WgmConfig (mode:TimerMode.PWMPhaseCorrect, timerTopValue: 0x01ff, ocrUpdateMode: OCRUpdateMode.Top, tovUpdateMode: TOVUpdateMode.Bottom, flags: 0),
-		new WgmConfig (mode:TimerMode.PWMPhaseCorrect, timerTopValue: 0x03ff, ocrUpdateMode: OCRUpdateMode.Top, tovUpdateMode: TOVUpdateMode.Bottom, flags: 0),
-		new WgmConfig (mode:TimerMode.CTC, timerTopValue: TopOCRA, ocrUpdateMode: OCRUpdateMode.Immediate, tovUpdateMode: TOVUpdateMode.Max, flags: 0),
-		new WgmConfig (mode:TimerMode.FastPWM, timerTopValue: 0x00ff, ocrUpdateMode: OCRUpdateMode.Bottom, tovUpdateMode: TOVUpdateMode.Top, flags: 0),
-		new WgmConfig (mode:TimerMode.FastPWM, timerTopValue: 0x01ff, ocrUpdateMode: OCRUpdateMode.Bottom, tovUpdateMode: TOVUpdateMode.Top, flags: 0),
-		new WgmConfig (mode:TimerMode.FastPWM, timerTopValue: 0x03ff, ocrUpdateMode: OCRUpdateMode.Bottom, tovUpdateMode: TOVUpdateMode.Top, flags: 0),
-		new WgmConfig (mode:TimerMode.PWMPhaseFrequencyCorrect, timerTopValue: TopICR, ocrUpdateMode: OCRUpdateMode.Bottom, tovUpdateMode: TOVUpdateMode.Bottom, flags: 0),
-		new WgmConfig (mode:TimerMode.PWMPhaseFrequencyCorrect, timerTopValue: TopOCRA, ocrUpdateMode: OCRUpdateMode.Bottom, tovUpdateMode: TOVUpdateMode.Bottom, flags: OCToggle),
-		new WgmConfig (mode:TimerMode.PWMPhaseCorrect, timerTopValue: TopICR, ocrUpdateMode: OCRUpdateMode.Top, tovUpdateMode: TOVUpdateMode.Bottom, flags: 0),
-		new WgmConfig (mode:TimerMode.PWMPhaseCorrect, timerTopValue: TopOCRA, ocrUpdateMode: OCRUpdateMode.Top, tovUpdateMode: TOVUpdateMode.Bottom, flags: OCToggle),
-		new WgmConfig (mode:TimerMode.CTC, timerTopValue: TopICR, ocrUpdateMode: OCRUpdateMode.Immediate, tovUpdateMode: TOVUpdateMode.Max, flags: 0),
-		new WgmConfig (mode:TimerMode.Reserved, timerTopValue: 0xffff, ocrUpdateMode: OCRUpdateMode.Immediate, tovUpdateMode: TOVUpdateMode.Max, flags: 0),
-		new WgmConfig (mode:TimerMode.FastPWM, timerTopValue: TopICR, ocrUpdateMode: OCRUpdateMode.Bottom, tovUpdateMode: TOVUpdateMode.Top, flags: OCToggle),
-		new WgmConfig (mode:TimerMode.FastPWM, timerTopValue: TopOCRA, ocrUpdateMode: OCRUpdateMode.Bottom, tovUpdateMode: TOVUpdateMode.Top, flags: OCToggle),
+	public static readonly WgmConfig[] WgmModes16Bits = [
+		new WgmConfig (mode:TimerMode.Normal, timerTopValue: 0xffff, ocrUpdateMode: OcrUpdateMode.Immediate, tovUpdateMode: TovUpdateMode.Max, flags: 0),
+		new WgmConfig (mode:TimerMode.PWMPhaseCorrect, timerTopValue: 0x00ff, ocrUpdateMode: OcrUpdateMode.Top, tovUpdateMode: TovUpdateMode.Bottom, flags: 0),
+		new WgmConfig (mode:TimerMode.PWMPhaseCorrect, timerTopValue: 0x01ff, ocrUpdateMode: OcrUpdateMode.Top, tovUpdateMode: TovUpdateMode.Bottom, flags: 0),
+		new WgmConfig (mode:TimerMode.PWMPhaseCorrect, timerTopValue: 0x03ff, ocrUpdateMode: OcrUpdateMode.Top, tovUpdateMode: TovUpdateMode.Bottom, flags: 0),
+		new WgmConfig (mode:TimerMode.CTC, timerTopValue: TOP_OCRA, ocrUpdateMode: OcrUpdateMode.Immediate, tovUpdateMode: TovUpdateMode.Max, flags: 0),
+		new WgmConfig (mode:TimerMode.FastPWM, timerTopValue: 0x00ff, ocrUpdateMode: OcrUpdateMode.Bottom, tovUpdateMode: TovUpdateMode.Top, flags: 0),
+		new WgmConfig (mode:TimerMode.FastPWM, timerTopValue: 0x01ff, ocrUpdateMode: OcrUpdateMode.Bottom, tovUpdateMode: TovUpdateMode.Top, flags: 0),
+		new WgmConfig (mode:TimerMode.FastPWM, timerTopValue: 0x03ff, ocrUpdateMode: OcrUpdateMode.Bottom, tovUpdateMode: TovUpdateMode.Top, flags: 0),
+		new WgmConfig (mode:TimerMode.PWMPhaseFrequencyCorrect, timerTopValue: TOP_ICR, ocrUpdateMode: OcrUpdateMode.Bottom, tovUpdateMode: TovUpdateMode.Bottom, flags: 0),
+		new WgmConfig (mode:TimerMode.PWMPhaseFrequencyCorrect, timerTopValue: TOP_OCRA, ocrUpdateMode: OcrUpdateMode.Bottom, tovUpdateMode: TovUpdateMode.Bottom, flags: OC_TOGGLE),
+		new WgmConfig (mode:TimerMode.PWMPhaseCorrect, timerTopValue: TOP_ICR, ocrUpdateMode: OcrUpdateMode.Top, tovUpdateMode: TovUpdateMode.Bottom, flags: 0),
+		new WgmConfig (mode:TimerMode.PWMPhaseCorrect, timerTopValue: TOP_OCRA, ocrUpdateMode: OcrUpdateMode.Top, tovUpdateMode: TovUpdateMode.Bottom, flags: OC_TOGGLE),
+		new WgmConfig (mode:TimerMode.CTC, timerTopValue: TOP_ICR, ocrUpdateMode: OcrUpdateMode.Immediate, tovUpdateMode: TovUpdateMode.Max, flags: 0),
+		new WgmConfig (mode:TimerMode.Reserved, timerTopValue: 0xffff, ocrUpdateMode: OcrUpdateMode.Immediate, tovUpdateMode: TovUpdateMode.Max, flags: 0),
+		new WgmConfig (mode:TimerMode.FastPWM, timerTopValue: TOP_ICR, ocrUpdateMode: OcrUpdateMode.Bottom, tovUpdateMode: TovUpdateMode.Top, flags: OC_TOGGLE),
+		new WgmConfig (mode:TimerMode.FastPWM, timerTopValue: TOP_OCRA, ocrUpdateMode: OcrUpdateMode.Bottom, tovUpdateMode: TovUpdateMode.Top, flags: OC_TOGGLE),
 	];
 	
-	private Action? CountParameterLess;
+	private readonly Action CountParameterLess;
 	
-	private Cpu.Cpu _cpu;
-	private AvrTimerConfig _config;
+	private readonly Cpu.Cpu _cpu;
+	private readonly AvrTimerConfig _config;
 
 	private readonly int _max;
 	private int _lastCycle = 0;
@@ -193,11 +193,11 @@ public class AvrTimer
 	private ushort _nextOcrA = 0;
 	private ushort _ocrB = 0;
 	private ushort _nextOcrB = 0;
-	private bool _hasOcrC;
+	private readonly bool _hasOcrC;
 	private ushort _ocrC = 0;
 	private ushort _nextOcrC = 0;
-	private OCRUpdateMode _ocrUpdateMode = OCRUpdateMode.Immediate;
-	private TOVUpdateMode _tovUpdateMode = TOVUpdateMode.Max;
+	private OcrUpdateMode _ocrUpdateMode = OcrUpdateMode.Immediate;
+	private TovUpdateMode _tovUpdateMode = TovUpdateMode.Max;
 	private ushort _icr = 0; // Only for 16-bit timers
 	private TimerMode _timerMode;
 	private int _topValue;
@@ -217,10 +217,10 @@ public class AvrTimer
 	private byte _highByteTemp = 0;
 	
 	// Interrupts
-	private AvrInterruptConfig _ovf;
-	private AvrInterruptConfig _ocfa;
-	private AvrInterruptConfig _ocfb;
-	private AvrInterruptConfig _ocfc;
+	private readonly AvrInterruptConfig _ovf;
+	private readonly AvrInterruptConfig _ocfa;
+	private readonly AvrInterruptConfig _ocfb;
+	private readonly AvrInterruptConfig _ocfc;
 
 	public byte TCCRA {
 		get {
@@ -251,9 +251,9 @@ public class AvrTimer
 	public int TOP {
 		get {
 			switch (_topValue) {
-				case TopOCRA:
+				case TOP_OCRA:
 					return _ocrA;
-				case TopICR:
+				case TOP_ICR:
 					return _icr;
 				default:
 					return _topValue;
@@ -263,8 +263,8 @@ public class AvrTimer
 	public int OcrMask {
 		get {
 			switch (_topValue) {
-				case TopOCRA:
-				case TopICR:
+				case TOP_OCRA:
+				case TOP_ICR:
 					return 0xffff;
 				default:
 					return _topValue;
@@ -285,9 +285,7 @@ public class AvrTimer
 		_max =config.Bits == 16 ? 0xffff : 0xff;
 		_hasOcrC = config.OCRC != 0;
 
-		if (CountParameterLess == null) {
-			CountParameterLess = () => Count ();
-		}
+		CountParameterLess = () => Count ();
 		
 		_ovf = new AvrInterruptConfig (
 			address: config.OverflowInterrupt,
@@ -344,7 +342,7 @@ public class AvrTimer
 		
 		_cpu.WriteHooks[config.OCRA] = (value, _, _, _) => {
 			_nextOcrA = (ushort)((_highByteTemp << 8) | value);
-			if (_ocrUpdateMode == OCRUpdateMode.Immediate) {
+			if (_ocrUpdateMode == OcrUpdateMode.Immediate) {
 				_ocrA = _nextOcrA;
 			}
 			return false;
@@ -352,7 +350,7 @@ public class AvrTimer
 		
 		_cpu.WriteHooks[config.OCRB] = (value, _, _, _) => {
 			_nextOcrB = (ushort)((_highByteTemp << 8) | value);
-			if (_ocrUpdateMode == OCRUpdateMode.Immediate) {
+			if (_ocrUpdateMode == OcrUpdateMode.Immediate) {
 				_ocrB = _nextOcrB;
 			}
 			return false;
@@ -361,7 +359,7 @@ public class AvrTimer
 		if (_hasOcrC) {
 			_cpu.WriteHooks[config.OCRC] = (value, _, _, _) => {
 				_nextOcrC = (ushort)((_highByteTemp << 8) | value);
-				if (_ocrUpdateMode == OCRUpdateMode.Immediate) {
+				if (_ocrUpdateMode == OcrUpdateMode.Immediate) {
 					_ocrC = _nextOcrC;
 				}
 				return false;
@@ -457,7 +455,6 @@ public class AvrTimer
 	private void UpdateWgmConfig ()
 	{
 		var wgmModes = _config.Bits == 16 ? WgmModes16Bits : WgmModes8Bit;
-		var tccra = _cpu.Data[_config.TCCRA];
 		if (wgmModes.Length <= WGM) {
 			return;
 		}
@@ -474,11 +471,9 @@ public class AvrTimer
 		
 		var prevCompA = _compA;
 		_compA = (byte)((TCCRA >> 6) & 0x3);
-		if (_compA == 1 && pwmMode && (flags & OCToggle) == 0) {
+		if (_compA == 1 && pwmMode && (flags & OC_TOGGLE) == 0) {
 			_compA = 0;
 		}
-		// TODO: Check if this is correct
-		// if (!!prevCompA !== !!this.compA) {
 		if (prevCompA != _compA) {
 			UpdateCompA (_compA != 0 ? PinOverrideMode.Enable : PinOverrideMode.None);
 		}
@@ -532,7 +527,7 @@ public class AvrTimer
 						UpdateCompPin (_compB, 'B', true);
 					}
 				}
-				if (_ocrUpdateMode == OCRUpdateMode.Bottom && overflow) {
+				if (_ocrUpdateMode == OcrUpdateMode.Bottom && overflow) {
 					// OCRUpdateMode.Top only occurs in Phase Correct modes, handled by phasePwmCount()
 					_ocrA = _nextOcrA;
 					_ocrB = _nextOcrB;
@@ -541,7 +536,7 @@ public class AvrTimer
 				
 				// OCRUpdateMode.Bottom only occurs in Phase Correct modes, handled by phasePwmCount().
 				// Thus we only handle TOVUpdateMode.Top or TOVUpdateMode.Max here.
-				if (overflow && (_tovUpdateMode == TOVUpdateMode.Top || TOP == _max)) {
+				if (overflow && (_tovUpdateMode == TovUpdateMode.Top || TOP == _max)) {
 					_cpu.SetInterruptFlag (_ovf);
 				}
 			}
@@ -550,7 +545,7 @@ public class AvrTimer
 		if (_tcntUpdated) {
 			_tcnt = _tcntNext;
 			_tcntUpdated = false;
-			if (_tcnt == 0 && _ocrUpdateMode == OCRUpdateMode.Bottom || _tcnt == TOP && _ocrUpdateMode == OCRUpdateMode.Top) {
+			if (_tcnt == 0 && _ocrUpdateMode == OcrUpdateMode.Bottom || _tcnt == TOP && _ocrUpdateMode == OcrUpdateMode.Top) {
 				_ocrA = _nextOcrA;
 				_ocrB = _nextOcrB;
 				_ocrC = _nextOcrC;
@@ -593,7 +588,7 @@ public class AvrTimer
 	{
 		if (value == 0 && TOP == 0) {
 			delta = 0;
-			if (_ocrUpdateMode == OCRUpdateMode.Top) {
+			if (_ocrUpdateMode == OcrUpdateMode.Top) {
 				_ocrA = _nextOcrA;
 				_ocrB = _nextOcrB;
 				_ocrC = _nextOcrC;
@@ -605,7 +600,7 @@ public class AvrTimer
 				value++;
 				if (value == TOP && !_tcntUpdated) {
 					_countingUp = false;
-					if (_ocrUpdateMode == OCRUpdateMode.Top) {
+					if (_ocrUpdateMode == OcrUpdateMode.Top) {
 						_ocrA = _nextOcrA;
 						_ocrB = _nextOcrB;
 						_ocrC = _nextOcrC;
@@ -616,7 +611,7 @@ public class AvrTimer
 				if (value == 0 && !_tcntUpdated) {
 					_countingUp = true;
 					_cpu.SetInterruptFlag (_ovf);
-					if (_ocrUpdateMode == OCRUpdateMode.Bottom) {
+					if (_ocrUpdateMode == OcrUpdateMode.Bottom) {
 						_ocrA = _nextOcrA;
 						_ocrB = _nextOcrB;
 						_ocrC = _nextOcrC;
@@ -746,7 +741,7 @@ public class AvrTimer
 		port?.TimerOverridePin (_config.ComparatorPinC, mode);
 	}
 
-	private PinOverrideMode CompToOverride (byte comp)
+	private static PinOverrideMode CompToOverride (byte comp)
 	{
 		switch (comp) {
 			case 1:
@@ -763,9 +758,9 @@ public class AvrTimer
 
 public class AvrTimerConfig
 {
-	public byte Bits;
-	public int[]? Dividers = [];
-	
+	public byte Bits { get; set; } 
+	public int[]? Dividers { get; set; }
+
 	// Interrupt Vectors
 	public readonly byte CaptureInterrupt;
 	public readonly byte ComparatorAInterrupt;
@@ -953,12 +948,12 @@ public class AvrTimerConfig
 	}
 }
 
-public class WgmConfig (TimerMode mode, int timerTopValue, OCRUpdateMode ocrUpdateMode, TOVUpdateMode tovUpdateMode, int flags)
+public class WgmConfig (TimerMode mode, int timerTopValue, OcrUpdateMode ocrUpdateMode, TovUpdateMode tovUpdateMode, int flags)
 {
 	public readonly TimerMode Mode = mode;
 	public readonly int TimerTopValue = timerTopValue;
-	public readonly OCRUpdateMode OCRUpdateMode = ocrUpdateMode;
-	public readonly TOVUpdateMode TOVUpdateMode = tovUpdateMode;
+	public readonly OcrUpdateMode OCRUpdateMode = ocrUpdateMode;
+	public readonly TovUpdateMode TOVUpdateMode = tovUpdateMode;
 	public readonly int Flags = flags;
 }
 
@@ -978,13 +973,13 @@ public enum TimerMode
 	Reserved,
 }
 
-public enum TOVUpdateMode {
+public enum TovUpdateMode {
 	Max,
 	Top,
 	Bottom,
 }
 
-public enum OCRUpdateMode {
+public enum OcrUpdateMode {
 	Immediate,
 	Top,
 	Bottom,

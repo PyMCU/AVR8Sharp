@@ -19,7 +19,7 @@ public class AvrSpi
 	
 	const byte BitsPerByte = 8;
 	
-	public static AvrSpiConfig SpiConfig = new AvrSpiConfig {
+	public static readonly AvrSpiConfig SpiConfig = new AvrSpiConfig {
 		SpiInterrupt = 0x22,
 		
 		SPCR = 0x4c,
@@ -27,16 +27,16 @@ public class AvrSpi
 		SPDR = 0x4e
 	};
 	
-	Cpu.Cpu _cpu;
-	AvrSpiConfig _config;
-	uint _freqHz;
+	readonly Cpu.Cpu _cpu;
+	readonly AvrSpiConfig _config;
+	readonly uint _freqHz;
 	
 	bool _transmissionActive = false;
 	
-	AvrInterruptConfig _spi;
-	
-	public Func<byte, int> OnTransfer = _ => 0;
-	public Action<byte> OnByte;
+	readonly AvrInterruptConfig _spi;
+
+	public Func<byte, int> OnTransfer { get; set; }
+	public Action<byte> OnByte { get; set; }
 	public bool IsMaster {
 		get {
 			return (_cpu.Data[_config.SPCR] & SPCR_MSTR) != 0;
@@ -67,7 +67,7 @@ public class AvrSpi
 				case 0b11:
 					return baseDivider * 32;
 				default:
-					throw new Exception ("Invalid divider value!");
+					return 0;
 			}
 		}
 	}
@@ -97,9 +97,11 @@ public class AvrSpi
 		);
 		
 		OnByte = value => {
-			var valueIn = OnTransfer(value);
+			var valueIn = OnTransfer?.Invoke(value) ?? 0;
 			_cpu.AddClockEvent (() => CompleteTransfer (valueIn), TransferCycles);
 		};
+		
+		OnTransfer = _ => 0;
 		
 		_cpu.WriteHooks[_config.SPDR] = (value,_ ,_ ,_ ) => {
 			if ((_cpu.Data[_config.SPCR] & SPCR_SPE) == 0) {
@@ -144,11 +146,11 @@ public class AvrSpi
 
 public class AvrSpiConfig
 {
-	public byte SpiInterrupt;
+	public byte SpiInterrupt { get; set; }
 	
-	public byte SPCR;
-	public byte SPSR;
-	public byte SPDR;
+	public byte SPCR { get; set; }
+	public byte SPSR { get; set; }
+	public byte SPDR { get; set; }
 }
 
 public enum SpiDataOrder

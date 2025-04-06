@@ -16,13 +16,13 @@ public class Cpu
 	readonly byte[] _data;
 	readonly AvrInterruptConfig?[] _pendingInterrupts = new AvrInterruptConfig?[MaxInterrupts];
 	AvrClockEventEntry? _nextClockEvent = null;
-	Stack<AvrClockEventEntry?> _clockEventPool = [];
+	readonly Stack<AvrClockEventEntry?> _clockEventPool = [];
 	short _nextInterrupt = -1;
 	short _maxInterrupt = 0;
     #endregion
 
 	#region Public Properties
-	public Action OnWatchdogReset = () => { };
+	public Action OnWatchdogReset { get; set; } = () => { };
 	public byte[] Data { get => _data; }
 	public DataView DataView { get; }
 	public ushort[] ProgramMemory { get; }
@@ -90,7 +90,6 @@ public class Cpu
 	public void Reset ()
 	{
 		// Reset the CPU
-		// this.SP = this.Data.Count - 1;
 		SP = (ushort)(_data.Length - 1);
 		PC = 0;
 		for (var i = 0; i < _pendingInterrupts.Length; i++) {
@@ -139,10 +138,8 @@ public class Cpu
 	
 	public void WriteData (ushort address, byte value, byte mask = 0xff)
 	{
-		if (WriteHooks.TryGetValue (address, out var hook) && hook != null) {
-			if (hook(value, Data[address], address, mask)) {
-				return;
-			}
+		if (WriteHooks.TryGetValue (address, out var hook) && hook != null && hook(value, Data[address], address, mask)) {
+			return;
 		} 
 		Data[address] = value;
 	}
@@ -304,9 +301,9 @@ public class AvrInterruptConfig (byte address, ushort enableRegister, int enable
 
 public class AvrClockEventEntry
 {
-	public int Cycles;
-	public Action Callback = () => { };
-	public AvrClockEventEntry? Next;
+	public int Cycles { get; set; }
+	public Action Callback { get; set; } = () => { };
+	public AvrClockEventEntry? Next { get; set; }
 	
 	public AvrClockEventEntry Clone ()
 	{

@@ -3,7 +3,7 @@ namespace AVR8Sharp.Peripherals;
 
 public class AvrIoPort
 {
-	public static AvrExternalInterrupt INT0 = new AvrExternalInterrupt (
+	public static readonly AvrExternalInterrupt INT0 = new AvrExternalInterrupt (
 		eicr: 0x69,
 		eimsk: 0x3d,
 		eifr: 0x3c,
@@ -12,7 +12,7 @@ public class AvrIoPort
 		interrupt: 2
 	);
 	
-	public static AvrExternalInterrupt INT1 = new AvrExternalInterrupt (
+	public static readonly AvrExternalInterrupt INT1 = new AvrExternalInterrupt (
 		eicr: 0x69,
 		eimsk: 0x3d,
 		eifr: 0x3c,
@@ -21,7 +21,7 @@ public class AvrIoPort
 		interrupt: 4
 	);
 	
-	public static AvrPinChangeInterrupt PCINT0 = new AvrPinChangeInterrupt (
+	public static readonly AvrPinChangeInterrupt PCINT0 = new AvrPinChangeInterrupt (
 		pcie: 0,
 		pcicr: 0x68,
 		pcifr: 0x3b,
@@ -31,7 +31,7 @@ public class AvrIoPort
 		offset: 0
 	);
 
-	public static AvrPinChangeInterrupt PCINT1 = new AvrPinChangeInterrupt (
+	public static readonly AvrPinChangeInterrupt PCINT1 = new AvrPinChangeInterrupt (
 		pcie:1,
 		pcicr:0x68,
 		pcifr:0x3b,
@@ -41,7 +41,7 @@ public class AvrIoPort
 		offset:0
 	);
 	
-	public static AvrPinChangeInterrupt PCINT2 = new AvrPinChangeInterrupt (
+	public static readonly AvrPinChangeInterrupt PCINT2 = new AvrPinChangeInterrupt (
 		pcie: 2,
 		pcicr: 0x68,
 		pcifr: 0x3b,
@@ -51,14 +51,14 @@ public class AvrIoPort
 		offset: 0
 	);
 	
-	public static AvrPortConfig PortAConfig = new AvrPortConfig (
+	public static readonly AvrPortConfig PortAConfig = new AvrPortConfig (
 		pin: 0x20,
 		ddr: 0x21,
 		port: 0x22,
 		externalInterrupts: []
 	);
 	
-	public static AvrPortConfig PortBConfig = new AvrPortConfig (
+	public static readonly AvrPortConfig PortBConfig = new AvrPortConfig (
 		pin: 0x23,
 		ddr: 0x24,
 		port: 0x25,
@@ -68,7 +68,7 @@ public class AvrIoPort
 		externalInterrupts: []
 	);
 	
-	public static AvrPortConfig PortCConfig = new AvrPortConfig (
+	public static readonly AvrPortConfig PortCConfig = new AvrPortConfig (
 		pin: 0x26,
 		ddr: 0x27,
 		port: 0x28,
@@ -78,7 +78,7 @@ public class AvrIoPort
 		externalInterrupts: []
 	);
 	
-	public static AvrPortConfig PortDConfig = new AvrPortConfig (
+	public static readonly AvrPortConfig PortDConfig = new AvrPortConfig (
 		pin: 0x29,
 		ddr: 0x2a,
 		port: 0x2b,
@@ -88,49 +88,49 @@ public class AvrIoPort
 		externalInterrupts: [null, null, INT0, INT1, ]
 	);
 
-	public static AvrPortConfig PortEConfig = new AvrPortConfig (
+	public static readonly AvrPortConfig PortEConfig = new AvrPortConfig (
 		pin: 0x2c,
 		ddr: 0x2d,
 		port: 0x2e,
 		externalInterrupts: []
 	);
 	
-	public static AvrPortConfig PortFConfig = new AvrPortConfig (
+	public static readonly AvrPortConfig PortFConfig = new AvrPortConfig (
 		pin: 0x2f,
 		ddr: 0x30,
 		port: 0x31,
 		externalInterrupts: []
 	);
 	
-	public static AvrPortConfig PortGConfig = new AvrPortConfig (
+	public static readonly AvrPortConfig PortGConfig = new AvrPortConfig (
 		pin: 0x32,
 		ddr: 0x33,
 		port: 0x34,
 		externalInterrupts: []
 	);
 	
-	public static AvrPortConfig PortHConfig = new AvrPortConfig (
+	public static readonly AvrPortConfig PortHConfig = new AvrPortConfig (
 		pin: 0x100,
 		ddr: 0x101,
 		port: 0x102,
 		externalInterrupts: []
 	);
 	
-	public static AvrPortConfig PortJConfig = new AvrPortConfig (
+	public static readonly AvrPortConfig PortJConfig = new AvrPortConfig (
 		pin: 0x103,
 		ddr: 0x104,
 		port: 0x105,
 		externalInterrupts: []
 	);
 	
-	public static AvrPortConfig PortKConfig = new AvrPortConfig (
+	public static readonly AvrPortConfig PortKConfig = new AvrPortConfig (
 		pin: 0x106,
 		ddr: 0x107,
 		port: 0x108,
 		externalInterrupts: []
 	);
 	
-	public static AvrPortConfig PortLConfig = new AvrPortConfig (
+	public static readonly AvrPortConfig PortLConfig = new AvrPortConfig (
 		pin: 0x109,
 		ddr: 0x10a,
 		port: 0x10b,
@@ -148,17 +148,9 @@ public class AvrIoPort
 	private byte _lastValue = 0;
 	private byte _lastDdr = 0;
 	private byte _lastPin = 0;
-	private byte _openCollector = 0;
-	
-	public byte OpenCollector {
-		get {
-			return _openCollector;
-		}
-		set {
-			_openCollector = value;
-		}
-	}
-	
+
+	public byte OpenCollector { get; set; } = 0;
+
 	public Dictionary<int, Action<bool>?> ExternalClockListeners { get; set; } = [];
 	
 	public Action<byte, PinOverrideMode> TimerOverridePin { get; set; }
@@ -214,16 +206,7 @@ public class AvrIoPort
 				return null;
 			}).ToList ();
 			
-			var eicr = new HashSet<byte> (portConfig.ExternalInterrupts.Select (item => item?.EICR ?? 0));
-			foreach (var eicrx in eicr) {
-				AttachInterruptHook (eicrx);
-			}
-		
-			var eimsk = portConfig.ExternalInterrupts.FirstOrDefault (item => item != null && item.EIMSK != 0)?.EIMSK ?? 0;
-			AttachInterruptHook (eimsk, "mask");
-		
-			var eifr = portConfig.ExternalInterrupts.FirstOrDefault (item => item != null && item.EIFR != 0)?.EIFR ?? 0;
-			AttachInterruptHook (eifr, "flag");
+			AssignExternalInterrupts (portConfig.ExternalInterrupts);
 		}
 		
 		_pcint = portConfig.PinChange != null ? new AvrInterruptConfig (
@@ -236,59 +219,88 @@ public class AvrIoPort
 		
 		if (portConfig.PinChange != null) {
 			var pcifr = portConfig.PinChange.PCIFR;
-			_cpu.WriteHooks[pcifr] = (value, _, _, _) => {
-				foreach (var gpio in _cpu.GpioPorts) {
-					var pcint = gpio._pcint;
-					if (pcint != null) {
-						_cpu.ClearInterruptByFlag (pcint, value);
-					}
-				}
-				return true;
-			};
+			_cpu.WriteHooks[pcifr] = DelegateWritePcifr;
 			
 			var pcmsk = portConfig.PinChange.PCMSK;
-			_cpu.WriteHooks[pcmsk] = (value, _, _, _) => {
-				_cpu.Data[pcmsk] = value;
-				foreach (var gpio in _cpu.GpioPorts) {
-					var pcint = gpio._pcint;
-					if (pcint != null) {
-						_cpu.UpdateInterruptEnable (pcint, value);
-					}
-				}
-				return true;
-			};
+			_cpu.WriteHooks[pcmsk] = DelegateWritePcmsk;
 		}
 		
 		// Move here to be able to test the TimerOverridePin
-		TimerOverridePin = (byte pin, PinOverrideMode mode) =>
-		{
-			var bitMask = 1 << pin;
-			if (mode == PinOverrideMode.None) {
-				_overrideMask |= (byte)bitMask;
-				_overrideValue &= (byte)~bitMask;
-			} else {
-				_overrideMask &= (byte)~bitMask;
-				switch (mode) {
-					case PinOverrideMode.Enable:
-						_overrideValue &= (byte)~bitMask;
-						_overrideValue |= (byte)(_cpu.Data[_portConfig.PORT] & bitMask);
-						break;
-					case PinOverrideMode.Set:
-						_overrideValue |= (byte)bitMask;
-						break;
-					case PinOverrideMode.Clear:
-						_overrideValue &= (byte)~bitMask;
-						break;
-					case PinOverrideMode.Toggle:
-						_overrideValue ^= (byte)bitMask;
-						break;
-				}
-			}
+		TimerOverridePin = DelegateTimerOverridePin;
+	}
+
+	private void AssignExternalInterrupts (AvrExternalInterrupt?[] externalInts)
+	{
+		var eicr = new HashSet<byte> (externalInts.Select (item => item?.EICR ?? 0));
+		foreach (var eicrx in eicr) {
+			if (eicrx != 0)
+				AttachInterruptHook (eicrx);
+		}
 		
-			var ddrMask = _cpu.Data[_portConfig.DDR];
-			WriteGpio (_cpu.Data[_portConfig.PORT], ddrMask);
-			UpdatePinRegister (ddrMask);
-		};
+		var eimsk = externalInts.FirstOrDefault (item => item != null && item.EIMSK != 0)?.EIMSK ?? 0;
+		if (eimsk != 0) {
+			AttachInterruptHook (eimsk, "mask");
+		}
+		
+		var eifr = externalInts.FirstOrDefault (item => item != null && item.EIFR != 0)?.EIFR ?? 0;
+		if (eifr != 0) {
+			AttachInterruptHook (eifr, "flag");
+		}
+	}
+	
+	private bool DelegateWritePcifr (byte value, byte oldValue, ushort v1, byte v2)
+	{
+		if (_portConfig.PinChange == null) 
+			return false;
+		foreach (var pcint in _cpu.GpioPorts.Select (gpio => gpio._pcint)) {
+			if (pcint != null) {
+				_cpu.ClearInterruptByFlag (pcint, value);
+			}
+		}
+		return true;
+	}
+
+	private bool DelegateWritePcmsk (byte value, byte oldValue, ushort v1, byte v2)
+	{
+		if (_portConfig.PinChange == null) 
+			return false;
+		_cpu.Data[_portConfig.PinChange.PCMSK] = value;
+		foreach (var pcint in _cpu.GpioPorts.Select (gpio => gpio._pcint)) {
+			if (pcint != null) {
+				_cpu.UpdateInterruptEnable (pcint, value);
+			}
+		}
+		return true;
+	}
+	
+	private void DelegateTimerOverridePin (byte pin, PinOverrideMode mode)
+	{
+		var bitMask = 1 << pin;
+		if (mode == PinOverrideMode.None) {
+			_overrideMask |= (byte)bitMask;
+			_overrideValue &= (byte)~bitMask;
+		} else {
+			_overrideMask &= (byte)~bitMask;
+			switch (mode) {
+				case PinOverrideMode.Enable:
+					_overrideValue &= (byte)~bitMask;
+					_overrideValue |= (byte)(_cpu.Data[_portConfig.PORT] & bitMask);
+					break;
+				case PinOverrideMode.Set:
+					_overrideValue |= (byte)bitMask;
+					break;
+				case PinOverrideMode.Clear:
+					_overrideValue &= (byte)~bitMask;
+					break;
+				case PinOverrideMode.Toggle:
+					_overrideValue ^= (byte)bitMask;
+					break;
+			}
+		}
+		
+		var ddrMask = _cpu.Data[_portConfig.DDR];
+		WriteGpio (_cpu.Data[_portConfig.PORT], ddrMask);
+		UpdatePinRegister (ddrMask);
 	}
 	
 	public void AddListener (Action<byte, byte> listener)
@@ -314,7 +326,7 @@ public class AvrIoPort
 		var port = _cpu.Data[_portConfig.PORT];
 		var bitMask = (byte)(1 << index);
 		var openState = (port & bitMask) != 0 ? PinState.InputPullup : PinState.Input;
-		var highValue = (_openCollector & bitMask) != 0 ? openState : PinState.High;
+		var highValue = (OpenCollector & bitMask) != 0 ? openState : PinState.High;
 		if ((ddr & bitMask) != 0) {
 			return (_lastValue & bitMask) != 0 ? highValue : PinState.Low;
 		}
@@ -355,25 +367,21 @@ public class AvrIoPort
 
 	private void ToggleInterrupt (byte index, bool risingEdge)
 	{
-		if (_portConfig.ExternalInterrupts == null)
-			return;
-		var externalInterrupts = _portConfig.ExternalInterrupts;
-		var externalConfig = externalInterrupts.Length == 0 || externalInterrupts.Length - 1 < index ? null : _portConfig.ExternalInterrupts[index];
-		var external = _externalInts.Count == 0 || _externalInts.Count - 1 < index ? null : _externalInts[index];
+		var external = GetExternalInterruptConfig (index);
+		var externalConfig = GetExternalInterrupt (index);
+		
 		if (external != null && externalConfig != null) {
-			var eimsk = externalConfig.EIMSK;
+			var eimsk = externalConfig!.EIMSK;
 			var eicr = externalConfig.EICR;
 			var iscOffset = externalConfig.IscOffset;
 			if ((_cpu.Data[eimsk] & (1 << externalConfig.Index)) != 0) {
 				var configuration = (InterruptMode)((_cpu.Data[eicr] >> iscOffset) & 0x3);
 				var generateInterrupt = false;
 				var shouldBeConstant = false;
-				// external.Constant = false;
 				switch (configuration) {
 					case InterruptMode.LowLevel:
 						generateInterrupt = !risingEdge;
-						shouldBeConstant = true;
-						// external.Constant = true;
+						shouldBeConstant = !external!.Constant;
 						break;
 					case InterruptMode.Change:
 						generateInterrupt = true;
@@ -385,19 +393,24 @@ public class AvrIoPort
 						generateInterrupt = risingEdge;
 						break;
 				}
-				if (shouldBeConstant && !external.Constant) {
+				if (shouldBeConstant) {
 					// The AvrInterruptConfig is immutable, so we need to create a new one
-					external = external.MakeConstant ();
+					external = external!.MakeConstant ();
 					_externalInts[index] = external;
 				}
 				if (generateInterrupt) {
-					_cpu.SetInterruptFlag (external);
-				} else if (external.Constant) {
+					_cpu.SetInterruptFlag (external!);
+				} else if (external!.Constant) {
 					_cpu.ClearInterrupt (external, true);
 				}
 			}
 		}
 		
+		TogglePinChangeInterrupt (index);
+	}
+	
+	private void TogglePinChangeInterrupt (byte index)
+	{
 		if (_pcint != null && _portConfig.PinChange != null && (_portConfig.PinChange.Mask & (1 << index)) != 0) {
 			var pcmsk = _portConfig.PinChange.PCMSK;
 			if ((_cpu.Data[pcmsk] & (1 << (index + _portConfig.PinChange.Offset))) != 0) {
@@ -405,20 +418,36 @@ public class AvrIoPort
 			}
 		}
 	}
+
+	private AvrExternalInterrupt? GetExternalInterrupt (byte index)
+	{
+		if (_portConfig.ExternalInterrupts == null) {
+			return null;
+		}
+		return _portConfig.ExternalInterrupts.Length == 0 || _portConfig.ExternalInterrupts.Length - 1 < index ? null : _portConfig.ExternalInterrupts[index];
+	}
+	
+	private AvrInterruptConfig? GetExternalInterruptConfig (byte index)
+	{
+		return _externalInts.Count == 0 || _externalInts.Count - 1 < index ? null : _externalInts[index];
+	}
 	
 	private void AttachInterruptHook (byte register, string registerType = "other")
 	{
-		if (register == 0) return;
+		var isFlag = registerType == "flag";
+		var isMask = registerType == "mask";
 		_cpu.WriteHooks[register] = (value, _, _, _) => {
-			if (registerType != "flag") {
+			if (!isFlag) {
 				_cpu.Data[register] = value;
 			}
 			foreach (var gpio in _cpu.GpioPorts) {
-				foreach (var external in gpio._externalInts) {
-					if (external != null && registerType == "mask") {
+				foreach (var external in gpio._externalInts.Where (interrupt => interrupt != null)) {
+					var shouldClear = !external!.Constant;
+					shouldClear &= isFlag;
+					if (isMask) {
 						_cpu.UpdateInterruptEnable (external, value);
 					}
-					if (external != null && !external.Constant && registerType == "flag") {
+					if (shouldClear) {
 						_cpu.ClearInterruptByFlag (external, value);
 					}
 				}
