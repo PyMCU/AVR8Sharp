@@ -8,9 +8,9 @@ on:
 
 jobs:
   build:
-
-    runs-on: macos-latest
-
+    # set the working directory to the src folder
+    working-directory: ./src
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - name: Setup .NET Core
