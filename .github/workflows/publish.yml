@@ -1,0 +1,130 @@
+name: Publish NuGet
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Publishes NuGet packages for AVR8Sharp.Core and Avr8Sharp.TestKit.
+#
+# Triggers
+# ────────
+#   • Push a version tag  (e.g. v1.2.3  → stable)
+#   • Push to main        → preview build (suffix: -preview.<run_number>)
+#   • Manual dispatch     → choose target and optional version suffix
+#
+# Required secrets (set in repo Settings → Secrets)
+#   NUGET_PRIVATE_SOURCE_URL  – NuGet v3 feed URL (required to push)
+#   NUGET_PRIVATE_API_KEY     – API key / PAT for the private feed
+#
+# Optional secrets
+#   NUGET_PUBLIC_API_KEY      – nuget.org API key; push skipped when absent
+# ─────────────────────────────────────────────────────────────────────────────
+on:
+  push:
+    tags:
+      - "v*"
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      version_suffix:
+        description: "Version suffix (e.g. beta.1). Leave blank for a stable build."
+        required: false
+        default: ""
+      push_public:
+        description: "Push to nuget.org as well?"
+        required: false
+        default: "false"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── Checkout ────────────────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── .NET setup ──────────────────────────────────────────────────────────
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      # ── Private NuGet source ────────────────────────────────────────────────
+      - name: Add private NuGet source
+        if: ${{ secrets.NUGET_PRIVATE_SOURCE_URL != '' }}
+        run: |
+          dotnet nuget add source "${{ secrets.NUGET_PRIVATE_SOURCE_URL }}" \
+            --name private \
+            --username ci \
+            --password "${{ secrets.NUGET_PRIVATE_API_KEY }}" \
+            --store-password-in-clear-text
+
+      # ── Resolve version suffix ───────────────────────────────────────────────
+      # Priority: tag > workflow_dispatch input > auto preview suffix
+      - name: Resolve version suffix
+        id: versioning
+        run: |
+          TAG="${{ github.ref }}"
+          if [[ "$TAG" == refs/tags/v* ]]; then
+            # Tag push — stable release, no suffix
+            echo "suffix=" >> "$GITHUB_OUTPUT"
+          elif [[ -n "${{ github.event.inputs.version_suffix }}" ]]; then
+            # Manual dispatch with explicit suffix
+            echo "suffix=${{ github.event.inputs.version_suffix }}" >> "$GITHUB_OUTPUT"
+          else
+            # Automatic preview build from main
+            echo "suffix=preview.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── Restore ─────────────────────────────────────────────────────────────
+      - name: Restore
+        run: dotnet restore AVR8Sharp.sln
+
+      # ── Build ────────────────────────────────────────────────────────────────
+      - name: Build
+        run: dotnet build AVR8Sharp.sln -c Release --no-restore
+
+      # ── Test ─────────────────────────────────────────────────────────────────
+      - name: Test
+        run: >
+          dotnet test tests/Avr8Sharp.Tests/Avr8Sharp.Tests.csproj
+          -c Release
+          --no-build
+          --logger "console;verbosity=normal"
+
+      # ── Pack ─────────────────────────────────────────────────────────────────
+      - name: Pack AVR8Sharp.Core
+        run: >
+          dotnet pack src/AVR8Sharp.Core/AVR8Sharp.Core.csproj
+          -c Release
+          --no-build
+          --output ./nupkgs
+          ${{ steps.versioning.outputs.suffix != '' && format('--version-suffix {0}', steps.versioning.outputs.suffix) || '' }}
+
+      - name: Pack Avr8Sharp.TestKit
+        run: >
+          dotnet pack src/Avr8Sharp.TestKit/Avr8Sharp.TestKit.csproj
+          -c Release
+          --no-build
+          --output ./nupkgs
+          ${{ steps.versioning.outputs.suffix != '' && format('--version-suffix {0}', steps.versioning.outputs.suffix) || '' }}
+
+      # ── Push to private feed ─────────────────────────────────────────────────
+      - name: Push to private NuGet
+        if: ${{ secrets.NUGET_PRIVATE_SOURCE_URL != '' }}
+        run: >
+          dotnet nuget push "./nupkgs/*.nupkg"
+          --source private
+          --api-key "${{ secrets.NUGET_PRIVATE_API_KEY }}"
+          --skip-duplicate
+
+      # ── Push to nuget.org (optional) ─────────────────────────────────────────
+      - name: Push to nuget.org
+        if: >
+          ${{ secrets.NUGET_PUBLIC_API_KEY != '' &&
+              (startsWith(github.ref, 'refs/tags/v') ||
+               github.event.inputs.push_public == 'true') }}
+        run: >
+          dotnet nuget push "./nupkgs/*.nupkg"
+          --source https://api.nuget.org/v3/index.json
+          --api-key "${{ secrets.NUGET_PUBLIC_API_KEY }}"
+          --skip-duplicate

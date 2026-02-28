@@ -6,7 +6,7 @@
         <Nullable>enable</Nullable>
         <PackageId>Avr8Sharp</PackageId>
         <Title>AVR-8 Simulator</Title>
-        <Authors>Iván Montie</Authors>
+        <Authors>Iván Montiel</Authors>
         <Description>An AVR-8 simulator implemented in C#, ported from the avr8js library.</Description>
         <Copyright>Copyright (c)  Iván Montiel</Copyright>
         <RepositoryUrl>https://github.com/begeistert/avr8sharp</RepositoryUrl>

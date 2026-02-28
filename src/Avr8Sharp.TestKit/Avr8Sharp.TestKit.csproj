@@ -1,9 +1,30 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+
+        <!-- NuGet package metadata -->
+        <PackageId>Avr8Sharp.TestKit</PackageId>
+        <Title>AVR-8 Simulator Test Kit</Title>
+        <Authors>Iván Montiel</Authors>
+        <Description>FluentAssertions-based test kit for integration-testing compiled AVR programs with the AVR-8 Simulator.</Description>
+        <Copyright>Copyright (c) Iván Montiel</Copyright>
+        <RepositoryUrl>https://github.com/begeistert/avr8sharp</RepositoryUrl>
+        <PackageTags>Arduino;AVR;Simulator;Testing;FluentAssertions</PackageTags>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <Version>1.0.0</Version>
+        <PackageProjectUrl>https://github.com/begeistert/avr8sharp</PackageProjectUrl>
+        <Company>Iván Montiel</Company>
     </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="FluentAssertions" Version="6.12.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\AVR8Sharp.Core\AVR8Sharp.Core.csproj" />
+    </ItemGroup>
 
 </Project>
