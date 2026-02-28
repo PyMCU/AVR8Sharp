@@ -12,12 +12,10 @@
         <RepositoryUrl>https://github.com/begeistert/avr8sharp</RepositoryUrl>
         <PackageTags>Arduino;AVR;Simulator</PackageTags>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
-        <Version>1.0.2</Version>
-        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <Version>1.0.0-alpha2</Version>
         <LangVersion>default</LangVersion>
         <Company>Iván Montiel</Company>
         <PackageProjectUrl>https://github.com/begeistert/avr8sharp</PackageProjectUrl>
-        <PackageLicenseUrl></PackageLicenseUrl>
     </PropertyGroup>
     
     <ItemGroup>
