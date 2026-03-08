@@ -334,7 +334,7 @@ public class AvrTimer
 			_tcntNext = (ushort)((_highByteTemp << 8) | value);
 			_countingUp = true;
 			_tcntUpdated = true;
-			_cpu.UpdateClockEvent (() => Count (), 0);
+			_cpu.UpdateClockEvent (CountParameterLess, 0);
 			if (_divider != 0) {
 				TimerUpdated (_tcntNext, _tcntNext);
 			}
@@ -420,13 +420,12 @@ public class AvrTimer
 		
 		_cpu.WriteHooks[config.TIFR] = (value, _, _, _) => {
 			_cpu.Data[config.TIFR] = value;
-			var boolValue = value != 0;
-			_cpu.ClearInterrupt (_ovf, boolValue);
-			_cpu.ClearInterrupt (_ocfa, boolValue);
-			_cpu.ClearInterrupt (_ocfb, boolValue);
+			_cpu.ClearInterruptByFlag (_ovf, value);
+			_cpu.ClearInterruptByFlag (_ocfa, value);
+			_cpu.ClearInterruptByFlag (_ocfb, value);
 			return true;
 		};
-		
+
 		_cpu.WriteHooks[config.TIMSK] = (value, _, _, _) => {
 			_cpu.UpdateInterruptEnable (_ovf, value);
 			_cpu.UpdateInterruptEnable (_ocfa, value);

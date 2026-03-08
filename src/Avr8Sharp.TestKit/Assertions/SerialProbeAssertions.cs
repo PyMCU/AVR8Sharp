@@ -134,4 +134,63 @@ public class SerialProbeAssertions : ReferenceTypeAssertions<SerialProbe, Serial
 
         return new AndConstraint<SerialProbeAssertions>(this);
     }
+
+    // ── Binary / byte-level assertions ───────────────────────────────────────
+
+    /// <summary>
+    /// Asserts that the raw byte stream contains <paramref name="value"/> at least once.
+    /// </summary>
+    public AndConstraint<SerialProbeAssertions> ContainByte(
+        byte value, string because = "", params object[] becauseArgs)
+    {
+        var bytes = Subject.Bytes;
+        Execute.Assertion
+            .BecauseOf(because, becauseArgs)
+            .ForCondition(bytes.Contains(value))
+            .FailWith(
+                "Expected serial output to contain byte 0x{0:X2}{reason}, but it did not. Bytes: [{1}]",
+                value, string.Join(", ", bytes.Select(b => $"0x{b:X2}")));
+
+        return new AndConstraint<SerialProbeAssertions>(this);
+    }
+
+    /// <summary>
+    /// Asserts that the raw byte stream is exactly equal to <paramref name="expected"/>.
+    /// </summary>
+    public AndConstraint<SerialProbeAssertions> HaveBytes(
+        IEnumerable<byte> expected, string because = "", params object[] becauseArgs)
+    {
+        var actual = Subject.Bytes;
+        var exp = expected.ToArray();
+        Execute.Assertion
+            .BecauseOf(because, becauseArgs)
+            .ForCondition(actual.SequenceEqual(exp))
+            .FailWith(
+                "Expected serial bytes to be [{0}]{reason}, but found [{1}].",
+                string.Join(", ", exp.Select(b => $"0x{b:X2}")),
+                string.Join(", ", actual.Select(b => $"0x{b:X2}")));
+
+        return new AndConstraint<SerialProbeAssertions>(this);
+    }
+
+    /// <summary>
+    /// Asserts that bytes starting at <paramref name="index"/> match <paramref name="expected"/>.
+    /// </summary>
+    public AndConstraint<SerialProbeAssertions> HaveBytesAt(
+        int index, IEnumerable<byte> expected, string because = "", params object[] becauseArgs)
+    {
+        var actual = Subject.Bytes;
+        var exp = expected.ToArray();
+        var slice = actual.Skip(index).Take(exp.Length).ToArray();
+        Execute.Assertion
+            .BecauseOf(because, becauseArgs)
+            .ForCondition(slice.SequenceEqual(exp))
+            .FailWith(
+                "Expected serial bytes at index {0} to be [{1}]{reason}, but found [{2}].",
+                index,
+                string.Join(", ", exp.Select(b => $"0x{b:X2}")),
+                string.Join(", ", slice.Select(b => $"0x{b:X2}")));
+
+        return new AndConstraint<SerialProbeAssertions>(this);
+    }
 }

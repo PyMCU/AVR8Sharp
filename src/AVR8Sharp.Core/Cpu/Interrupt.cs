@@ -2,8 +2,11 @@ namespace AVR8Sharp.Core.Cpu;
 
 public static class AvrInterrupt
 {
+	public static Action<int, uint>? OnInterruptDispatch { get; set; }
+
 	public static void DoAvrInterrupt (Cpu cpu, int address)
 	{
+		OnInterruptDispatch?.Invoke(address, cpu.PC);
 		var sp = cpu.DataView.GetUint16(93, true);
 		cpu.Data[sp] = (byte)(cpu.PC & 0xff);
 		cpu.Data[sp - 1] = (byte)(cpu.PC >> 8 & 0xff);

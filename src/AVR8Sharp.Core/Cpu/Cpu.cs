@@ -131,7 +131,7 @@ public class Cpu
 	
 	public byte ReadData (ushort address)
 	{
-		if (address > 32 && ReadHooks.TryGetValue (address, out var hook) && hook != null) {
+		if (address >= 32 && ReadHooks.TryGetValue (address, out var hook) && hook != null) {
 			return hook.Invoke(address);
 		}
 		return Data[address];

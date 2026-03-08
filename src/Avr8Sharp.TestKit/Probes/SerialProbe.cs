@@ -9,17 +9,23 @@ namespace Avr8Sharp.TestKit.Probes;
 /// </summary>
 public class SerialProbe
 {
-    private readonly StringBuilder _buffer = new();
+    private readonly List<byte> _rawBytes = new();
     private readonly AvrUsart _usart;
 
     internal SerialProbe(AvrUsart usart)
     {
         _usart = usart;
-        usart.OnByteTransmit = b => _buffer.Append((char)b);
+        usart.OnByteTransmit = b => _rawBytes.Add(b);
     }
 
-    /// <summary>All characters received so far as a single string.</summary>
-    public string Text => _buffer.ToString();
+    /// <summary>All characters received so far as a single string (Latin-1 encoded).</summary>
+    public string Text => Encoding.Latin1.GetString(_rawBytes.ToArray());
+
+    /// <summary>All received bytes as a raw byte array (useful for binary-protocol tests).</summary>
+    public byte[] Bytes => _rawBytes.ToArray();
+
+    /// <summary>Number of bytes received so far.</summary>
+    public int ByteCount => _rawBytes.Count;
 
     /// <summary>
     /// The received text split on <c>'\n'</c>, with trailing <c>'\r'</c> stripped from each line.
@@ -28,7 +34,7 @@ public class SerialProbe
         => Text.Split('\n').Select(l => l.TrimEnd('\r')).ToList();
 
     /// <summary>Clears the captured output buffer.</summary>
-    public void Clear() => _buffer.Clear();
+    public void Clear() => _rawBytes.Clear();
 
     /// <summary>
     /// Injects a byte into the USART receiver, simulating an incoming character

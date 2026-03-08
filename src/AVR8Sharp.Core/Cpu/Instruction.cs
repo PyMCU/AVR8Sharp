@@ -600,7 +600,7 @@ public static class Instruction
 		sreg |= ((R ^ r) & (R ^ d) & 128) != 0 ? 8 : 0;
 		sreg |= (sreg >> 2 & 1 ^ sreg >> 3 & 1) != 0 ? 0x10 : 0;
 		sreg |= (d + r & 256) != 0 ? 1 : 0;
-		sreg |= (1 & (d & r | r & ~R | ~R & d)) != 0 ? 0x20 : 0;
+		sreg |= (8 & (d & r | r & ~R | ~R & d)) != 0 ? 0x20 : 0;
 		cpu.Data[95] = (byte)sreg;
 	}
 	
@@ -671,15 +671,15 @@ public static class Instruction
 	private static void BRBC (ref Cpu cpu, ref ushort opcode)
 	{
 		if ((cpu.Data[95] & (1 << (opcode & 7))) == 0) {
-			cpu.PC = (ushort)(cpu.PC + (((opcode & 0x1f8) >> 3) - ((opcode & 0x200) != 0 ? 0x40 : 0)));
+			cpu.PC = (uint)(cpu.PC + (((opcode & 0x1f8) >> 3) - ((opcode & 0x200) != 0 ? 0x40 : 0)));
 			cpu.Cycles++;
 		}
 	}
-	
+
 	private static void BRBS (ref Cpu cpu, ref ushort opcode)
 	{
 		if ((cpu.Data[95] & (1 << (opcode & 7))) != 0) {
-			cpu.PC = (ushort)(cpu.PC + (((opcode & 0x1f8) >> 3) - ((opcode & 0x200) != 0 ? 0x40 : 0)));
+			cpu.PC = (uint)(cpu.PC + (((opcode & 0x1f8) >> 3) - ((opcode & 0x200) != 0 ? 0x40 : 0)));
 			cpu.Cycles++;
 		}
 	}
@@ -693,12 +693,12 @@ public static class Instruction
 	{
 		var d = cpu.Data[(opcode & 0x1f0) >> 4];
 		var b = opcode & 7;
-		cpu.Data[95] = (byte)(((cpu.Data[95] & 0xbf) | ((d >> b) & 1)) != 0 ? 0x40 : 0);
+		cpu.Data[95] = (byte)((cpu.Data[95] & 0xbf) | (((d >> b) & 1) != 0 ? 0x40 : 0));
 	}
 	
 	private static void CALL (ref Cpu cpu, ref ushort opcode)
 	{
-		var k = (ushort)(cpu.ProgramMemory[(int)(cpu.PC + 1)] | ((opcode & 1) << 16) | ((opcode & 0x1f0) << 13));
+		var k = (uint)(cpu.ProgramMemory[(int)(cpu.PC + 1)] | ((opcode & 1) << 16) | ((opcode & 0x1f0) << 13));
 		var ret = cpu.PC + 2;
 		var sp = cpu.DataView.GetUint16(93, true);
 		cpu.Data[sp] = (byte)(ret & 255);
@@ -707,7 +707,7 @@ public static class Instruction
 			cpu.Data[sp - 2] = (byte)((ret >> 16) & 255);
 		}
 		cpu.DataView.SetUint16(93, (ushort)(sp - (cpu.PC22Bits ? 3 : 2)), true);
-		cpu.PC = (ushort)(k - 1);
+		cpu.PC = k - 1;
 		cpu.Cycles += cpu.PC22Bits ? 4 : 3;
 	}
 	
@@ -743,7 +743,7 @@ public static class Instruction
 		sreg |= ((val1 ^ val2) & (val1 ^ R) & 128) != 0 ? 8 : 0;
 		sreg |= ((sreg >> 2 & 1) ^ (sreg >> 3 & 1)) != 0 ? 0x10 : 0;
 		sreg |= val2 > val1 ? 1 : 0;
-		sreg |= (1 & (~val1 & val2 | val2 & R | R & ~val1)) != 0 ? 0x20 : 0;
+		sreg |= (8 & (~val1 & val2 | val2 & R | R & ~val1)) != 0 ? 0x20 : 0;
 		cpu.Data[95] = (byte)sreg;
 	}
 	
@@ -753,11 +753,11 @@ public static class Instruction
 		var arg2 = cpu.Data[(opcode & 0xf) | ((opcode & 0x200) >> 5)];
 		int sreg = cpu.Data[95];
 		var r = arg1 - arg2 - (sreg & 1);
-		sreg = (sreg & 0xc0) | ((~r & (sreg >> 1 & 1)) != 0 ? 2 : 0) | (arg2 + (sreg & 1) > arg1 ? 1 : 0);
+		sreg = (sreg & 0xc0) | ((r == 0 && ((sreg >> 1) & 1) != 0) ? 2 : 0) | (arg2 + (sreg & 1) > arg1 ? 1 : 0);
 		sreg |= ((128 & r) != 0 ? 4 : 0);
 		sreg |= ((arg1 ^ arg2) & (arg1 ^ r) & 128) != 0 ? 8 : 0;
 		sreg |= (((sreg >> 2) & 1) ^ ((sreg >> 3) & 1)) != 0 ? 0x10 : 0;
-		sreg |= (1 & ((~arg1 & arg2) | (arg2 & r) | (r & ~arg1))) != 0 ? 0x20 : 0;
+		sreg |= (8 & ((~arg1 & arg2) | (arg2 & r) | (r & ~arg1))) != 0 ? 0x20 : 0;
 		cpu.Data[95] = (byte)sreg;
 	}
 	
@@ -808,14 +808,14 @@ public static class Instruction
 		cpu.Data[sp - 1] = (byte)((retAddr >> 8) & 255);
 		cpu.Data[sp - 2] = (byte)((retAddr >> 16) & 255);
 		cpu.DataView.SetUint16(93, (ushort)(sp - 3), true);
-		cpu.PC = (uint)((eind << 16) | cpu.DataView.GetUint16(30, true) - 1);
+		cpu.PC = (uint)(((eind << 16) | cpu.DataView.GetUint16(30, true)) - 1);
 		cpu.Cycles += 3;
 	}
 	
 	private static void EIJMP (ref Cpu cpu)
 	{
 		var eind = cpu.Data[0x5c];
-		cpu.PC = (uint)((eind << 16) | cpu.DataView.GetUint16(30, true) - 1);
+		cpu.PC = (uint)(((eind << 16) | cpu.DataView.GetUint16(30, true)) - 1);
 		cpu.Cycles++;
 	}
 	
@@ -882,7 +882,7 @@ public static class Instruction
 		var v2 = cpu.Data[(opcode & 7) + 16];
 		var R = (v1 * v2) << 1;
 		cpu.DataView.SetInt16(0, (short)R, true);
-		cpu.Data[95] = (byte)((((cpu.Data[95] & 0xfc) | (0xffff & R)) != 0 ? 0 : 2) | ((v1 * v2 & 0x8000) != 0 ? 1 : 0));
+		cpu.Data[95] = (byte)((cpu.Data[95] & 0xfc) | ((0xffff & R) != 0 ? 0 : 2) | ((v1 * v2 & 0x8000) != 0 ? 1 : 0));
 		cpu.Cycles++;
 	}
 	
@@ -908,7 +908,7 @@ public static class Instruction
 	
 	private static void IN (ref Cpu cpu, ref ushort opcode)
 	{
-		var i = cpu.ReadData((ushort)((opcode & 0xf) | ((opcode & 0x600) >> 5) + 32));
+		var i = cpu.ReadData((ushort)(((opcode & 0xf) | ((opcode & 0x600) >> 5)) + 32));
 		cpu.Data[(opcode & 0x1f0) >> 4] = i;
 	}
 	
@@ -1246,11 +1246,11 @@ public static class Instruction
 		int sreg = cpu.Data[95];
 		var R = (byte)(val1 - val2 - (sreg & 1));
 		cpu.Data[(opcode & 0x1f0) >> 4] = R;
-		sreg = ((sreg & 0xc0) | ((~R & (sreg >> 1) & 1) != 0 ? 2 : 0) | (val2 + (sreg & 1) > val1 ? 1 : 0));
+		sreg = (sreg & 0xc0) | ((R == 0 && ((sreg >> 1) & 1) != 0) ? 2 : 0) | (val2 + (sreg & 1) > val1 ? 1 : 0);
 		sreg |= ((128 & R) != 0 ? 4 : 0);
 		sreg |= ((val1 ^ val2) & (val1 ^ R) & 128) != 0 ? 8 : 0;
 		sreg |= (((sreg >> 2) & 1) ^ ((sreg >> 3) & 1)) != 0 ? 0x10 : 0;
-		sreg |= (1 & ((~val1 & val2) | (val2 & R) | (R & ~val1))) != 0 ? 0x20 : 0;
+		sreg |= (8 & ((~val1 & val2) | (val2 & R) | (R & ~val1))) != 0 ? 0x20 : 0;
 		cpu.Data[95] = (byte)sreg;
 	}
 	
@@ -1261,11 +1261,11 @@ public static class Instruction
 		int sreg = cpu.Data[95];
 		var R = (byte)(val1 - val2 - (sreg & 1));
 		cpu.Data[((opcode & 0xf0) >> 4) + 16] = R;
-		sreg = (sreg & 0xc0) | ((~R & (sreg >> 1) & 1) != 0 ? 2 : 0) | (val2 + (sreg & 1) > val1 ? 1 : 0);
+		sreg = (sreg & 0xc0) | ((R == 0 && ((sreg >> 1) & 1) != 0) ? 2 : 0) | (val2 + (sreg & 1) > val1 ? 1 : 0);
 		sreg |= ((128 & R) != 0 ? 4 : 0);
 		sreg |= ((val1 ^ val2) & (val1 ^ R) & 128) != 0 ? 8 : 0;
 		sreg |= (((sreg >> 2) & 1) ^ ((sreg >> 3) & 1)) != 0 ? 0x10 : 0;
-		sreg |= (1 & ((~val1 & val2) | (val2 & R) | (R & ~val1))) != 0 ? 0x20 : 0;
+		sreg |= (8 & ((~val1 & val2) | (val2 & R) | (R & ~val1))) != 0 ? 0x20 : 0;
 		cpu.Data[95] = (byte)sreg;
 	}
 	
@@ -1447,7 +1447,7 @@ public static class Instruction
 		sreg |= ((val1 ^ val2) & (val1 ^ R) & 128) != 0 ? 8 : 0;
 		sreg |= (((sreg >> 2) & 1) ^ ((sreg >> 3) & 1)) != 0 ? 0x10 : 0;
 		sreg |= val2 > val1 ? 1 : 0;
-		sreg |= (1 & ((~val1 & val2) | (val2 & R) | (R & ~val1))) != 0 ? 0x20 : 0;
+		sreg |= (8 & ((~val1 & val2) | (val2 & R) | (R & ~val1))) != 0 ? 0x20 : 0;
 		cpu.Data[95] = (byte)sreg;
 	}
 	

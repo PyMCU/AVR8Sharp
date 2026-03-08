@@ -1708,7 +1708,7 @@ public class Instruction
 			Assert.That (cpu.PC, Is.EqualTo (1));
 			Assert.That (cpu.Cycles, Is.EqualTo (1));
 			Assert.That (cpu.Data[r0], Is.EqualTo (246));
-			Assert.That (cpu.Data[SREG], Is.EqualTo (SREG_S | SREG_N | SREG_C));
+			Assert.That (cpu.Data[SREG], Is.EqualTo (SREG_S | SREG_N | SREG_C | SREG_H));
 		});
 	}
 	

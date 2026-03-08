@@ -228,4 +228,57 @@ public class AvrTestSimulation
     /// </summary>
     public AvrTestSimulation RunToAddress(int byteAddress, int maxInstructions = 100_000)
         => RunUntil(s => (int)(s.Cpu.PC * 2) == byteAddress, maxInstructions);
+
+    // ── Cycle-based helpers ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Runs instructions until <paramref name="predicate"/> returns <c>true</c>,
+    /// evaluated before each instruction. Unlike <see cref="RunUntil(Func{AvrTestSimulation,bool},int)"/>
+    /// the timeout is expressed in <paramref name="maxMs"/> of simulated time, making
+    /// it easier to reason about firmware timing.
+    /// </summary>
+    public AvrTestSimulation RunUntilMs(
+        Func<AvrTestSimulation, bool> predicate,
+        double maxMs = 1000)
+    {
+        var deadline = (long)Runner.Cpu.Cycles + (long)(maxMs / 1000.0 * Runner.Speed);
+        while ((long)Runner.Cpu.Cycles < deadline)
+        {
+            if (predicate(this)) return this;
+            Instruction.AvrInstruction(Runner.Cpu);
+            Runner.Cpu.Tick();
+        }
+        throw new TimeoutException(
+            $"RunUntilMs: predicate was not satisfied within {maxMs} ms of simulated time.");
+    }
+
+    /// <summary>
+    /// Runs until the captured <paramref name="serial"/> text satisfies <paramref name="predicate"/>,
+    /// or until <paramref name="maxMs"/> of simulated time elapses.
+    /// </summary>
+    public AvrTestSimulation RunUntilSerial(
+        Probes.SerialProbe serial,
+        Func<string, bool> predicate,
+        double maxMs = 2000)
+        => RunUntilMs(_ => predicate(serial.Text), maxMs);
+
+    /// <summary>
+    /// Runs until <paramref name="serial"/> contains the given <paramref name="text"/> as a substring,
+    /// or until <paramref name="maxMs"/> of simulated time elapses.
+    /// </summary>
+    public AvrTestSimulation RunUntilSerial(
+        Probes.SerialProbe serial,
+        string text,
+        double maxMs = 2000)
+        => RunUntilMs(_ => serial.Text.Contains(text), maxMs);
+
+    /// <summary>
+    /// Runs until <paramref name="serial"/> has received at least <paramref name="byteCount"/> bytes,
+    /// or until <paramref name="maxMs"/> of simulated time elapses.
+    /// </summary>
+    public AvrTestSimulation RunUntilSerialBytes(
+        Probes.SerialProbe serial,
+        int byteCount,
+        double maxMs = 2000)
+        => RunUntilMs(_ => serial.ByteCount >= byteCount, maxMs);
 }

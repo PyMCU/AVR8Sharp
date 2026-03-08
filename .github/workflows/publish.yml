@@ -120,9 +120,10 @@ jobs:
       # ── Push to nuget.org (optional) ─────────────────────────────────────────
       - name: Push to nuget.org
         if: >
-          ${{ secrets.NUGET_PUBLIC_API_KEY != '' &&
+          ${{ github.server_url == 'https://github.com' &&
+              secrets.NUGET_PUBLIC_API_KEY != '' &&
               (startsWith(github.ref, 'refs/tags/v') ||
-               github.event.inputs.push_public == 'true') }}
+              github.event.inputs.push_public == 'true') }}
         run: >
           dotnet nuget push "./nupkgs/*.nupkg"
           --source https://api.nuget.org/v3/index.json
