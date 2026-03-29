@@ -21,7 +21,6 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\Avr8Sharp.TestKit\Avr8Sharp.TestKit.csproj" />
-        <ProjectReference Include="..\..\src\AVR8Sharp.Core\AVR8Sharp.Core.csproj" />
     </ItemGroup>
 
 </Project>

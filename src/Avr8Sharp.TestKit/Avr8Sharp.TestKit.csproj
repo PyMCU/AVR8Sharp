@@ -24,7 +24,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\AVR8Sharp.Core\AVR8Sharp.Core.csproj" />
+      <ProjectReference Include="..\Avr8Sharp\Avr8Sharp.csproj" />
     </ItemGroup>
 
 </Project>
