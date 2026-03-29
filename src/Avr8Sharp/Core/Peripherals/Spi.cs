@@ -40,25 +40,25 @@ public class AvrSpi
 	public Action<byte> OnByte { get; set; }
 	public bool IsMaster {
 		get {
-			return (_cpu.Data[_config.SPCR] & SPCR_MSTR) != 0;
+			return (_cpu.Mmio.Data[_config.SPCR] & SPCR_MSTR) != 0;
 		}
 	}
 	public SpiDataOrder DataOrder {
 		get {
-			return (_cpu.Data[_config.SPCR] & SPCR_DORD) != 0 ? SpiDataOrder.LsbFirst : SpiDataOrder.MsbFirst;
+			return (_cpu.Mmio.Data[_config.SPCR] & SPCR_DORD) != 0 ? SpiDataOrder.LsbFirst : SpiDataOrder.MsbFirst;
 		}
 	}
 	public int SpiMode {
 		get {
-			var cpha = _cpu.Data[_config.SPCR] & SPCR_CPHA;
-			var cpol = _cpu.Data[_config.SPCR] & SPCR_CPOL;
+			var cpha = _cpu.Mmio.Data[_config.SPCR] & SPCR_CPHA;
+			var cpol = _cpu.Mmio.Data[_config.SPCR] & SPCR_CPOL;
 			return (cpha != 0 ? 2 : 0) | (cpol != 0 ? 1 : 0);
 		}
 	}
 	public int ClockDivider {
 		get {
-			var baseDivider = (_cpu.Data[_config.SPSR] & SPSR_SPI2X) != 0 ? 2 : 4;
-			switch (_cpu.Data[_config.SPCR] & SPSR_SPR_MASK) {
+			var baseDivider = (_cpu.Mmio.Data[_config.SPSR] & SPSR_SPI2X) != 0 ? 2 : 4;
+			switch (_cpu.Mmio.Data[_config.SPCR] & SPSR_SPR_MASK) {
 				case 0b00:
 					return baseDivider;
 				case 0b01:
@@ -104,42 +104,43 @@ public class AvrSpi
 		
 		OnTransfer = _ => 0;
 		
-		_cpu.WriteHooks[_config.SPDR] = (value,_ ,_ ,_ ) => {
-			if ((_cpu.Data[_config.SPCR] & SPCR_SPE) == 0) {
+		cpu.Mmio.RegisterWrite(_config.SPDR, (value,_ ,_ ,_ ) => {
+			if ((_cpu.Mmio.Data[_config.SPCR] & SPCR_SPE) == 0) {
 				// SPI not enabled, ignore write
 				return false;
 			}
 			
 			// Write collision
 			if (_transmissionActive) {
-				_cpu.Data[_config.SPSR] |= SPSR_WCOL;
+				_cpu.Mmio.Data[_config.SPSR] |= SPSR_WCOL;
 				return true;
 			}
 			
 			// Clear write collision / interrupt flags
-			_cpu.Data[_config.SPSR] &= ~SPSR_WCOL & 0xFF;
+			_cpu.Mmio.Data[_config.SPSR] &= ~SPSR_WCOL & 0xFF;
 			_cpu.ClearInterrupt (_spi);
 			
 			_transmissionActive = true;
 			OnByte(value);
 			return true;
-		};
+		});
 		
-		_cpu.WriteHooks[_config.SPCR] = (value, _, _, _) => {
+		cpu.Mmio.RegisterWrite(_config.SPCR, (value, _, _, _) => {
 			_cpu.UpdateInterruptEnable (_spi, value);
 			return false;
-		};
-		
-		_cpu.WriteHooks[_config.SPSR] = (value, _, _, _) => {
-			_cpu.Data[_config.SPSR] = value;
-			_cpu.ClearInterruptByFlag (_spi, value);
+		});
+
+		cpu.Mmio.RegisterWrite(_config.SPSR, (value, _, _, _) =>
+		{
+			_cpu.Mmio.Data[_config.SPSR] = value;
+			_cpu.ClearInterruptByFlag(_spi, value);
 			return false;
-		};
+		});
 	}
 
 	public void CompleteTransfer (int receivedByte)
 	{
-		_cpu.Data[_config.SPDR] = (byte)receivedByte;
+		_cpu.Mmio.Data[_config.SPDR] = (byte)receivedByte;
 		_cpu.SetInterruptFlag (_spi);
 		_transmissionActive = false;
 	}

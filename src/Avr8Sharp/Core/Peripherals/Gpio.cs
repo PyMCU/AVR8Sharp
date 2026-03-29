@@ -139,8 +139,8 @@ public class AvrIoPort
 	);
 	
 	private readonly List<AvrInterruptConfig?> _externalInts = [];
+	public event Action<byte, byte>? OnGpioChange;
 	private readonly AvrInterruptConfig? _pcint;
-	private readonly List<Action<byte, byte>> _listeners = [];
 	private readonly Cpu.Cpu _cpu;
 	private readonly AvrPortConfig _portConfig;
 	private int _pinValue;
@@ -152,7 +152,7 @@ public class AvrIoPort
 
 	public byte OpenCollector { get; set; } = 0;
 
-	public Dictionary<int, Action<bool>?> ExternalClockListeners { get; set; } = [];
+	public Action<bool>?[] ExternalClockListeners { get; } = new Action<bool>?[8];
 	
 	public Action<byte, PinOverrideMode> TimerOverridePin { get; set; }
 
@@ -164,32 +164,33 @@ public class AvrIoPort
 		_cpu.GpioPorts.Add (this);
 		_cpu.GpioByPort[_portConfig.PORT] = this;
 		
-		_cpu.WriteHooks[portConfig.DDR] = (value, _, _, _) => {
-			var portValue = _cpu.Data[portConfig.PORT];
-			_cpu.Data[portConfig.DDR] = value;
+		cpu.Mmio.RegisterWrite(portConfig.DDR, (value, _, _, _) => {
+			var portValue = _cpu.Mmio.Data[portConfig.PORT];
+			_cpu.Mmio.Data[portConfig.DDR] = value;
 			WriteGpio (portValue, value);
 			UpdatePinRegister (value);
 			return true;
-		};
+		});
 		
-		_cpu.WriteHooks[portConfig.PORT] = (value, _, _, _) => {
-			var ddrMask = _cpu.Data[portConfig.DDR];
-			_cpu.Data[portConfig.PORT] = value;
+		cpu.Mmio.RegisterWrite(portConfig.PORT, (value, _, _, _) => {
+			var ddrMask = _cpu.Mmio.Data[portConfig.DDR];
+			_cpu.Mmio.Data[portConfig.PORT] = value;
 			WriteGpio (value, ddrMask);
 			UpdatePinRegister (ddrMask);
 			return true;
-		};
-		
-		_cpu.WriteHooks[portConfig.PIN] = (value, _, _, mask) => {
+		});
+
+		cpu.Mmio.RegisterWrite(portConfig.PIN, (value, _, _, mask) =>
+		{
 			// Writing to 1 PIN toggles PORT bits
-			var oldPortValue = _cpu.Data[portConfig.PORT];
-			var ddrMask = _cpu.Data[portConfig.DDR];
+			var oldPortValue = _cpu.Mmio.Data[portConfig.PORT];
+			var ddrMask = _cpu.Mmio.Data[portConfig.DDR];
 			var portValue = (byte)(oldPortValue ^ (value & mask));
-			_cpu.Data[portConfig.PORT] = portValue;
-			WriteGpio (portValue, ddrMask);
-			UpdatePinRegister (ddrMask);
+			_cpu.Mmio.Data[portConfig.PORT] = portValue;
+			WriteGpio(portValue, ddrMask);
+			UpdatePinRegister(ddrMask);
 			return true;
-		};
+		});
 		
 		// External interrupts
 
@@ -220,10 +221,10 @@ public class AvrIoPort
 		
 		if (portConfig.PinChange != null) {
 			var pcifr = portConfig.PinChange.PCIFR;
-			_cpu.WriteHooks[pcifr] = DelegateWritePcifr;
+			cpu.Mmio.RegisterWrite(pcifr, DelegateWritePcifr);
 			
 			var pcmsk = portConfig.PinChange.PCMSK;
-			_cpu.WriteHooks[pcmsk] = DelegateWritePcmsk;
+			cpu.Mmio.RegisterWrite(pcmsk, DelegateWritePcmsk);
 		}
 		
 		// Move here to be able to test the TimerOverridePin
@@ -249,26 +250,30 @@ public class AvrIoPort
 		}
 	}
 	
-	private bool DelegateWritePcifr (byte value, byte oldValue, ushort v1, byte v2)
+	private bool DelegateWritePcifr(byte value, byte oldValue, ushort v1, byte v2)
 	{
-		if (_portConfig.PinChange == null) 
-			return false;
-		foreach (var pcint in _cpu.GpioPorts.Select (gpio => gpio._pcint)) {
-			if (pcint != null) {
-				_cpu.ClearInterruptByFlag (pcint, value);
+		if (_portConfig.PinChange == null) return false;
+    
+		foreach (var gpio in _cpu.GpioPorts) 
+		{
+			if (gpio._pcint != null) 
+			{
+				_cpu.ClearInterruptByFlag(gpio._pcint, value);
 			}
 		}
 		return true;
 	}
 
-	private bool DelegateWritePcmsk (byte value, byte oldValue, ushort v1, byte v2)
+	private bool DelegateWritePcmsk(byte value, byte oldValue, ushort v1, byte v2)
 	{
-		if (_portConfig.PinChange == null) 
-			return false;
-		_cpu.Data[_portConfig.PinChange.PCMSK] = value;
-		foreach (var pcint in _cpu.GpioPorts.Select (gpio => gpio._pcint)) {
-			if (pcint != null) {
-				_cpu.UpdateInterruptEnable (pcint, value);
+		if (_portConfig.PinChange == null) return false;
+    
+		_cpu.Mmio.Data[_portConfig.PinChange.PCMSK] = value;
+		foreach (var gpio in _cpu.GpioPorts) 
+		{
+			if (gpio._pcint != null) 
+			{
+				_cpu.UpdateInterruptEnable(gpio._pcint, value);
 			}
 		}
 		return true;
@@ -285,7 +290,7 @@ public class AvrIoPort
 			switch (mode) {
 				case PinOverrideMode.Enable:
 					_overrideValue &= (byte)~bitMask;
-					_overrideValue |= (byte)(_cpu.Data[_portConfig.PORT] & bitMask);
+					_overrideValue |= (byte)(_cpu.Mmio.Data[_portConfig.PORT] & bitMask);
 					break;
 				case PinOverrideMode.Set:
 					_overrideValue |= (byte)bitMask;
@@ -299,20 +304,14 @@ public class AvrIoPort
 			}
 		}
 		
-		var ddrMask = _cpu.Data[_portConfig.DDR];
-		WriteGpio (_cpu.Data[_portConfig.PORT], ddrMask);
+		var ddrMask = _cpu.Mmio.Data[_portConfig.DDR];
+		WriteGpio (_cpu.Mmio.Data[_portConfig.PORT], ddrMask);
 		UpdatePinRegister (ddrMask);
 	}
 	
-	public void AddListener (Action<byte, byte> listener)
-	{
-		_listeners.Add (listener);
-	}
+	public void AddListener (Action<byte, byte> listener) => OnGpioChange += listener;
 	
-	public void RemoveListener (Action<byte, byte> listener)
-	{
-		_listeners.Remove (listener);
-	}
+	public void RemoveListener (Action<byte, byte> listener) => OnGpioChange -= listener;
 
 	/// <summary>
 	/// Get the state of a given pin
@@ -323,8 +322,8 @@ public class AvrIoPort
 	/// been enabled.</returns>
 	public PinState GetPinState (byte index)
 	{
-		var ddr = _cpu.Data[_portConfig.DDR];
-		var port = _cpu.Data[_portConfig.PORT];
+		var ddr = _cpu.Mmio.Data[_portConfig.DDR];
+		var port = _cpu.Mmio.Data[_portConfig.PORT];
 		var bitMask = (byte)(1 << index);
 		var openState = (port & bitMask) != 0 ? PinState.InputPullup : PinState.Input;
 		var highValue = (OpenCollector & bitMask) != 0 ? openState : PinState.High;
@@ -347,20 +346,23 @@ public class AvrIoPort
 		if (value) {
 			_pinValue |= bitMask;
 		}
-		UpdatePinRegister (_cpu.Data[_portConfig.DDR]);
+		UpdatePinRegister (_cpu.Mmio.Data[_portConfig.DDR]);
 	}
 	
 	private void UpdatePinRegister (byte ddr)
 	{
 		var newPin = (byte)(((_pinValue & ~ddr) | (_lastValue & ddr)) & 0xff);
-		_cpu.Data[_portConfig.PIN] = newPin;
+		_cpu.Mmio.Data[_portConfig.PIN] = newPin;
 		if (_lastPin == newPin) return;
-		for (var index = 0; index < 8; index++) {
-			if (((newPin & (1 << index)) != (_lastPin & (1 << index)))) {
-				var value = (newPin & (1 << index)) != 0;
-				ToggleInterrupt ((byte)index, value);
-				if (ExternalClockListeners.TryGetValue (index, out var a))
-                    a?.Invoke (value);
+		for (var index = 0; index < 8; index++)
+		{
+			if (((newPin & (1 << index)) == (_lastPin & (1 << index)))) continue;
+			var value = (newPin & (1 << index)) != 0;
+			ToggleInterrupt ((byte)index, value);
+			var listener = ExternalClockListeners[index];
+			if (listener != null)
+			{
+				listener(value);
 			}
 		}
 		_lastPin = newPin;
@@ -375,8 +377,8 @@ public class AvrIoPort
 			var eimsk = externalConfig!.EIMSK;
 			var eicr = externalConfig.EICR;
 			var iscOffset = externalConfig.IscOffset;
-			if ((_cpu.Data[eimsk] & (1 << externalConfig.Index)) != 0) {
-				var configuration = (InterruptMode)((_cpu.Data[eicr] >> iscOffset) & 0x3);
+			if ((_cpu.Mmio.Data[eimsk] & (1 << externalConfig.Index)) != 0) {
+				var configuration = (InterruptMode)((_cpu.Mmio.Data[eicr] >> iscOffset) & 0x3);
 				var generateInterrupt = false;
 				var shouldBeConstant = false;
 				switch (configuration) {
@@ -395,8 +397,7 @@ public class AvrIoPort
 						break;
 				}
 				if (shouldBeConstant) {
-					// The AvrInterruptConfig is immutable, so we need to create a new one
-					external = external!.MakeConstant ();
+					external.Constant = true;
 					_externalInts[index] = external;
 				}
 				if (generateInterrupt) {
@@ -414,7 +415,7 @@ public class AvrIoPort
 	{
 		if (_pcint != null && _portConfig.PinChange != null && (_portConfig.PinChange.Mask & (1 << index)) != 0) {
 			var pcmsk = _portConfig.PinChange.PCMSK;
-			if ((_cpu.Data[pcmsk] & (1 << (index + _portConfig.PinChange.Offset))) != 0) {
+			if ((_cpu.Mmio.Data[pcmsk] & (1 << (index + _portConfig.PinChange.Offset))) != 0) {
 				_cpu.SetInterruptFlag (_pcint);
 			}
 		}
@@ -437,25 +438,27 @@ public class AvrIoPort
 	{
 		var isFlag = registerType == "flag";
 		var isMask = registerType == "mask";
-		_cpu.WriteHooks[register] = (value, _, _, _) => {
-			if (!isFlag) {
-				_cpu.Data[register] = value;
-			}
-			foreach (var gpio in _cpu.GpioPorts) {
-				foreach (var external in gpio._externalInts.Where (interrupt => interrupt != null)) {
-					var shouldClear = !external!.Constant;
-					shouldClear &= isFlag;
-					if (isMask) {
-						_cpu.UpdateInterruptEnable (external, value);
-					}
-					if (shouldClear) {
-						_cpu.ClearInterruptByFlag (external, value);
-					}
+		_cpu.Mmio.RegisterWrite(register, (value, _, _, _) =>
+		{
+			if (!isFlag) _cpu.Mmio.Data[register] = value;
+
+			foreach (var gpio in _cpu.GpioPorts)
+			{
+				for (var i = 0; i < gpio._externalInts.Count; i++)
+				{
+					var external = gpio._externalInts[i];
+					if (external == null) continue;
+
+					var shouldClear = !external.Constant && isFlag;
+            
+					if (isMask) _cpu.UpdateInterruptEnable(external, value);
+					if (shouldClear) _cpu.ClearInterruptByFlag(external, value);
 				}
-				gpio.CheckExternalInterrupts ();
+				gpio.CheckExternalInterrupts();
 			}
 			return true;
-		};
+		});
+		
 	}
 
 	public void CheckExternalInterrupts ()
@@ -474,8 +477,8 @@ public class AvrIoPort
 			var eicr = external.EICR;
 			var iscOffset = external.IscOffset;
 			var interrupt = external.Interrupt;
-			if ((_cpu.Data[eimsk] & (1 << index)) == 0 || pinValue) continue;
-			var configuration = (byte)((_cpu.Data[eicr] >> iscOffset) & 0x3);
+			if ((_cpu.Mmio.Data[eimsk] & (1 << index)) == 0 || pinValue) continue;
+			var configuration = (byte)((_cpu.Mmio.Data[eicr] >> iscOffset) & 0x3);
 			if (configuration == (byte)InterruptMode.LowLevel) {
 				_cpu.QueueInterrupt (new AvrInterruptConfig (
 					address: interrupt,
@@ -496,9 +499,7 @@ public class AvrIoPort
 		if (newValue == prevValue && ddr == _lastDdr) return;
 		_lastValue = newValue;
 		_lastDdr = ddr;
-		foreach (var listener in _listeners) {
-			listener (newValue, prevValue);
-		}
+		OnGpioChange?.Invoke(newValue, prevValue);
 	}
 }
 
