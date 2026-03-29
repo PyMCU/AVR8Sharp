@@ -1,4 +1,5 @@
 using AVR8Sharp.Core.Cpu;
+using AVR8Sharp.Core.Cpu.Decoders;
 using AVR8Sharp.Core.Peripherals;
 namespace AVR8Sharp.Core.Utils;
 
@@ -56,13 +57,23 @@ public class AvrRunner
 		Cpu.LoadProgram (target);
 	}
 
-	public void Execute (Action<Cpu.Cpu>? callback = null)
+	public void Execute<TDecoder> (ref TDecoder decoder, Action<Cpu.Cpu> callback) where TDecoder : struct, IInstructionDecoder
 	{
 		var cyclesToRun = Cpu.Cycles + workUnitCycles;
 		while (Cpu.Cycles < cyclesToRun) {
-			Instruction.AvrInstruction (Cpu);
+			decoder.Decode (Cpu);
 			Cpu.Tick ();
 		}
-		callback?.Invoke (Cpu);
+		callback.Invoke (Cpu);
+	}
+	
+	public void Execute<TDecoder> (ref TDecoder decoder) where TDecoder : struct, IInstructionDecoder
+	{
+		var cpu = this.Cpu;
+		var cyclesToRun = cpu.Cycles + workUnitCycles;
+		while (cpu.Cycles < cyclesToRun) {
+			decoder.Decode (cpu);
+			cpu.Tick ();
+		}
 	}
 }
