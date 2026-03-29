@@ -49,6 +49,10 @@ public sealed class ArduinoUnoSimulation : AvrTestSimulation
     /// <summary>Captures all bytes sent via USART0 (TX = PD1).</summary>
     public SerialProbe Serial { get; }
 
+    // ── EEPROM ────────────────────────────────────────────────────────────────
+    /// <summary>ATmega328P internal EEPROM — 1024 bytes, volatile (in-memory backend).</summary>
+    public AvrEeprom Eeprom { get; }
+
     public ArduinoUnoSimulation() : base(Flash, Sram)
     {
         WithFrequency(Frequency);
@@ -62,5 +66,7 @@ public sealed class ArduinoUnoSimulation : AvrTestSimulation
         AddTimer(AvrTimer.Timer2Config, out var t2); Timer2 = t2;
 
         AddUsart(AvrUsart.Usart0Config, out var serial); Serial = serial;
+
+        AddEeprom(AvrEeprom.EepromConfig, out var eeprom); Eeprom = eeprom;
     }
 }

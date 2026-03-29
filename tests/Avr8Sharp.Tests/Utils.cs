@@ -46,22 +46,24 @@ public class TestProgramRunner
 	
 	private AVR8Sharp.Core.Cpu.Cpu _cpu;
 	private Action<AVR8Sharp.Core.Cpu.Cpu> _onBreak;
+	private AVR8Sharp.Core.Cpu.Decoders.SwitchDecoder _decoder;
 	
 	public TestProgramRunner (AVR8Sharp.Core.Cpu.Cpu cpu, Action<AVR8Sharp.Core.Cpu.Cpu>? onBreak = null)
 	{
 		_cpu = cpu;
 		_onBreak = onBreak ?? DefaultOnBreak;
+		_decoder = new AVR8Sharp.Core.Cpu.Decoders.SwitchDecoder();
 	}
 	
 	public void RunInstructions (int count)
 	{
 		for (var i = 0; i < count; i++)
 		{
-			if (_cpu.ProgramMemory[_cpu.PC] == BREAK_OPCODE)
+			if (_cpu.ProgramMemory[_cpu.Pc] == BREAK_OPCODE)
 			{
 				_onBreak(_cpu);
 			}
-			AVR8Sharp.Core.Cpu.Instruction.AvrInstruction (_cpu);
+			_decoder.Decode(_cpu);
 			_cpu.Tick ();
 		}
 	}
@@ -69,13 +71,13 @@ public class TestProgramRunner
 	public void RunUntil (Func<AVR8Sharp.Core.Cpu.Cpu, bool> predicate, int maxInstructions = 5000)
 	{
 		for (var i = 0; i < maxInstructions; i++) {
-			if (_cpu.ProgramMemory[_cpu.PC] == BREAK_OPCODE)
+			if (_cpu.ProgramMemory[_cpu.Pc] == BREAK_OPCODE)
 				_onBreak(_cpu);
 			
 			if (predicate(_cpu))
 				return;
 			
-			AVR8Sharp.Core.Cpu.Instruction.AvrInstruction (_cpu);
+			_decoder.Decode(_cpu);
 			_cpu.Tick ();
 		}
 		throw new Exception("Max instructions reached");
@@ -83,11 +85,11 @@ public class TestProgramRunner
 	
 	public void RunToBreak ()
 	{
-		RunUntil(cpu => cpu.ProgramMemory[cpu.PC] == BREAK_OPCODE);
+		RunUntil(cpu => cpu.ProgramMemory[cpu.Pc] == BREAK_OPCODE);
 	}
 	
 	public void RunToAddress (int address)
 	{
-		RunUntil(cpu => cpu.PC * 2 == address);
+		RunUntil(cpu => cpu.Pc * 2 == address);
 	}
 }

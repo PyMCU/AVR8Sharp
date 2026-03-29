@@ -225,7 +225,7 @@ public class Timer
         {
             Assert.That(tcnt, Is.EqualTo(2)); // TCNT should be 2 (one tick above + 2 cycles for interrupt)
             Assert.That(cpu.ReadData(TIFR0) & TOV0, Is.Zero);
-            Assert.That(cpu.PC, Is.EqualTo(0x20));
+            Assert.That(cpu.Pc, Is.EqualTo(0x20));
             Assert.That(cpu.Cycles, Is.EqualTo(4));
         });
     }
@@ -252,7 +252,7 @@ public class Timer
 		{
 			Assert.That(tcnt, Is.EqualTo(2)); // TCNT should be 2 (one tick above + 2 cycles for interrupt)
 			Assert.That(cpu.ReadData(TIFR0) & 2, Is.Zero);
-			Assert.That(cpu.PC, Is.EqualTo(0x20));
+			Assert.That(cpu.Pc, Is.EqualTo(0x20));
 			Assert.That(cpu.Cycles, Is.EqualTo(4));
 		});
 	}
@@ -267,14 +267,14 @@ public class Timer
 		cpu.WriteData(TCCR0B, CS00); // Set prescaler to 1
 		cpu.Cycles = 1;
 		cpu.Tick();
-		cpu.Data[TIMSK0] = TOIE0;
-		cpu.Data[SREG] = 0x0; // SREG: --------
+		cpu.Mmio.Data[TIMSK0] = TOIE0;
+		cpu.Mmio.Data[SREG] = 0x0; // SREG: --------
 		cpu.Cycles = 2;
 		cpu.Tick();
 		Assert.Multiple(() =>
 		{
 			Assert.That(cpu.ReadData(TIFR0) & TOV0, Is.EqualTo(TOV0));
-			Assert.That(cpu.PC, Is.Zero);
+			Assert.That(cpu.Pc, Is.Zero);
 			Assert.That(cpu.Cycles, Is.EqualTo(2));
 		});
 	}
@@ -289,14 +289,14 @@ public class Timer
 		cpu.WriteData(TCCR0B, CS00); // Set prescaler to 1
 		cpu.Cycles = 1;
 		cpu.Tick();
-		cpu.Data[TIMSK0] = 0;
-		cpu.Data[SREG] = 0x80; // SREG: I-------
+		cpu.Mmio.Data[TIMSK0] = 0;
+		cpu.Mmio.Data[SREG] = 0x80; // SREG: I-------
 		cpu.Cycles = 2;
 		cpu.Tick();
 		Assert.Multiple(() =>
 		{
-			Assert.That(cpu.Data[TIFR0] & TOV0, Is.EqualTo(TOV0));
-			Assert.That(cpu.PC, Is.Zero);
+			Assert.That(cpu.Mmio.Data[TIFR0] & TOV0, Is.EqualTo(TOV0));
+			Assert.That(cpu.Pc, Is.Zero);
 			Assert.That(cpu.Cycles, Is.EqualTo(2));
 		});
 	}
@@ -319,8 +319,8 @@ public class Timer
 		Assert.Multiple(() =>
 		{
 			Assert.That(cpu.ReadData (TCNT0), Is.Zero);
-			Assert.That(cpu.Data[TIFR0] & (OCF0A | OCF0B), Is.EqualTo(OCF0A | OCF0B));
-			Assert.That(cpu.PC, Is.Zero);
+			Assert.That(cpu.Mmio.Data[TIFR0] & (OCF0A | OCF0B), Is.EqualTo(OCF0A | OCF0B));
+			Assert.That(cpu.Pc, Is.Zero);
 			Assert.That(cpu.Cycles, Is.EqualTo(2));
 		});
 	}
@@ -343,8 +343,8 @@ public class Timer
 		Assert.Multiple(() =>
 		{
 			Assert.That(cpu.ReadData(TCNT1), Is.EqualTo(1));
-			Assert.That(cpu.Data[TIFR1] & (OCF1A | OCF1C), Is.EqualTo(OCF1A));
-			Assert.That(cpu.PC, Is.Zero);
+			Assert.That(cpu.Mmio.Data[TIFR1] & (OCF1A | OCF1C), Is.EqualTo(OCF1A));
+			Assert.That(cpu.Pc, Is.Zero);
 			Assert.That(cpu.Cycles, Is.EqualTo(5));
 		});
 	}
@@ -366,7 +366,7 @@ public class Timer
 		Assert.Multiple(() =>
 		{
 			Assert.That(cpu.ReadData(TIFR0), Is.EqualTo(OCF0A));
-			Assert.That(cpu.PC, Is.Zero);
+			Assert.That(cpu.Pc, Is.Zero);
 			Assert.That(cpu.Cycles, Is.EqualTo(2));
 		});
 	}
@@ -388,7 +388,7 @@ public class Timer
 		Assert.Multiple(() =>
 		{
 			Assert.That(cpu.ReadData(TCNT0), Is.Zero);
-			Assert.That(cpu.PC, Is.Zero);
+			Assert.That(cpu.Pc, Is.Zero);
 			Assert.That(cpu.Cycles, Is.EqualTo(3));
 		});
 	}
@@ -413,7 +413,7 @@ public class Timer
 		Assert.Multiple(() =>
 		{
 			Assert.That(tcnt, Is.Zero);
-			Assert.That(cpu.Data[TIFR0] & TOV0, Is.Zero); // TOV0 clear
+			Assert.That(cpu.Mmio.Data[TIFR0] & TOV0, Is.Zero); // TOV0 clear
 		});
 	}
 	
@@ -435,7 +435,7 @@ public class Timer
 		Assert.Multiple(() =>
 		{
 			Assert.That(cpu.ReadData(TCNT0), Is.EqualTo(0xff));
-			Assert.That(cpu.Data[TIFR0] & TOV0, Is.Zero); // TOV clear
+			Assert.That(cpu.Mmio.Data[TIFR0] & TOV0, Is.Zero); // TOV clear
 		});
 		
 		cpu.Cycles++;
@@ -443,7 +443,7 @@ public class Timer
 		Assert.Multiple(() =>
 		{
 			Assert.That(cpu.ReadData(TCNT0), Is.Zero);
-			Assert.That(cpu.Data[TIFR0] & TOV0, Is.EqualTo(TOV0)); // TOV set
+			Assert.That(cpu.Mmio.Data[TIFR0] & TOV0, Is.EqualTo(TOV0)); // TOV set
 		});
 	}
 	
@@ -466,7 +466,7 @@ public class Timer
 		Assert.Multiple(() =>
 		{
 			Assert.That(cpu.ReadData(TCNT0), Is.EqualTo(0xff));
-			Assert.That(cpu.Data[TIFR0] & TOV0, Is.Zero); // TOV clear
+			Assert.That(cpu.Mmio.Data[TIFR0] & TOV0, Is.Zero); // TOV clear
 		});
 		
 		cpu.Cycles++;
@@ -474,7 +474,7 @@ public class Timer
 		Assert.Multiple(() =>
 		{
 			Assert.That(cpu.ReadData(TCNT0), Is.Zero);
-			Assert.That(cpu.Data[TIFR0] & TOV0, Is.EqualTo(TOV0)); // TOV set
+			Assert.That(cpu.Mmio.Data[TIFR0] & TOV0, Is.EqualTo(TOV0)); // TOV set
 		});
 	}
 	
@@ -495,7 +495,7 @@ public class Timer
 		Assert.Multiple(() =>
 		{
 			Assert.That(cpu.ReadData(TIFR0), Is.EqualTo(OCF0B));
-			Assert.That(cpu.PC, Is.Zero);
+			Assert.That(cpu.Pc, Is.Zero);
 			Assert.That(cpu.Cycles, Is.EqualTo(2));
 		});
 	}
@@ -520,7 +520,7 @@ public class Timer
 		{
 			Assert.That(tcnt, Is.EqualTo(0x23)); // TCNT should be 0x23 (one tick above + 2 cycles for interrupt)
 			Assert.That(cpu.ReadData(TIFR0) & OCF0A, Is.Zero);
-			Assert.That(cpu.PC, Is.EqualTo(0x1c));
+			Assert.That(cpu.Pc, Is.EqualTo(0x1c));
 			Assert.That(cpu.Cycles, Is.EqualTo(4));
 		});
 	}
@@ -543,7 +543,7 @@ public class Timer
 		Assert.Multiple(() =>
 		{
 			Assert.That(cpu.ReadData(TCNT0), Is.EqualTo(0x21));
-			Assert.That(cpu.PC, Is.Zero);
+			Assert.That(cpu.Pc, Is.Zero);
 			Assert.That(cpu.Cycles, Is.EqualTo(2));
 		});
 	}
@@ -568,7 +568,7 @@ public class Timer
 		{
 			Assert.That(tcnt, Is.EqualTo(0x23)); // TCNT should be 0x23 (one tick above + 2 cycles for interrupt)
 			Assert.That(cpu.ReadData(TIFR0) & OCF0B, Is.Zero);
-			Assert.That(cpu.PC, Is.EqualTo(0x1e));
+			Assert.That(cpu.Pc, Is.EqualTo(0x1e));
 			Assert.That(cpu.Cycles, Is.EqualTo(4));
 		});
 	}
@@ -590,7 +590,7 @@ public class Timer
 		
 		runner.RunInstructions (program.InstructionCount);
 		
-		Assert.That(cpu.Data[R17], Is.EqualTo(0x31));
+		Assert.That(cpu.Mmio.Data[R17], Is.EqualTo(0x31));
 	}
 	
 	[Test (Description = "Timer2 should count every 256 ticks when prescaler is 6 (issue #5)")]
@@ -629,7 +629,7 @@ public class Timer
 		
 		runner.RunInstructions (program.InstructionCount);
 		
-		Assert.That(cpu.Data[R1], Is.EqualTo(2));
+		Assert.That(cpu.Mmio.Data[R1], Is.EqualTo(2));
 	}
 	
 	[Test (Description = "Should not start counting before the prescaler is first set (issue #41)")]
@@ -651,7 +651,7 @@ public class Timer
 		
 		runner.RunInstructions (program.InstructionCount);
 		
-		Assert.That(cpu.Data[R17], Is.EqualTo(2));
+		Assert.That(cpu.Mmio.Data[R17], Is.EqualTo(2));
 	}
 
 	[Test (Description = "Should not keep counting for one more instruction when the timer is disabled (issue #72)")]
@@ -1251,7 +1251,7 @@ public class Timer
 			
 			cpu.ReadData (TCNT1);
 			
-			Assert.That(cpu.DataView.GetUint16(TCNT1, true), Is.EqualTo(0x2234)); // TCNT1 should increment
+			Assert.That(cpu.Mmio.DataView.GetUint16(TCNT1, true), Is.EqualTo(0x2234)); // TCNT1 should increment
 		}
 
 		[Test (Description = "Should set OCF0A flag when timer equals OCRA (16 bit mode)")]
@@ -1274,7 +1274,7 @@ public class Timer
             Assert.Multiple(() =>
             {
                 Assert.That(cpu.ReadData(TIFR1) & OCF1A, Is.EqualTo(OCF1A)); // TIFR1 should have OCF1A bit on
-                Assert.That(cpu.PC, Is.Zero);
+                Assert.That(cpu.Pc, Is.Zero);
                 Assert.That(cpu.Cycles, Is.EqualTo(2));
             });
         }
@@ -1305,7 +1305,7 @@ public class Timer
 			Assert.Multiple(() =>
 			{
 				Assert.That(cpu.ReadData(TIFR1), Is.EqualTo(OCF1C));
-				Assert.That(cpu.PC, Is.Zero);
+				Assert.That(cpu.Pc, Is.Zero);
 				Assert.That(cpu.Cycles, Is.EqualTo(2));
 			});
 		}
@@ -1320,7 +1320,7 @@ public class Timer
 			cpu.WriteData(TCCR1B, 0x9); // TCCR1B <- WGM12 | CS10
 			cpu.WriteData(TIMSK1, 0x1); // TIMSK1: TOIE1
 			
-			cpu.Data[SREG] = 0x80; // SREG: I-------
+			cpu.Mmio.Data[SREG] = 0x80; // SREG: I-------
 			cpu.WriteData(TCNT1H, 0x3); // TCNT1 <- 0x3ff
 			cpu.Cycles = 1;
 			cpu.Tick();
@@ -1332,9 +1332,9 @@ public class Timer
 			cpu.ReadData(TCNT1); // Refresh TCNT1
 			Assert.Multiple(() =>
 			{
-				Assert.That(cpu.DataView.GetUint16(TCNT1, true), Is.EqualTo(2));
+				Assert.That(cpu.Mmio.DataView.GetUint16(TCNT1, true), Is.EqualTo(2));
 				Assert.That(cpu.ReadData(TIFR1) & TOV1, Is.Zero);
-				Assert.That(cpu.PC, Is.EqualTo(0x1a));
+				Assert.That(cpu.Pc, Is.EqualTo(0x1a));
 				Assert.That(cpu.Cycles, Is.EqualTo(5));
 			});
 		}
@@ -1357,7 +1357,7 @@ public class Timer
 			cpu.ReadData(TCNT1); // Refresh TCNT1
 			Assert.Multiple(() =>
 			{
-				Assert.That(cpu.DataView.GetUint16(TCNT1, true), Is.Zero); // TCNT should be 0
+				Assert.That(cpu.Mmio.DataView.GetUint16(TCNT1, true), Is.Zero); // TCNT should be 0
 				Assert.That(cpu.ReadData(TIFR1) & TOV1, Is.Zero);
 				Assert.That(cpu.Cycles, Is.EqualTo(3));
 			});

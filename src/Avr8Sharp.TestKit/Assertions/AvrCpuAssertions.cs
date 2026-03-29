@@ -23,10 +23,10 @@ public class AvrCpuAssertions : ReferenceTypeAssertions<AvrCpu, AvrCpuAssertions
     {
         Execute.Assertion
             .BecauseOf(because, becauseArgs)
-            .ForCondition(Subject.Data[index] == expected)
+            .ForCondition(Subject.Mmio.Data[index] == expected)
             .FailWith(
                 "Expected register R{0} to be 0x{1:X2} ({1}){reason}, but found 0x{2:X2} ({2}).",
-                index, expected, Subject.Data[index]);
+                index, expected, Subject.Mmio.Data[index]);
 
         return new AndConstraint<AvrCpuAssertions>(this);
     }
@@ -39,10 +39,10 @@ public class AvrCpuAssertions : ReferenceTypeAssertions<AvrCpu, AvrCpuAssertions
     {
         Execute.Assertion
             .BecauseOf(because, becauseArgs)
-            .ForCondition(Subject.PC == expected)
+            .ForCondition(Subject.Pc == expected)
             .FailWith(
                 "Expected PC to be 0x{0:X4}{reason}, but found 0x{1:X4}.",
-                expected, Subject.PC);
+                expected, Subject.Pc);
 
         return new AndConstraint<AvrCpuAssertions>(this);
     }
@@ -53,10 +53,10 @@ public class AvrCpuAssertions : ReferenceTypeAssertions<AvrCpu, AvrCpuAssertions
     {
         Execute.Assertion
             .BecauseOf(because, becauseArgs)
-            .ForCondition(Subject.SP == expected)
+            .ForCondition(Subject.Sp == expected)
             .FailWith(
                 "Expected SP to be 0x{0:X4}{reason}, but found 0x{1:X4}.",
-                expected, Subject.SP);
+                expected, Subject.Sp);
 
         return new AndConstraint<AvrCpuAssertions>(this);
     }
@@ -85,17 +85,17 @@ public class AvrCpuAssertions : ReferenceTypeAssertions<AvrCpu, AvrCpuAssertions
     {
         Execute.Assertion
             .BecauseOf(because, becauseArgs)
-            .ForCondition(Subject.SREG == expected)
+            .ForCondition(Subject.Sreg == expected)
             .FailWith(
                 "Expected SREG to be 0b{0} (0x{0:X2}){reason}, but found 0b{1} (0x{1:X2}).",
-                expected, Subject.SREG);
+                expected, Subject.Sreg);
 
         return new AndConstraint<AvrCpuAssertions>(this);
     }
 
     // ── SREG individual flags ─────────────────────────────────────────────────
 
-    private bool SregBit(int bit) => (Subject.SREG & (1 << bit)) != 0;
+    private bool SregBit(int bit) => (Subject.Sreg & (1 << bit)) != 0;
 
     /// <summary>
     /// Asserts the SREG carry flag (C, bit 0).

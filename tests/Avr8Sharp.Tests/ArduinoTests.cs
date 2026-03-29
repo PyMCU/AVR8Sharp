@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using AVR8Sharp.Core;
+using AVR8Sharp.Core.Cpu.Decoders;
 using AVR8Sharp.Core.Peripherals;
 using Newtonsoft.Json;
 namespace Avr8Sharp.Tests;
@@ -123,6 +124,7 @@ void loop() {
 			.AddTimer (AvrTimer.Timer1Config, out _)
 			.AddTimer (AvrTimer.Timer2Config, out _)
 			.Build ();
+		var decoder = new SwitchDecoder();
 		
 		var builder = new StringBuilder ();
 		usart.OnByteTransmit = b => {
@@ -131,7 +133,7 @@ void loop() {
 		const int fiveSecs = 5 * 16_000_000;
 		var watch = Stopwatch.StartNew ();
 		while (runner.Cpu.Cycles < fiveSecs) {
-			runner.Execute ();
+			runner.Execute (ref decoder);
 		}
 		watch.Stop ();
 		Assert.That (builder.ToString (), Does.Contain ("Blink"));
@@ -153,6 +155,8 @@ void loop() {
 			.AddTimer (attinyTimer0, out var timer)
 			.Build ();
 		
+		var decoder = new SwitchDecoder();
+		
 		var stringBuilder = new StringBuilder ();
 		port.AddListener ((value, oldValue) => {
 			stringBuilder.Append (value.ToString ());
@@ -160,7 +164,7 @@ void loop() {
 		
 		const int fiveSecs = 5 * 16_000_000;
 		while (runner.Cpu.Cycles < fiveSecs) {
-			runner.Execute ();
+			runner.Execute (ref decoder);
 		}
 		
 		Assert.True (true);

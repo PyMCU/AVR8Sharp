@@ -66,8 +66,8 @@ public class Adc
 		// Now read the result
 		runner.RunInstructions (5);
 		
-		var low = cpu.Data[R16];
-		var high = cpu.Data[R17];
+		var low = cpu.Mmio.Data[R16];
+		var high = cpu.Mmio.Data[R17];
 		var result = (high << 8) | low;
 		Assert.That(result, Is.EqualTo(524));
 	}
@@ -127,11 +127,9 @@ public class Adc
 		// Read the result
 		runner.RunToBreak ();
 		
-		var low = cpu.Data[R16];
-		var high = cpu.Data[R17];
+		var low = cpu.Mmio.Data[R16];
+		var high = cpu.Mmio.Data[R17];
 		var result = (high << 8) | low;
 		Assert.That(result, Is.EqualTo(0)); // Should be 0 since the ADC is not enabled
 	}
-
-		
 }

@@ -95,7 +95,7 @@ public class Watchdog
 		cpu.Tick();
         Assert.Multiple(() =>
         {
-            Assert.That(cpu.PC, Is.EqualTo(0));
+            Assert.That(cpu.Pc, Is.EqualTo(0));
             Assert.That(cpu.ReadData(MCUSR), Is.EqualTo(WDRF));
         });
     }
@@ -130,17 +130,17 @@ public class Watchdog
 		// Now we skip 8ms. Watchdog shouldn't fire, yet
 		cpu.Cycles += 16000 * 8;
 		runner.RunInstructions(1);
-		Assert.That(cpu.PC, Is.Not.EqualTo(0));
+		Assert.That(cpu.Pc, Is.Not.EqualTo(0));
 		
 		// Now we skip an extra 8ms. We extended the timeout with WDR, so watchdog won't fire yet
 		cpu.Cycles += 16000 * 8;
 		runner.RunInstructions(1);
-		Assert.That(cpu.PC, Is.Not.EqualTo(0));
+		Assert.That(cpu.Pc, Is.Not.EqualTo(0));
 		
 		// Finally, another 8ms bring us to 16ms since last WDR, and watchdog should fire
 		cpu.Cycles += 16000 * 8;
 		cpu.Tick();
-		Assert.That(cpu.PC, Is.EqualTo(0));
+		Assert.That(cpu.Pc, Is.EqualTo(0));
 	}
 	
 	[Test (Description = "Should fire an interrupt when the watchdog expires and WDIE is set")]
@@ -178,7 +178,7 @@ public class Watchdog
 		cpu.Cycles += 16000 * 8;
 		runner.RunInstructions (1);
 		
-		Assert.That (cpu.PC, Is.EqualTo(INT_WDT));
+		Assert.That (cpu.Pc, Is.EqualTo(INT_WDT));
 		// The watchdog timer should also clean the WDIE bit, so next timeout will reset the MCU.
 		Assert.That ((cpu.ReadData (WDTCSR) & WDIE), Is.EqualTo(0));
 	}
@@ -223,7 +223,7 @@ public class Watchdog
 		// Now we skip an extra 20ms. Watchdog shouldn't reset!
 		cpu.Cycles += 16000 * 20;
 		runner.RunInstructions(1);
-		Assert.That(cpu.PC, Is.Not.EqualTo(0));
+		Assert.That(cpu.Pc, Is.Not.EqualTo(0));
 		Assert.That(cpu.ReadData(R20), Is.EqualTo(55)); // assert that `ldi r20, 55` ran
 	}
 }

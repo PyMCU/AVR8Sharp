@@ -7,7 +7,7 @@ public class Cpu
 	public void Initial_Stack_Pointer_Value()
 	{
 		var cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[1024], 0x1000);
-		Assert.That(cpu.SP, Is.EqualTo(0x10FF));
+		Assert.That(cpu.Sp, Is.EqualTo(0x10FF));
 	}
 	
 	[TestFixture]

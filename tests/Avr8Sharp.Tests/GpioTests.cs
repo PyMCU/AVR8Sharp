@@ -53,7 +53,7 @@ public class Gpio
 
 		cpu.WriteData (PORTB, 0x55);
 
-		Assert.That (cpu.Data[0x23], Is.EqualTo (0x5));
+		Assert.That (cpu.Mmio.Data[0x23], Is.EqualTo (0x5));
 	}
 
 	[Test (Description = "Should invoke the listeners when DDR changes (issue #28)")]
@@ -107,7 +107,7 @@ public class Gpio
 
         Assert.Multiple(() =>
         {
-            Assert.That(cpu.Data[PINB], Is.EqualTo(0x4));
+            Assert.That(cpu.Mmio.Data[PINB], Is.EqualTo(0x4));
             Assert.That(calledCorrectly, Is.True);
         });
     }
@@ -144,7 +144,7 @@ public class Gpio
 		});
 
 		runner.RunInstructions (3);
-		Assert.That (cpu.Data[PORTD], Is.EqualTo (0x48));
+		Assert.That (cpu.Mmio.Data[PORTD], Is.EqualTo (0x48));
 
 		var calledCorrectly2 = false;
 		portD.AddListener ((value, oldValue) => {
@@ -154,7 +154,7 @@ public class Gpio
 		runner.RunInstructions (1);
         Assert.Multiple(() =>
         {
-            Assert.That(cpu.Data[PORTD], Is.EqualTo(0x8));
+            Assert.That(cpu.Mmio.Data[PORTD], Is.EqualTo(0x8));
             Assert.That(calledCorrectly, Is.True);
             Assert.That(calledCorrectly2, Is.True);
         });
@@ -171,13 +171,13 @@ public class Gpio
 		port.TimerOverridePin (1, PinOverrideMode.Set);
 		Assert.Multiple (() => {
 			Assert.That (port.GetPinState (1), Is.EqualTo (AVR8Sharp.Core.Peripherals.PinState.High));
-			Assert.That (cpu.Data[PINB], Is.EqualTo (1 << 1));
+			Assert.That (cpu.Mmio.Data[PINB], Is.EqualTo (1 << 1));
 		});
 
 		port.TimerOverridePin (1, PinOverrideMode.Clear);
 		Assert.Multiple (() => {
 			Assert.That (port.GetPinState (1), Is.EqualTo (AVR8Sharp.Core.Peripherals.PinState.Low));
-			Assert.That (cpu.Data[PINB], Is.EqualTo (0));
+			Assert.That (cpu.Mmio.Data[PINB], Is.EqualTo (0));
 		});
 	}
 
@@ -295,10 +295,10 @@ public class Gpio
 
 			cpu.WriteData(DDRB, 0);
 			port.SetPinValue (PB4, true);
-			Assert.That (cpu.Data[0x23], Is.EqualTo (0x10));
+			Assert.That (cpu.Mmio.Data[0x23], Is.EqualTo (0x10));
 
 			port.SetPinValue (PB4, false);
-			Assert.That (cpu.Data[0x23], Is.EqualTo (0));
+			Assert.That (cpu.Mmio.Data[0x23], Is.EqualTo (0));
 		}
 
 		[Test (Description = "Should only update PIN register when pin in Input mode")]
@@ -312,11 +312,11 @@ public class Gpio
 
 			port.SetPinValue (PB4, true);
 
-			Assert.That (cpu.Data[PINB], Is.EqualTo (0x0));
+			Assert.That (cpu.Mmio.Data[PINB], Is.EqualTo (0x0));
 
 			cpu.WriteData (DDRB, 0x0);
 
-			Assert.That (cpu.Data[PINB], Is.EqualTo (0x10));
+			Assert.That (cpu.Mmio.Data[PINB], Is.EqualTo (0x10));
 		}
 	}
 
@@ -332,21 +332,21 @@ public class Gpio
 			cpu.WriteData (EIMSK, 1 << INT0);
 			cpu.WriteData (EICRA, (1 << ISC01) | (1 << ISC00));
 			
-			Assert.That (cpu.Data[EIFR], Is.EqualTo (0));
+			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (0));
 			port.SetPinValue (PD2, true);
-			Assert.That (cpu.Data[EIFR], Is.EqualTo (1 << INT0));
+			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (1 << INT0));
 			
-			cpu.Data[SREG] = 0x80; // SREG: I------- (enable interrupts)
+			cpu.Mmio.Data[SREG] = 0x80; // SREG: I------- (enable interrupts)
 			cpu.Tick ();
 			
 			Assert.Multiple (() => {
-				Assert.That (cpu.PC, Is.EqualTo (PC_INT_INT0));
+				Assert.That (cpu.Pc, Is.EqualTo (PC_INT_INT0));
 				Assert.That (cpu.Cycles, Is.EqualTo (2));
-				Assert.That (cpu.Data[EIFR], Is.EqualTo (0));
+				Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (0));
 			});
 			
 			port.SetPinValue (PD2, false);
-			Assert.That (cpu.Data[EIFR], Is.EqualTo (0));
+			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (0));
 		}
 
 		[Test (Description = "Should generate INT0 interrupt on falling edge")]
@@ -358,19 +358,19 @@ public class Gpio
 			cpu.WriteData (EIMSK, 1 << INT0);
 			cpu.WriteData (EICRA, 1 << ISC01);
 			
-			Assert.That (cpu.Data[EIFR], Is.EqualTo (0));
+			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (0));
 			port.SetPinValue (PD2, true);
-			Assert.That (cpu.Data[EIFR], Is.EqualTo (0));
+			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (0));
 			port.SetPinValue (PD2, false);
-			Assert.That (cpu.Data[EIFR], Is.EqualTo (1 << INT0));
+			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (1 << INT0));
 			
-			cpu.Data[SREG] = 0x80; // SREG: I------- (enable interrupts)
+			cpu.Mmio.Data[SREG] = 0x80; // SREG: I------- (enable interrupts)
 			cpu.Tick ();
 			
 			Assert.Multiple (() => {
-				Assert.That (cpu.PC, Is.EqualTo (PC_INT_INT0));
+				Assert.That (cpu.Pc, Is.EqualTo (PC_INT_INT0));
 				Assert.That (cpu.Cycles, Is.EqualTo (2));
-				Assert.That (cpu.Data[EIFR], Is.EqualTo (0));
+				Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (0));
 			});
 		}
 		
@@ -383,13 +383,13 @@ public class Gpio
 			cpu.WriteData (EIMSK, 1 << INT0);
 			cpu.WriteData (EICRA, 1 << ISC00);
 			
-			Assert.That (cpu.Data[EIFR], Is.EqualTo (0));
+			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (0));
 			port.SetPinValue (PD2, true);
-			Assert.That (cpu.Data[EIFR], Is.EqualTo (1 << INT0));
+			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (1 << INT0));
 			cpu.WriteData (EIFR, 1 << INT0);
-			Assert.That (cpu.Data[EIFR], Is.EqualTo (0));
+			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (0));
 			port.SetPinValue (PD2, false);
-			Assert.That (cpu.Data[EIFR], Is.EqualTo (1 << INT0));
+			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (1 << INT0));
 		}
 		
 		[Test (Description = "Should a sticky INT0 interrupt while the pin level is low")]
@@ -401,31 +401,31 @@ public class Gpio
 			cpu.WriteData (EIMSK, 1 << INT0);
 			cpu.WriteData (EICRA, 0);
 			
-			Assert.That (cpu.Data[EIFR], Is.EqualTo (0));
+			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (0));
 			
 			port.SetPinValue (PD2, true);
-			Assert.That (cpu.Data[EIFR], Is.EqualTo (0));
+			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (0));
 			
 			port.SetPinValue (PD2, false);
-			Assert.That (cpu.Data[EIFR], Is.EqualTo (1 << INT0));
+			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (1 << INT0));
 			
 			// This is a sticky interrupt, verify we can't clear the flag:
 			cpu.WriteData (EIFR, 1 << INT0);
-			Assert.That (cpu.Data[EIFR], Is.EqualTo (1 << INT0));
+			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (1 << INT0));
 			
-			cpu.Data[SREG] = 0x80; // SREG: I------- (enable interrupts)
+			cpu.Mmio.Data[SREG] = 0x80; // SREG: I------- (enable interrupts)
 			cpu.Tick ();
 			Assert.Multiple (() => {
-				Assert.That (cpu.PC, Is.EqualTo (PC_INT_INT0));
+				Assert.That (cpu.Pc, Is.EqualTo (PC_INT_INT0));
 				Assert.That (cpu.Cycles, Is.EqualTo (2));
 			});
 			
 			// Flag shouldn't be cleared, as the interrupt is sticky
-			Assert.That (cpu.Data[EIFR], Is.EqualTo (1 << INT0));
+			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (1 << INT0));
 			
 			// But it will be cleared as soon as the pin goes high.
 			port.SetPinValue (PD2, true);
-			Assert.That (cpu.Data[EIFR], Is.EqualTo (0));
+			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (0));
 		}
 	}
 
@@ -442,15 +442,15 @@ public class Gpio
 			cpu.WriteData (PCMSK0, 1 << PCINT3);
 			
 			port.SetPinValue (PB3, true);
-			Assert.That (cpu.Data[PCIFR], Is.EqualTo (1 << PCIE0));
+			Assert.That (cpu.Mmio.Data[PCIFR], Is.EqualTo (1 << PCIE0));
 			
-			cpu.Data[SREG] = 0x80; // SREG: I------- (enable interrupts)
+			cpu.Mmio.Data[SREG] = 0x80; // SREG: I------- (enable interrupts)
 			cpu.Tick ();
 			
 			Assert.Multiple (() => {
-				Assert.That (cpu.PC, Is.EqualTo (PC_INT_PCINT0));
+				Assert.That (cpu.Pc, Is.EqualTo (PC_INT_PCINT0));
 				Assert.That (cpu.Cycles, Is.EqualTo(2));
-				Assert.That (cpu.Data[PCIFR], Is.EqualTo (0));
+				Assert.That (cpu.Mmio.Data[PCIFR], Is.EqualTo (0));
 			});
 		}
 		
@@ -463,18 +463,18 @@ public class Gpio
 			port.SetPinValue (PB3, true);
 			cpu.WriteData (PCICR, 1 << PCIE0);
 			cpu.WriteData (PCMSK0, 1 << PCINT3);
-			Assert.That (cpu.Data[PCIFR], Is.EqualTo (0));
+			Assert.That (cpu.Mmio.Data[PCIFR], Is.EqualTo (0));
 			
 			port.SetPinValue (PB3, false);
-			Assert.That (cpu.Data[PCIFR], Is.EqualTo (1 << PCIE0));
+			Assert.That (cpu.Mmio.Data[PCIFR], Is.EqualTo (1 << PCIE0));
 			
-			cpu.Data[SREG] = 0x80; // SREG: I------- (enable interrupts)
+			cpu.Mmio.Data[SREG] = 0x80; // SREG: I------- (enable interrupts)
 			cpu.Tick ();
 			
 			Assert.Multiple (() => {
-				Assert.That (cpu.PC, Is.EqualTo (PC_INT_PCINT0));
+				Assert.That (cpu.Pc, Is.EqualTo (PC_INT_PCINT0));
 				Assert.That (cpu.Cycles, Is.EqualTo(2));
-				Assert.That (cpu.Data[PCIFR], Is.EqualTo (0));
+				Assert.That (cpu.Mmio.Data[PCIFR], Is.EqualTo (0));
 			});
 		}
 		
@@ -488,10 +488,10 @@ public class Gpio
 			cpu.WriteData (PCMSK0, 1 << PCINT3);
 			
 			port.SetPinValue (PB3, true);
-			Assert.That (cpu.Data[PCIFR], Is.EqualTo (1 << PCIE0));
+			Assert.That (cpu.Mmio.Data[PCIFR], Is.EqualTo (1 << PCIE0));
 			
 			cpu.WriteData (PCIFR, 1 << PCIE0);
-			Assert.That (cpu.Data[PCIFR], Is.EqualTo (0));
+			Assert.That (cpu.Mmio.Data[PCIFR], Is.EqualTo (0));
 		}
 	}
 }

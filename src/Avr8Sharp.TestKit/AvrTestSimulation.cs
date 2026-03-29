@@ -1,5 +1,6 @@
 using AVR8Sharp.Core;
 using AVR8Sharp.Core.Cpu;
+using AVR8Sharp.Core.Cpu.Decoders;
 using AVR8Sharp.Core.Peripherals;
 using AVR8Sharp.Core.Utils;
 using Avr8Sharp.TestKit.Probes;
@@ -39,8 +40,9 @@ public class AvrTestSimulation
     internal readonly AvrRunner Runner;
 
     public AvrCpu Cpu => Runner.Cpu;
-    public byte[] Data => Runner.Cpu.Data;
-    public AvrMemoryView Memory => new(Runner.Cpu.Data);
+    public SwitchDecoder Decoder = new SwitchDecoder();
+    public byte[] Data => Runner.Cpu.Mmio.Data;
+    public AvrMemoryView Memory => new(Runner.Cpu.Mmio.Data);
 
     protected AvrTestSimulation(int flashSize, int sramBytes)
     {
@@ -124,6 +126,22 @@ public class AvrTestSimulation
         return this;
     }
 
+    /// <summary>Adds an EEPROM peripheral with a volatile in-memory backend.</summary>
+    public AvrTestSimulation AddEeprom(AvrEepromConfig config, out AvrEeprom eeprom)
+    {
+        var backend = new EepromMemoryBackend(1024);
+        eeprom = new AvrEeprom(Runner.Cpu, backend, config);
+        return this;
+    }
+
+    /// <summary>Adds an EEPROM peripheral (no out handle).</summary>
+    public AvrTestSimulation AddEeprom(AvrEepromConfig config)
+    {
+        var backend = new EepromMemoryBackend(1024);
+        _ = new AvrEeprom(Runner.Cpu, backend, config);
+        return this;
+    }
+
     /// <summary>Adds an SPI peripheral.</summary>
     public AvrTestSimulation AddSpi(AvrSpiConfig config, out AvrSpi spi)
     {
@@ -156,7 +174,7 @@ public class AvrTestSimulation
         var target = (long)Runner.Cpu.Cycles + cycles;
         while ((long)Runner.Cpu.Cycles < target)
         {
-            Instruction.AvrInstruction(Runner.Cpu);
+            Decoder.Decode(Runner.Cpu);
             Runner.Cpu.Tick();
         }
         return this;
@@ -177,7 +195,7 @@ public class AvrTestSimulation
     {
         for (var i = 0; i < count; i++)
         {
-            Instruction.AvrInstruction(Runner.Cpu);
+            Decoder.Decode(Runner.Cpu);
             Runner.Cpu.Tick();
         }
         return this;
@@ -197,7 +215,7 @@ public class AvrTestSimulation
         {
             if (predicate(this))
                 return this;
-            Instruction.AvrInstruction(Runner.Cpu);
+            Decoder.Decode(Runner.Cpu);
             Runner.Cpu.Tick();
         }
         throw new TimeoutException(
@@ -213,9 +231,9 @@ public class AvrTestSimulation
     {
         for (var i = 0; i < maxInstructions; i++)
         {
-            if (Runner.Cpu.ProgramMemory[Runner.Cpu.PC] == BreakOpcode)
+            if (Runner.Cpu.ProgramMemory[Runner.Cpu.Pc] == BreakOpcode)
                 return this;
-            Instruction.AvrInstruction(Runner.Cpu);
+            Decoder.Decode(Runner.Cpu);
             Runner.Cpu.Tick();
         }
         throw new TimeoutException(
@@ -227,7 +245,7 @@ public class AvrTestSimulation
     /// Returns <c>this</c> for chaining.
     /// </summary>
     public AvrTestSimulation RunToAddress(int byteAddress, int maxInstructions = 100_000)
-        => RunUntil(s => (int)(s.Cpu.PC * 2) == byteAddress, maxInstructions);
+        => RunUntil(s => (int)(s.Cpu.Pc * 2) == byteAddress, maxInstructions);
 
     // ── Cycle-based helpers ───────────────────────────────────────────────────
 
@@ -245,7 +263,7 @@ public class AvrTestSimulation
         while ((long)Runner.Cpu.Cycles < deadline)
         {
             if (predicate(this)) return this;
-            Instruction.AvrInstruction(Runner.Cpu);
+            Decoder.Decode(Runner.Cpu);
             Runner.Cpu.Tick();
         }
         throw new TimeoutException(

@@ -125,7 +125,7 @@ public class Eeprom
 			cpu.WriteData (EEARL, 15);
 			cpu.WriteData (EEARH, 0);
 			cpu.WriteData (EECR, EEMPE);
-			cpu.Data[SREG] = 0x80; // SREG: I-------
+			cpu.Mmio.Data[SREG] = 0x80; // SREG: I-------
 			cpu.WriteData (EECR, EEPE | EERIE);
 			cpu.Cycles += 1000;
 			cpu.Tick ();
@@ -133,8 +133,8 @@ public class Eeprom
 			// At this point, write shouldn't be complete yet
 			Assert.Multiple(() =>
 			{
-				Assert.That(cpu.Data[EECR] & EEPE, Is.EqualTo(EEPE));
-				Assert.That(cpu.PC, Is.EqualTo(0));
+				Assert.That(cpu.Mmio.Data[EECR] & EEPE, Is.EqualTo(EEPE));
+				Assert.That(cpu.Pc, Is.EqualTo(0));
 			});
 			
 			cpu.Cycles += 10_000_000;
@@ -146,7 +146,7 @@ public class Eeprom
 			{
 				Assert.That(backend.ReadMemory (15), Is.EqualTo(0x55));
 				Assert.That(cpu.ReadData(EECR) & EEPE, Is.EqualTo(0));
-				Assert.That(cpu.PC, Is.EqualTo(0x2c)); // EEPROM Ready interrupt
+				Assert.That(cpu.Pc, Is.EqualTo(0x2c)); // EEPROM Ready interrupt
 			});
 		}
 		
@@ -161,7 +161,7 @@ public class Eeprom
 			cpu.WriteData (EEARL, 15);
 			cpu.WriteData (EEARH, 0);
 			cpu.WriteData (EECR, EEMPE);
-			cpu.Data[SREG] = 0x80; // SREG: I-------
+			cpu.Mmio.Data[SREG] = 0x80; // SREG: I-------
 			cpu.WriteData (EECR, EEPE);
 			cpu.Cycles += 1000;
 			cpu.Tick ();
@@ -170,7 +170,7 @@ public class Eeprom
 			Assert.Multiple(() =>
 			{
 				Assert.That(cpu.ReadData(EECR) & EEPE, Is.EqualTo(EEPE));
-				Assert.That(cpu.PC, Is.EqualTo(0));
+				Assert.That(cpu.Pc, Is.EqualTo(0));
 			});
 			
 			cpu.Cycles += 10_000_000;
@@ -184,7 +184,7 @@ public class Eeprom
 				Assert.That(cpu.ReadData(EECR) & EEPE, Is.EqualTo(0));
 				cpu.WriteData (EECR, EERIE);
 				cpu.Tick ();
-				Assert.That(cpu.PC, Is.EqualTo(0x2c)); // EEPROM Ready interrupt
+				Assert.That(cpu.Pc, Is.EqualTo(0x2c)); // EEPROM Ready interrupt
 			});
 		}
 		

@@ -285,13 +285,13 @@ public class Usart
 			var usart = new AvrUsart(cpu,  AvrUsart.Usart0Config, FREQ_16MHZ);
 			
 			cpu.WriteData (UCSR0B, UDRIE | TXEN);
-			cpu.Data[SREG] = 0x80; // SREG: I-------
+			cpu.Mmio.Data[SREG] = 0x80; // SREG: I-------
 			cpu.Tick();
             Assert.Multiple(() =>
             {
-                Assert.That(cpu.PC, Is.EqualTo(PC_INT_UDRE));
+                Assert.That(cpu.Pc, Is.EqualTo(PC_INT_UDRE));
                 Assert.That(cpu.Cycles, Is.EqualTo(2));
-                Assert.That((cpu.Data[UCSR0A] & UDRE), Is.EqualTo(0));
+                Assert.That((cpu.Mmio.Data[UCSR0A] & UDRE), Is.EqualTo(0));
             });
         }
 
@@ -303,14 +303,14 @@ public class Usart
 			
 			cpu.WriteData (UCSR0B, TXCIE | TXEN);
 			cpu.WriteData (UDR0, 0x61);
-			cpu.Data[SREG] = 0x80; // SREG: I-------
+			cpu.Mmio.Data[SREG] = 0x80; // SREG: I-------
 			cpu.Cycles = 1_000_000;
 			cpu.Tick();
             Assert.Multiple(() =>
             {
-                Assert.That(cpu.PC, Is.EqualTo(PC_INT_TXC));
+                Assert.That(cpu.Pc, Is.EqualTo(PC_INT_TXC));
                 Assert.That(cpu.Cycles, Is.EqualTo(1_000_000 + 2));
-                Assert.That((cpu.Data[UCSR0A] & TXC), Is.EqualTo(0));
+                Assert.That((cpu.Mmio.Data[UCSR0A] & TXC), Is.EqualTo(0));
             });
         }
 
@@ -321,11 +321,11 @@ public class Usart
 			var usart = new AvrUsart (cpu, AvrUsart.Usart0Config, FREQ_16MHZ);
 			
 			cpu.WriteData (UCSR0B, TXCIE | TXEN);
-			cpu.Data[SREG] = 0x80; // SREG: I-------
+			cpu.Mmio.Data[SREG] = 0x80; // SREG: I-------
 			cpu.Tick();
 			Assert.Multiple(() =>
 			{
-				Assert.That(cpu.PC, Is.EqualTo(0));
+				Assert.That(cpu.Pc, Is.EqualTo(0));
 				Assert.That(cpu.Cycles, Is.EqualTo(0));
 			});
 		}
@@ -338,14 +338,14 @@ public class Usart
 			
 			cpu.WriteData (UCSR0B, UDRIE | TXEN);
 			cpu.WriteData (UDR0, 0x61);
-			cpu.Data[SREG] = 0; // SREG: 0 (disable interrupts)
+			cpu.Mmio.Data[SREG] = 0; // SREG: 0 (disable interrupts)
 			cpu.Cycles = 1_000_000;
 			cpu.Tick();
 			Assert.Multiple(() =>
 			{
-				Assert.That(cpu.PC, Is.EqualTo(0));
+				Assert.That(cpu.Pc, Is.EqualTo(0));
 				Assert.That(cpu.Cycles, Is.EqualTo(1_000_000));
-				Assert.That(cpu.Data[UCSR0A], Is.EqualTo(TXC | UDRE));
+				Assert.That(cpu.Mmio.Data[UCSR0A], Is.EqualTo(TXC | UDRE));
 			});
 		}
 	}
@@ -448,10 +448,10 @@ public class Usart
 			cpu.WriteData (UDR0, 0x48); // 'H'
 			cpu.Cycles += 16_000; // 1ms
 			cpu.Tick();
-			Assert.That ((cpu.Data[UCSR0A] & TXC), Is.EqualTo(0));
+			Assert.That ((cpu.Mmio.Data[UCSR0A] & TXC), Is.EqualTo(0));
 			cpu.Cycles += 800; // 0.05ms
 			cpu.Tick();
-			Assert.That ((cpu.Data[UCSR0A] & TXC), Is.EqualTo(TXC));
+			Assert.That ((cpu.Mmio.Data[UCSR0A] & TXC), Is.EqualTo(TXC));
 		}
 		
 		[Test(Description = "Should be ready to recieve the next byte after ~1.04ms when baudrate set to 9600")]
@@ -470,7 +470,7 @@ public class Usart
 			cpu.Tick();
             Assert.Multiple(() =>
             {
-                Assert.That((cpu.Data[UCSR0A] & RXC), Is.EqualTo(0)); // byte not received yet
+                Assert.That((cpu.Mmio.Data[UCSR0A] & RXC), Is.EqualTo(0)); // byte not received yet
                 Assert.That(usart.RxBusy, Is.True);
                 Assert.That(rxCompleteCallback, Is.EqualTo(0));
             });
@@ -478,7 +478,7 @@ public class Usart
 			cpu.Tick();
             Assert.Multiple(() =>
             {
-                Assert.That((cpu.Data[UCSR0A] & RXC), Is.EqualTo(RXC));
+                Assert.That((cpu.Mmio.Data[UCSR0A] & RXC), Is.EqualTo(RXC));
                 Assert.That(usart.RxBusy, Is.False);
                 Assert.That(rxCompleteCallback, Is.EqualTo(1));
                 Assert.That(cpu.ReadData(UDR0), Is.EqualTo(0x42));

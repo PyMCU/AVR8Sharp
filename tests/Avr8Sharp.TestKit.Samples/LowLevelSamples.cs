@@ -67,7 +67,7 @@ public class LowLevelSamples
 
         // RunUntil evaluates the predicate BEFORE each instruction.
         // Execution stops the moment R16 first equals 3.
-        sim.RunUntil(s => s.Cpu.Data[16] == 3);
+        sim.RunUntil(s => s.Cpu.Mmio.Data[16] == 3);
 
         sim.Cpu.Should().HaveRegister(16, 3);
     }

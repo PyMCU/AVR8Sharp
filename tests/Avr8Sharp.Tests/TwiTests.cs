@@ -56,7 +56,7 @@ public class Twi
 		var twi = new AvrTwi (cpu, AvrTwi.TwiConfig, FREQ_16MHZ);
 		
 		cpu.WriteData(TWCR, TWIE);
-		cpu.Data [SREG] = 0x80; // SREG: I-------
+		cpu.Mmio.Data [SREG] = 0x80; // SREG: I-------
 		
 		twi.CompleteStart (); // This will set the TWINT flag
 		
@@ -64,7 +64,7 @@ public class Twi
 		
 		Assert.Multiple(() =>
 		{
-			Assert.That (cpu.PC, Is.EqualTo(0x30)); // 2-wire Serial Interface Vector
+			Assert.That (cpu.Pc, Is.EqualTo(0x30)); // 2-wire Serial Interface Vector
 			Assert.That (cpu.Cycles, Is.EqualTo(2));
 			Assert.That ((cpu.ReadData(TWCR) & TWINT), Is.EqualTo(0));
 		});
@@ -491,7 +491,7 @@ public class Twi
 			
 			// Step 6: wait for the assembly code to indicate success by settings r17 to 0x42
 			runner.RunInstructions(16);
-			Assert.That(cpu.Data[R17], Is.EqualTo(0x42));
+			Assert.That(cpu.Mmio.Data[R17], Is.EqualTo(0x42));
 		}
 
 		internal class MockTwiEventHandler : ITwiEventHandler

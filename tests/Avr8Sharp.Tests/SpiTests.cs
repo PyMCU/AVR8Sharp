@@ -185,7 +185,7 @@ public class Spi
             Assert.That(cpu.Cycles, Is.GreaterThanOrEqualTo(128));
             
             Assert.That(byteReceivedFromAsmCode, Is.EqualTo(0xb8));
-            Assert.That(cpu.Data[R17], Is.EqualTo(0x5b));
+            Assert.That(cpu.Mmio.Data[R17], Is.EqualTo(0x5b));
         });
 
     }
@@ -213,12 +213,12 @@ public class Spi
 		
 		cpu.WriteData(SPCR, SPE | SPIE | MSTR);
 		cpu.WriteData(SPDR, 0x50);
-		cpu.Data[SREG] = 0x80; // SREG: I-------
+		cpu.Mmio.Data[SREG] = 0x80; // SREG: I-------
 		
 		// At this point, write shouldn't be complete yet
 		cpu.Cycles += 10;
 		cpu.Tick();
-		Assert.That (cpu.PC, Is.Zero);
+		Assert.That (cpu.Pc, Is.Zero);
 		
 		// 100 cycles later, it should (8 bits * 8 cycles per bit = 64).
 		cpu.Cycles += 100;
@@ -226,7 +226,7 @@ public class Spi
 		Assert.Multiple(() =>
 		{
 			Assert.That(cpu.ReadData(SPSR) & SPIF, Is.Zero);
-			Assert.That(cpu.PC, Is.EqualTo(0x22)); // SPI Ready interrupt
+			Assert.That(cpu.Pc, Is.EqualTo(0x22)); // SPI Ready interrupt
 		});
 	}
 	
@@ -238,7 +238,7 @@ public class Spi
 		
 		cpu.WriteData(SPCR, SPE | MSTR);
 		cpu.WriteData(SPDR, 0x50);
-		cpu.Data[SREG] = 0x80; // SREG: I-------
+		cpu.Mmio.Data[SREG] = 0x80; // SREG: I-------
 		
 		// Wait for transfer to complete (8 bits * 8 cycles per bit = 64).
 		cpu.Cycles += 64;
@@ -247,12 +247,12 @@ public class Spi
 		Assert.Multiple(() =>
 		{
 			Assert.That(cpu.ReadData(SPSR) & SPIF, Is.EqualTo(SPIF));
-			Assert.That(cpu.PC, Is.Zero); // Interrupt not taken (yet)
+			Assert.That(cpu.Pc, Is.Zero); // Interrupt not taken (yet)
 			
 			// Enable the interrupt (SPIE)
 			cpu.WriteData(SPCR, SPE | MSTR | SPIE);
 			cpu.Tick();
-			Assert.That(cpu.PC, Is.EqualTo(0x22)); // SPI Ready interrupt
+			Assert.That(cpu.Pc, Is.EqualTo(0x22)); // SPI Ready interrupt
 			Assert.That(cpu.ReadData(SPSR) & SPIF, Is.Zero);
 		});
 	}
