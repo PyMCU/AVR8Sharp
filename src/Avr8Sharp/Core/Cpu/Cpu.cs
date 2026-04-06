@@ -79,6 +79,7 @@ public class Cpu
 	{
 		// Reset the CPU
 		Sp = (ushort)(Mmio.Data.Length - 1);
+		Mmio.Data[95] = 0; // Clear SREG (all flags including global interrupt enable)
 		Pc = 0;
 		for (var i = 0; i < _pendingInterrupts.Length; i++) {
 			_pendingInterrupts[i] = null;

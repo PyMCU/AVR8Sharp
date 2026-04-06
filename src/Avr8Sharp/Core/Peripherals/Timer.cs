@@ -108,10 +108,12 @@ public class AvrTimer
         ocfa: DefaultTimerBits.OCFA,
         ocfb: DefaultTimerBits.OCFB,
         ocfc: DefaultTimerBits.OCFC,
+        icf: 0x20,  // ICF1 = TIFR1 bit 5 (ATmega328P datasheet)
         toie: DefaultTimerBits.TOIE,
         ociea: DefaultTimerBits.OCIEA,
         ocieb: DefaultTimerBits.OCIEB,
-        ociec: DefaultTimerBits.OCIEC
+        ociec: DefaultTimerBits.OCIEC,
+        icie: 0x20  // ICIE1 = TIMSK1 bit 5 (ATmega328P datasheet)
     );
 
     public static readonly AvrTimerConfig Timer2Config = new AvrTimerConfig(
@@ -221,6 +223,7 @@ public class AvrTimer
     private readonly AvrTimerConfig _config;
 
     private readonly int _max;
+    private readonly bool _hasCaptureInterrupt;
     private int _lastCycle = 0;
     private ushort _ocrA = 0;
     private ushort _nextOcrA = 0;
@@ -256,6 +259,7 @@ public class AvrTimer
     private readonly AvrInterruptConfig _ocfa;
     private readonly AvrInterruptConfig _ocfb;
     private readonly AvrInterruptConfig _ocfc;
+    private readonly AvrInterruptConfig? _capt; // Input Capture — only for 16-bit timers
 
     public byte TCCRA
     {
@@ -329,7 +333,8 @@ public class AvrTimer
 
         _max = config.Bits == 16 ? 0xffff : 0xff;
         _hasOcrC = config.OCRC != 0;
-        
+        _hasCaptureInterrupt = config.CaptureInterrupt != 0 && config.ICF != 0;
+
         _countAction = () => Count(true, false);
 
         _ovf = new AvrInterruptConfig(
@@ -363,6 +368,17 @@ public class AvrTimer
             flagRegister: config.TIFR,
             flagMask: config.OCFC
         );
+
+        if (_hasCaptureInterrupt)
+        {
+            _capt = new AvrInterruptConfig(
+                address: config.CaptureInterrupt,
+                enableRegister: config.TIMSK,
+                enableMask: config.ICIE,
+                flagRegister: config.TIFR,
+                flagMask: config.ICF
+            );
+        }
 
         UpdateWgmConfig();
 
@@ -441,6 +457,8 @@ public class AvrTimer
             _cpu.ClearInterruptByFlag(_ovf, value);
             _cpu.ClearInterruptByFlag(_ocfa, value);
             _cpu.ClearInterruptByFlag(_ocfb, value);
+            if (_hasOcrC) _cpu.ClearInterruptByFlag(_ocfc, value);
+            if (_hasCaptureInterrupt) _cpu.ClearInterruptByFlag(_capt!, value);
             return true;
         });
 
@@ -449,6 +467,8 @@ public class AvrTimer
             _cpu.UpdateInterruptEnable(_ovf, value);
             _cpu.UpdateInterruptEnable(_ocfa, value);
             _cpu.UpdateInterruptEnable(_ocfb, value);
+            if (_hasOcrC) _cpu.UpdateInterruptEnable(_ocfc, value);
+            if (_hasCaptureInterrupt) _cpu.UpdateInterruptEnable(_capt!, value);
             return false;
         });
     }
@@ -535,6 +555,27 @@ public class AvrTimer
         _tcntUpdated = false;
         _countingUp = false;
         _updateDivider = true;
+    }
+
+    /// <summary>
+    /// Trigger an Input Capture event (equivalent to an edge on the ICPn pin).
+    /// Captures the current TCNT value into ICR and sets the ICF flag.
+    /// Only has effect on 16-bit timers that have a capture interrupt configured.
+    /// </summary>
+    public void TriggerCapture()
+    {
+        if (!_hasCaptureInterrupt || _capt == null) return;
+
+        // Capture current TCNT value into ICR (per AVR spec §16.6.3)
+        Count(false);
+        _icr = _tcnt;
+        UpdateCachedTop();
+
+        // Update the 16-bit ICR register in memory so firmware can read it
+        _cpu.Mmio.Data[_config.ICR] = (byte)(_icr & 0xff);
+        _cpu.Mmio.Data[_config.ICR + 1] = (byte)(_icr >> 8);
+
+        _cpu.SetInterruptFlag(_capt);
     }
 
     private void UpdateWgmConfig()
@@ -1029,12 +1070,14 @@ public class AvrTimerConfig
     public readonly byte OCFA;
     public readonly byte OCFB;
     public readonly byte OCFC; // Optional: Only if CompareCInterrupt is != 0
+    public readonly byte ICF;  // Input Capture Flag — optional, 16-bit timers only
 
     // TIMSK bits
     public readonly byte TOIE;
     public readonly byte OCIEA;
     public readonly byte OCIEB;
     public readonly byte OCIEC; // Optional: Only if CompareCInterrupt is != 0
+    public readonly byte ICIE;  // Input Capture Interrupt Enable — optional, 16-bit timers only
 
     // Output Compare Inputs
     public readonly ushort ComparatorPortA;
@@ -1070,10 +1113,12 @@ public class AvrTimerConfig
         byte ocfa = 0,
         byte ocfb = 0,
         byte ocfc = 0,
+        byte icf = 0,
         byte toie = 0,
         byte ociea = 0,
         byte ocieb = 0,
         byte ociec = 0,
+        byte icie = 0,
         ushort comparatorPortA = 0,
         byte comparatorPinA = 0,
         ushort comparatorPortB = 0,
@@ -1105,10 +1150,12 @@ public class AvrTimerConfig
         OCFA = ocfa;
         OCFB = ocfb;
         OCFC = ocfc;
+        ICF = icf;
         TOIE = toie;
         OCIEA = ociea;
         OCIEB = ocieb;
         OCIEC = ociec;
+        ICIE = icie;
         ComparatorPortA = comparatorPortA;
         ComparatorPinA = comparatorPinA;
         ComparatorPortB = comparatorPortB;
@@ -1140,10 +1187,12 @@ public class AvrTimerConfig
         byte ocfa = 0,
         byte ocfb = 0,
         byte ocfc = 0,
+        byte icf = 0,
         byte toie = 0,
         byte ociea = 0,
         byte ocieb = 0,
         byte ociec = 0,
+        byte icie = 0,
         ushort comparatorPortA = 0,
         byte comparatorPinA = 0,
         ushort comparatorPortB = 0,
@@ -1176,10 +1225,12 @@ public class AvrTimerConfig
             ocfa: ocfa == 0 ? OCFA : ocfa,
             ocfb: ocfb == 0 ? OCFB : ocfb,
             ocfc: ocfc == 0 ? OCFC : ocfc,
+            icf: icf == 0 ? ICF : icf,
             toie: toie == 0 ? TOIE : toie,
             ociea: ociea == 0 ? OCIEA : ociea,
             ocieb: ocieb == 0 ? OCIEB : ocieb,
             ociec: ociec == 0 ? OCIEC : ociec,
+            icie: icie == 0 ? ICIE : icie,
             comparatorPortA: comparatorPortA == 0 ? ComparatorPortA : comparatorPortA,
             comparatorPinA: comparatorPinA == 0 ? ComparatorPinA : comparatorPinA,
             comparatorPortB: comparatorPortB == 0 ? ComparatorPortB : comparatorPortB,

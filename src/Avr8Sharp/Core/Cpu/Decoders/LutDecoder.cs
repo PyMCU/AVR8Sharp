@@ -348,6 +348,13 @@ public struct LutDecoder : IInstructionDecoder
                                 break;
                             }
 
+                            if (opcode == 0x9598)
+                            {
+                                /* BREAK - hardware breakpoint */
+                                table[i] = (ref Cpu cpu, ref ushort _) => AvrInterrupt.OnBreakpoint?.Invoke(cpu.Pc);
+                                break;
+                            }
+
                             if (opcode == 0x95E8)
                             {
                                 /* SPM not implemented */

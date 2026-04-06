@@ -640,6 +640,12 @@ public static class Opcodes
     public static void NOP(ref Cpu cpu, ref ushort opcode) { }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void BREAK(ref Cpu cpu, ref ushort opcode)
+    {
+        AvrInterrupt.OnBreakpoint?.Invoke(cpu.Pc);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void OR(ref Cpu cpu, ref ushort opcode)
     {
         var R = cpu.Mmio.Data[(opcode & 0x1f0) >> 4] | cpu.Mmio.Data[(opcode & 0xf) | ((opcode & 0x200) >> 5)];

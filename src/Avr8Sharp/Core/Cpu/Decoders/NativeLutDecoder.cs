@@ -351,6 +351,13 @@ public unsafe struct NativeLutDecoder : IInstructionDecoder
                                 break;
                             }
 
+                            if (opcode == 0x9598)
+                            {
+                                /* BREAK - hardware breakpoint */
+                                LookupTable[i] = &Opcodes.BREAK;
+                                break;
+                            }
+
                             if (opcode == 0x95E8)
                             {
                                 /* SPM not implemented */

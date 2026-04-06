@@ -52,7 +52,7 @@ public class AvrUsart
         { 6, 0x3f },
         { 7, 0x7f },
         { 8, 0xff },
-        { 9, 0xff },
+        { 9, 0x1ff }, // 9-bit mode: preserve bit 8 (RXB8)
     };
 
     private readonly Cpu.Cpu _cpu;

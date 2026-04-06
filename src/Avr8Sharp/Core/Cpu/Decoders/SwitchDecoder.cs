@@ -327,6 +327,13 @@ public struct SwitchDecoder : IInstructionDecoder
                             break;
                         }
 
+                        if (opcode == 0x9598)
+                        {
+                            /* BREAK - hardware breakpoint */
+                            AvrInterrupt.OnBreakpoint?.Invoke(cpu.Pc);
+                            break;
+                        }
+
                         if (opcode == 0x95E8)
                         {
                             /* SPM not implemented */

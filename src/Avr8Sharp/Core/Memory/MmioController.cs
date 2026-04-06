@@ -24,7 +24,24 @@ public class MmioController
 
     public void RegisterWrite(ushort address, Func<byte, byte, ushort, byte, bool> hook)
     {
-        _writeHooks[address] = hook;
+        var prev = _writeHooks[address];
+        if (prev == null)
+        {
+            _writeHooks[address] = hook;
+        }
+        else
+        {
+            // Chain: both handlers run regardless of order.
+            // The write is vetoed (default write skipped) if either handler returns true.
+            // This supports multiple peripherals sharing the same register (e.g. ATtiny85 TIFR/TIMSK).
+            var captured = prev;
+            _writeHooks[address] = (value, oldValue, addr, mask) =>
+            {
+                var r1 = captured(value, oldValue, addr, mask);
+                var r2 = hook(value, oldValue, addr, mask);
+                return r1 || r2;
+            };
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
