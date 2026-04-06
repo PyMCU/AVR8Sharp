@@ -1,4 +1,5 @@
 #nullable enable
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Avr8Sharp.Core.Memory;
 using AVR8Sharp.Core.Peripherals;
@@ -46,30 +47,30 @@ public class Cpu
 	{
 		Mmio = new MmioController (sramBytes + RegisterSpace);
 		_ram = Mmio.Data;
-		
+
 		ProgramMemory = new ushort[program.Length];
 		ProgBytes = new byte[program.Length * 2];
-		
+
 		LoadProgram(program);
-		
+
 		Pc22Bits = (program.Length * 2) > 0x20000;
-		
+
 		// Reset the CPU
 		Reset ();
 	}
-	
+
 	public Cpu (byte[] program, int sramBytes = 8192)
 	{
 		Mmio = new MmioController (sramBytes + RegisterSpace);
 		_ram = Mmio.Data;
-		
+
 		ProgBytes = new byte[program.Length];
 		ProgramMemory = new ushort[program.Length / 2];
-		
+
 		LoadProgram(program);
-		
+
 		Pc22Bits = program.Length > 0x20000;
-		
+
 		// Reset the CPU
 		Reset ();
 	}
@@ -233,6 +234,7 @@ public class Cpu
 		return false;
 	}
 	
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void Tick()
 	{
 		if (Cycles >= _nextEventCycle) 
@@ -280,18 +282,6 @@ public class AvrInterruptConfig (byte address, ushort enableRegister, int enable
 	public readonly int FlagMask = flagMask;
 	public readonly bool InverseFlag = inverseFlag;
 	public bool Constant = constant;
-}
-
-public class AvrClockEventEntry
-{
-	public int Cycles { get; set; }
-	public Action Callback { get; set; } = () => { };
-	public AvrClockEventEntry? Next { get; set; }
-	
-	public AvrClockEventEntry Clone ()
-	{
-		return new AvrClockEventEntry { Cycles = Cycles, Callback = Callback, Next = Next };
-	}
 }
 
 public struct ClockEventEntry
