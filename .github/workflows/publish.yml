@@ -1,7 +1,7 @@
 name: Publish NuGet
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Publishes NuGet packages for AVR8Sharp.Core and Avr8Sharp.TestKit.
+# Publishes NuGet packages for Avr8Sharp and Avr8Sharp.TestKit.
 #
 # Triggers
 # ────────
@@ -92,9 +92,9 @@ jobs:
           --logger "console;verbosity=normal"
 
       # ── Pack ─────────────────────────────────────────────────────────────────
-      - name: Pack AVR8Sharp.Core
+      - name: Pack Avr8Sharp
         run: >
-          dotnet pack src/AVR8Sharp.Core/AVR8Sharp.Core.csproj
+          dotnet pack src/Avr8Sharp/Avr8Sharp.csproj
           -c Release
           --no-build
           --output ./nupkgs
