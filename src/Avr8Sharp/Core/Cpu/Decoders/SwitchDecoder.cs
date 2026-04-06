@@ -4,6 +4,7 @@ namespace AVR8Sharp.Core.Cpu.Decoders;
 
 public struct SwitchDecoder : IInstructionDecoder
 {
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Decode(Cpu cpu)
     {
         var opcode = cpu.ProgramMemory[(int)cpu.Pc];
@@ -447,7 +448,7 @@ public struct SwitchDecoder : IInstructionDecoder
                 break;
         }
 
-        cpu.Pc = (uint)((cpu.Pc + 1) % cpu.ProgramMemory.Length);
+        cpu.Pc = (cpu.Pc + 1u) % (uint)cpu.ProgramMemory.Length;
         cpu.Cycles++;
     }
 }

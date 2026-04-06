@@ -155,6 +155,14 @@ public class AvrAdc
         {
             _muxArray[i] = config.MuxChannels.GetValueOrDefault(i, FallbackMuxInput);
         }
+
+        _completeAdcAction = () => CompleteAdcRead(_pendingAdcResult);
+
+        _cpu.Mmio.RegisterWrite(config.ADMUX, (value, _, _, _) => {
+            _cpu.Mmio.Data[config.ADMUX] = value;
+            UpdateCaches();
+            return true;
+        });
         
         _cpu.Mmio.RegisterWrite(config.ADCSRA, (value, oldValue, _, _) =>
         {
@@ -164,7 +172,9 @@ public class AvrAdc
             }
 
             cpu.Mmio.Data[config.ADCSRA] = value;
+            UpdateCaches();
             cpu.UpdateInterruptEnable(_adc, value);
+
             if (!_converting && (value & ADSC) != 0)
             {
                 if ((value & ADEN) == 0)
@@ -180,8 +190,7 @@ public class AvrAdc
                     channel |= 0x20;
                 }
 
-                channel &= config.MuxInputMask;
-                var muxInput = config.MuxChannels[(ushort)channel] ?? FallbackMuxInput;
+                var muxInput = _muxArray[channel & 0x1F];
                 _converting = true;
                 OnADCRead(muxInput);
                 return true;
@@ -189,39 +198,32 @@ public class AvrAdc
 
             return false;
         });
+
+        UpdateCaches();
     }
 
     public void OnADCRead(AdcMuxInput input)
     {
-        // // Default implementation
-        var voltage = 0.0;
-        switch (input.Type)
+        var voltage = input.Type switch
         {
-            case AdcMuxInputType.Constant:
-                voltage = input.Voltage;
-                break;
-            case AdcMuxInputType.SingleEnded:
-                voltage = ChannelValues[input.Channel];
-                break;
-            case AdcMuxInputType.Differential:
-                voltage = input.Gain *
-                          (ChannelValues[input.PositiveChannel] -
-                           ChannelValues[input.NegativeChannel]);
-                break;
-            case AdcMuxInputType.Temperature:
-                voltage = 0.378125; // 25 celcius
-                break;
-        }
+            AdcMuxInputType.Constant => input.Voltage,
+            AdcMuxInputType.SingleEnded => ChannelValues[input.Channel],
+            AdcMuxInputType.Differential => input.Gain * (ChannelValues[input.PositiveChannel] - ChannelValues[input.NegativeChannel]),
+            AdcMuxInputType.Temperature => 0.378125,
+            _ => 0.0
+        };
 
-        var rawValue = voltage / ReferenceVoltage * 1024;
-        var result = Math.Min(Math.Max((int)Math.Floor(rawValue), 0), 1023);
-        _cpu.AddClockEvent(() => CompleteAdcRead(result), SampleCycles);
+        var rawValue = voltage / _cachedReferenceVoltage * 1024;
+        _pendingAdcResult = Math.Clamp((int)Math.Floor(rawValue), 0, 1023);
+
+        _cpu.AddClockEvent(_completeAdcAction, _cachedSampleCycles);
     }
 
     public void CompleteAdcRead(int result)
     {
         _converting = false;
         _conversionCycles = 13;
+        UpdateCaches();
         var admux = _config.ADMUX;
         var adcl = _config.ADCL;
         var adch = _config.ADCH;
@@ -239,6 +241,31 @@ public class AvrAdc
 
         _cpu.Mmio.Data[adcsra] &= ~ADSC & 0xff;
         _cpu.SetInterruptFlag(_adc);
+    }
+
+    private void UpdateCaches()
+    {
+        var admux = _cpu.Mmio.Data[_config.ADMUX];
+        var refs = (admux >> REFS_SHIFT) & REFS_MASK;
+        if (_config.AdcReferences.Length > 4 && (admux & REFS2) != 0) refs |= 0x4;
+
+        var refType = _config.AdcReferences[refs] ?? AdcReference.AVCC;
+        _cachedReferenceVoltage = refType switch
+        {
+            AdcReference.AREF => aref,
+            AdcReference.Internal1V1 => 1.1,
+            AdcReference.Internal2V56 => 2.56,
+            _ => avcc
+        };
+
+        var adcsra = _cpu.Mmio.Data[_config.ADCSRA];
+        var adps = adcsra & ADPS_MASK;
+        var prescaler = adps switch
+        {
+            2 => 4, 3 => 8, 4 => 16, 5 => 32, 6 => 64, 7 => 128,
+            _ => 2
+        };
+        _cachedSampleCycles = _conversionCycles * prescaler;
     }
 }
 

@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace AVR8Sharp.Core.Cpu.Decoders;
@@ -17,13 +18,14 @@ public unsafe struct NativeLutDecoder : IInstructionDecoder
         BuildTable();
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Decode(Cpu cpu)
     {
         var opcode = cpu.ProgramMemory[(int)cpu.Pc];
-        
+
         LookupTable[opcode](ref cpu, ref opcode);
-        
-        cpu.Pc = (uint)((cpu.Pc + 1) % cpu.ProgramMemory.Length);
+
+        cpu.Pc = (cpu.Pc + 1u) % (uint)cpu.ProgramMemory.Length;
         cpu.Cycles++;
     }
     

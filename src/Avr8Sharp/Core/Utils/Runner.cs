@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using AVR8Sharp.Core.Cpu;
 using AVR8Sharp.Core.Cpu.Decoders;
 using AVR8Sharp.Core.Peripherals;
@@ -67,6 +68,7 @@ public class AvrRunner
 		callback.Invoke (Cpu);
 	}
 	
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void Execute<TDecoder> (ref TDecoder decoder) where TDecoder : struct, IInstructionDecoder
 	{
 		var cpu = this.Cpu;

@@ -1,4 +1,5 @@
 #nullable enable
+using System.Runtime.CompilerServices;
 namespace Avr8Sharp.Core.Memory;
 
 public class MmioController
@@ -26,13 +27,15 @@ public class MmioController
         _writeHooks[address] = hook;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public byte ReadData(ushort address)
     {
         var hook = _readHooks[address];
-        
+
         return hook == null ? Data[address] : hook(address);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WriteData(ushort address, byte value, byte mask = 0xff)
     {
         var hook = _writeHooks[address];
