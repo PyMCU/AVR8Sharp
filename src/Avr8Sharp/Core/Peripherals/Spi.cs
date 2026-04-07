@@ -39,6 +39,8 @@ public class AvrSpi
 
 	public Func<byte, int> OnTransfer { get; set; }
 	public Action<byte> OnByte { get; set; }
+	public Action<byte>? OnSlaveSelect { get; set; }
+	public Action<byte>? OnSlaveTransfer { get; set; }
 	public bool IsMaster {
 		get {
 			return (_cpu.Mmio.Data[_config.SPCR] & SPCR_MSTR) != 0;
@@ -147,6 +149,18 @@ public class AvrSpi
 		_cpu.Mmio.Data[_config.SPDR] = _shiftRegister;
 		_cpu.SetInterruptFlag (_spi);
 		_transmissionActive = false;
+	}
+
+	/// <summary>
+	/// Simulate a byte driven by an external SPI master when this device is in slave mode (MSTR=0).
+	/// The received byte is stored in SPDR; SPIF is set and the SPI interrupt fires if SPIE is set.
+	/// </summary>
+	public void SimulateIncomingMasterByte (byte masterByte)
+	{
+		_shiftRegister = masterByte;
+		_cpu.Mmio.Data[_config.SPDR] = _shiftRegister;
+		OnSlaveTransfer?.Invoke (masterByte);
+		_cpu.SetInterruptFlag (_spi);
 	}
 }
 
