@@ -257,6 +257,30 @@ public class Spi
 		});
 	}
 	
+	[Test (Description = "Shift register: byte is moved to SPDR only when transfer completes")]
+	public void ShiftRegister_ByteMovedToSpdr ()
+	{
+		var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
+		var spi = new AvrSpi (cpu, AvrSpi.SpiConfig, FREQ_16MHZ);
+
+		spi.OnByte = b => {
+			cpu.AddClockEvent (() => spi.CompleteTransfer (0xA5), spi.TransferCycles);
+		};
+
+		cpu.WriteData (SPCR, SPE | MSTR);
+		cpu.WriteData (SPDR, 0x00); // initiate transfer
+
+		// SPDR must still hold the old value during transfer
+		Assert.That (cpu.ReadData (SPDR), Is.Zero, "SPDR must not update while transfer is in progress");
+
+		// Advance past transfer (8 bits * 4 cycles/bit = 32)
+		cpu.Cycles += 32;
+		cpu.Tick ();
+
+		Assert.That (cpu.ReadData (SPDR), Is.EqualTo (0xA5),
+			"Byte must be moved from shift register to SPDR on transfer completion");
+	}
+
 	[Test (Description = "Should should only update SPDR when tranfer finishes (double buffering)")]
 	public void DoubleBuffering ()
 	{

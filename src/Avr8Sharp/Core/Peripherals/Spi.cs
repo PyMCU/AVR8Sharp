@@ -33,7 +33,8 @@ public class AvrSpi
 	readonly uint _freqHz;
 	
 	bool _transmissionActive = false;
-	
+	byte _shiftRegister = 0;
+
 	readonly AvrInterruptConfig _spi;
 
 	public Func<byte, int> OnTransfer { get; set; }
@@ -140,7 +141,10 @@ public class AvrSpi
 
 	public void CompleteTransfer (int receivedByte)
 	{
-		_cpu.Mmio.Data[_config.SPDR] = (byte)receivedByte;
+		// Two-stage model: shift register receives bits during transfer,
+		// then the byte is moved to SPDR (the read buffer) on completion.
+		_shiftRegister = (byte)receivedByte;
+		_cpu.Mmio.Data[_config.SPDR] = _shiftRegister;
 		_cpu.SetInterruptFlag (_spi);
 		_transmissionActive = false;
 	}
