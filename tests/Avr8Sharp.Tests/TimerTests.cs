@@ -2014,4 +2014,124 @@ public class Timer
 				"Both registered write hooks must be called (hook chaining)");
 		}
 	}
+
+	[TestFixture]
+	public class Timer5
+	{
+		// ATmega2560 Timer5 register addresses (data memory / extended I/O)
+		const ushort TCCR5A = 0x120;
+		const ushort TCCR5B = 0x121;
+		const ushort TCNT5L = 0x124;
+		const ushort TCNT5H = 0x125;
+		const ushort OCR5AL = 0x128;
+		const ushort ICR5L  = 0x126;
+		const ushort ICR5H  = 0x127;
+		const int    TIFR5  = 0x3A;
+		const int    TIMSK5 = 0x73;
+		const int    SREG   = 95;
+
+		// TIFR5 / TIMSK5 bit masks
+		const int TOV5  = 1;     // bit 0 — timer overflow flag/enable
+		const int TOIE5 = 1;     // bit 0
+		const int OCFA5 = 2;     // bit 1
+		const int ICF5  = 0x20;  // bit 5
+		const int ICIE5 = 0x20;  // bit 5
+
+		// ATmega2560 Timer5 overflow vector (0-indexed, 4-byte entries)
+		// vector 50 × 4 = 200 = 0xC8
+		const int Timer5OvfVector = 0xC8;
+
+		// Build the Timer5 config (same as in ArduinoMegaSimulation)
+		private static AvrTimerConfig MakeTimer5Config () =>
+			new AvrTimerConfig (
+				bits:                 16,
+				dividers:             AvrTimer.Timer01Dividers,
+				captureInterrupt:     0xB8,
+				comparatorAInterrupt: 0xBC,
+				comparatorBInterrupt: 0xC0,
+				comparatorCInterrupt: 0xC4,
+				overflowInterrupt:    Timer5OvfVector,
+				tccra: TCCR5A, tccrb: TCCR5B, tccrc: 0x122,
+				tcnt:  TCNT5L, icr:   ICR5L,
+				ocra:  OCR5AL, ocrb:  0x12A, ocrc: 0x12C,
+				timsk: TIMSK5, tifr:  TIFR5,
+				tov: TOV5, ocfa: OCFA5, ocfb: 4, ocfc: 8,
+				toie: TOIE5, ociea: 2, ocieb: 4, ociec: 8,
+				icf:  ICF5,  icie:  ICIE5);
+
+		[Test (Description = "ATmega2560 Timer5 counts up with /1 prescaler")]
+		public void Timer5_Counts ()
+		{
+			// ATmega2560 flash size triggers 22-bit PC
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[0x20000]);
+			var timer = new AvrTimer (cpu, MakeTimer5Config ());
+
+			cpu.WriteData (TCCR5B, 1); // CS50 = /1
+			cpu.Cycles = 1; cpu.Tick ();
+			cpu.Cycles = 5; cpu.Tick ();
+
+			// Read 16-bit TCNT5 (little-endian — low byte first)
+			var low  = (int)cpu.Mmio.Data[TCNT5L];
+			var high = (int)cpu.Mmio.Data[TCNT5H];
+			cpu.ReadData (TCNT5L); // trigger ReadTcnt hook to refresh
+			var tcnt = cpu.Mmio.DataView.GetUint16 (TCNT5L, true);
+
+			Assert.That (tcnt, Is.GreaterThan (0), "Timer5 must count when enabled with /1 prescaler");
+		}
+
+		[Test (Description = "ATmega2560 Timer5 overflow sets TOV5 and jumps to overflow vector")]
+		public void Timer5_OverflowInterrupt ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[0x20000]);
+			var timer = new AvrTimer (cpu, MakeTimer5Config ());
+
+			// Set TCNT5 = 0xFFFF via proper 16-bit write sequence (high byte → temp register, low byte → WriteTcnt)
+			cpu.WriteData (TCNT5H, 0xFF); // → _highByteTemp = 0xFF
+			cpu.WriteData (TCNT5L, 0xFF); // → WriteTcnt: _tcntNext = 0xFFFF, _tcntUpdated = true
+
+			cpu.WriteData (TCCR5B, 1);    // CS50 = /1; starts timer, schedules count at cycle 1
+
+			// Enable global interrupts and TOIE5 (direct write to data memory is enough for SetInterruptFlag)
+			cpu.Mmio.Data[SREG]   = 0x80;
+			cpu.Mmio.Data[TIMSK5] = TOIE5;
+
+			// Tick 1: Count() applies _tcntNext=0xFFFF (no overflow — tcntUpdated takes priority)
+			cpu.Cycles = 1; cpu.Tick ();
+			// Tick 2: Count() increments 0xFFFF → overflow → TOV5 set → interrupt dispatched → PC = 0xC8
+			cpu.Cycles = 2; cpu.Tick ();
+			cpu.ReadData (TCNT5L);
+
+			Assert.Multiple (() =>
+			{
+				Assert.That (cpu.Mmio.Data[TIFR5] & TOV5, Is.EqualTo (0),
+					"TOV5 should be cleared after interrupt dispatch");
+				Assert.That (cpu.Pc, Is.EqualTo (Timer5OvfVector),
+					"PC must jump to Timer5 overflow vector");
+			});
+		}
+
+		[Test (Description = "ATmega2560 Timer5 input capture latches TCNT5 into ICR5 and sets ICF5")]
+		public void Timer5_InputCapture ()
+		{
+			var cpu  = new AVR8Sharp.Core.Cpu.Cpu (new ushort[0x20000]);
+			var timer = new AvrTimer (cpu, MakeTimer5Config ());
+
+			cpu.WriteData (TCCR5B, 1); // /1 prescaler
+			cpu.Cycles = 1; cpu.Tick ();
+			cpu.Cycles = 10; cpu.Tick ();
+			cpu.ReadData (TCNT5L); // refresh
+
+			var tcntBefore = cpu.Mmio.DataView.GetUint16 (TCNT5L, true);
+
+			timer.TriggerCapture ();
+
+			var icr = cpu.Mmio.DataView.GetUint16 (ICR5L, true);
+
+			Assert.Multiple (() =>
+			{
+				Assert.That (icr, Is.EqualTo (tcntBefore), "ICR5 must latch TCNT5 on TriggerCapture");
+				Assert.That (cpu.Mmio.Data[TIFR5] & ICF5, Is.EqualTo (ICF5), "ICF5 must be set after capture");
+			});
+		}
+	}
 }

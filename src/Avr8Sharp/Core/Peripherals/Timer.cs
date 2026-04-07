@@ -1054,16 +1054,16 @@ public class AvrTimerConfig
     public readonly byte OverflowInterrupt;
 
     // Register Addresses
-    public readonly byte TIFR;
-    public readonly byte OCRA;
-    public readonly byte OCRB;
-    public readonly byte OCRC; // Optional: 0 if not used
-    public readonly byte ICR;
-    public readonly byte TCNT;
-    public readonly byte TCCRA;
-    public readonly byte TCCRB;
-    public readonly byte TCCRC;
-    public readonly byte TIMSK;
+    public readonly ushort TIFR;
+    public readonly ushort OCRA;
+    public readonly ushort OCRB;
+    public readonly ushort OCRC; // Optional: 0 if not used
+    public readonly ushort ICR;
+    public readonly ushort TCNT;
+    public readonly ushort TCCRA;
+    public readonly ushort TCCRB;
+    public readonly ushort TCCRC;
+    public readonly ushort TIMSK;
 
     // TIFR bits
     public readonly byte TOV;
@@ -1099,16 +1099,16 @@ public class AvrTimerConfig
         byte comparatorBInterrupt = 0,
         byte comparatorCInterrupt = 0,
         byte overflowInterrupt = 0,
-        byte tifr = 0,
-        byte ocra = 0,
-        byte ocrb = 0,
-        byte ocrc = 0,
-        byte icr = 0,
-        byte tcnt = 0,
-        byte tccra = 0,
-        byte tccrb = 0,
-        byte tccrc = 0,
-        byte timsk = 0,
+        ushort tifr = 0,
+        ushort ocra = 0,
+        ushort ocrb = 0,
+        ushort ocrc = 0,
+        ushort icr = 0,
+        ushort tcnt = 0,
+        ushort tccra = 0,
+        ushort tccrb = 0,
+        ushort tccrc = 0,
+        ushort timsk = 0,
         byte tov = 0,
         byte ocfa = 0,
         byte ocfb = 0,
@@ -1173,16 +1173,16 @@ public class AvrTimerConfig
         byte comparatorBInterrupt = 0,
         byte comparatorCInterrupt = 0,
         byte overflowInterrupt = 0,
-        byte tifr = 0,
-        byte ocra = 0,
-        byte ocrb = 0,
-        byte ocrc = 0,
-        byte icr = 0,
-        byte tcnt = 0,
-        byte tccra = 0,
-        byte tccrb = 0,
-        byte tccrc = 0,
-        byte timsk = 0,
+        ushort tifr = 0,
+        ushort ocra = 0,
+        ushort ocrb = 0,
+        ushort ocrc = 0,
+        ushort icr = 0,
+        ushort tcnt = 0,
+        ushort tccra = 0,
+        ushort tccrb = 0,
+        ushort tccrc = 0,
+        ushort timsk = 0,
         byte tov = 0,
         byte ocfa = 0,
         byte ocfb = 0,

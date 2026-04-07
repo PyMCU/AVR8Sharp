@@ -342,10 +342,10 @@ public class AvrUsartConfig
     public byte DataRegisterEmptyInterrupt { get; set; }
     public byte TxCompleteInterrupt { get; set; }
 
-    public byte UCSRA { get; set; }
-    public byte UCSRB { get; set; }
-    public byte UCSRC { get; set; }
-    public byte UBRRL { get; set; }
-    public byte UBRRH { get; set; }
-    public byte UDR { get; set; }
+    public ushort UCSRA { get; set; }
+    public ushort UCSRB { get; set; }
+    public ushort UCSRC { get; set; }
+    public ushort UBRRL { get; set; }
+    public ushort UBRRH { get; set; }
+    public ushort UDR { get; set; }
 }
