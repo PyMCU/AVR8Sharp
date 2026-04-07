@@ -140,6 +140,13 @@ public class AvrAdc
 
     public double[] ChannelValues { get; }
 
+    /// <summary>
+    /// Voltage returned by the internal temperature sensor channel (mux input 8 on ATmega328P).
+    /// Defaults to ~0.378 V which corresponds to approximately 25 °C.
+    /// Set this to simulate a different ambient temperature.
+    /// </summary>
+    public double TemperatureVoltage { get; set; } = 0.378125;
+
     public AvrAdc(Cpu.Cpu cpu, AvrAdcConfig config)
     {
         _cpu = cpu;
@@ -211,7 +218,7 @@ public class AvrAdc
             AdcMuxInputType.Constant => input.Voltage,
             AdcMuxInputType.SingleEnded => ChannelValues[input.Channel],
             AdcMuxInputType.Differential => input.Gain * (ChannelValues[input.PositiveChannel] - ChannelValues[input.NegativeChannel]),
-            AdcMuxInputType.Temperature => 0.378125,
+            AdcMuxInputType.Temperature => TemperatureVoltage,
             _ => 0.0
         };
 

@@ -199,4 +199,33 @@ public class Adc
 		Assert.That(cpu.Mmio.Data[ADCSRA] & ADIF, Is.EqualTo(0),
 			"ADIF must NOT fire again when ADATE=0 (single-conversion mode)");
 	}
+
+	[Test (Description = "AvrAdc.TemperatureVoltage is configurable and affects the ADC result")]
+	public void TemperatureSensor_Configurable ()
+	{
+		var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[0x8000]);
+		var adc = new AvrAdc (cpu, AvrAdc.AdcConfig);
+
+		// Set a known temperature voltage (0.4 V)
+		adc.TemperatureVoltage = 0.4;
+
+		// Select temperature channel (mux 8 = 0b1000), AVCC reference (REFS0)
+		cpu.Mmio.Data[ADMUX] = (byte)((1 << 6) | 8); // REFS0 | MUX3
+
+		// Enable ADC, start conversion, prescaler /128
+		// Write via WriteData to trigger the ADCSRA hook (direct Mmio.Data write bypasses it)
+		cpu.Mmio.Data[ADCSRA] = ADEN | ADSC | ADPS0 | ADPS1 | ADPS2;
+		adc.OnADCRead (new AdcMuxInput (type: AdcMuxInputType.Temperature));
+
+		cpu.Cycles += 128 * 25;
+		cpu.Tick ();
+
+		var low    = cpu.Mmio.Data[ADCL];
+		var high   = cpu.Mmio.Data[ADCH];
+		var result = (high << 8) | low;
+
+		// Expected: 0.4 / 5.0 * 1024 = 81.92 → floor → 81
+		Assert.That (result, Is.EqualTo (81),
+			"ADC result must reflect the configured TemperatureVoltage");
+	}
 }
