@@ -41,13 +41,12 @@ public struct LutDecoder : IInstructionDecoder
                         break;
                     }
 
-                    // Sub-switch basado en los bits 8-11
                     switch (opcode & 0x0F00)
                     {
                         case 0x0100: table[i] = Opcodes.MOVW; break;
                         case 0x0200: table[i] = Opcodes.MULS; break;
 
-                        case 0x0300: // Máscara 0xFF88 (analizamos bit 3 y 7)
+                        case 0x0300:
                             switch (opcode & 0x0088)
                             {
                                 case 0x0000: table[i] = Opcodes.MULSU; break;
@@ -58,7 +57,6 @@ public struct LutDecoder : IInstructionDecoder
 
                             break;
 
-                        // Agrupamos casos para simular la máscara 0xFC00 de forma nativa
                         case 0x0400:
                         case 0x0500:
                         case 0x0600:
@@ -81,13 +79,12 @@ public struct LutDecoder : IInstructionDecoder
                     break;
 
                 case 0x1000:
-                    // Sub-switch sobre los bits 10 y 11 (máscara 0x0C00 interna)
                     switch (opcode & 0x0C00)
                     {
-                        case 0x0000: table[i] = Opcodes.CPSE; break; // 1000 a 13FF
-                        case 0x0400: table[i] = Opcodes.CP; break; // 1400 a 17FF
-                        case 0x0800: table[i] = Opcodes.SUB; break; // 1800 a 1BFF
-                        case 0x0C00: table[i] = Opcodes.ADC; break; // 1C00 a 1FFF
+                        case 0x0000: table[i] = Opcodes.CPSE; break;
+                        case 0x0400: table[i] = Opcodes.CP; break;
+                        case 0x0800: table[i] = Opcodes.SUB; break;
+                        case 0x0C00: table[i] = Opcodes.ADC; break;
                     }
 
                     break;
@@ -110,8 +107,6 @@ public struct LutDecoder : IInstructionDecoder
                 case 0x7000: table[i] = Opcodes.ANDI; break;
 
                 case 0x8000:
-                    // Para instrucciones muy granulares o esparcidas, los 'if' siguen siendo 
-                    // la mejor opción para no hacer un switch gigante e ilegible.
                     if ((opcode & 0xFE0F) == 0x8008)
                     {
                         table[i] = Opcodes.LDY;
@@ -344,14 +339,15 @@ public struct LutDecoder : IInstructionDecoder
 
                             if (opcode == 0x9588)
                             {
-                                /* SLEEP not implemented */
+                                /* SLEEP — invoke OnSleep callback with SM2:SM1:SM0 bits from SMCR */
+                                table[i] = Opcodes.SLEEP;
                                 break;
                             }
 
                             if (opcode == 0x9598)
                             {
                                 /* BREAK - hardware breakpoint */
-                                table[i] = (ref Cpu cpu, ref ushort _) => AvrInterrupt.OnBreakpoint?.Invoke(cpu.Pc);
+                                table[i] = Opcodes.BREAK;
                                 break;
                             }
 
@@ -426,7 +422,6 @@ public struct LutDecoder : IInstructionDecoder
                     break;
 
                 case 0xB000:
-                    // IN (B000-B7FF) y OUT (B800-BFFF)
                     switch (opcode & 0x0800)
                     {
                         case 0x0000: table[i] = Opcodes.IN; break;
@@ -440,7 +435,6 @@ public struct LutDecoder : IInstructionDecoder
                 case 0xE000: table[i] = Opcodes.LDI; break;
 
                 case 0xF000:
-                    // Sub-switch para BRBS y BRBC
                     switch (opcode & 0x0C00)
                     {
                         case 0x0000: table[i] = Opcodes.BRBS; break;

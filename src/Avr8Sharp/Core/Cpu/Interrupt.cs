@@ -10,6 +10,13 @@ public static class AvrInterrupt
 	/// </summary>
 	public static Action<uint>? OnBreakpoint { get; set; }
 
+	/// <summary>
+	/// Called when a SLEEP instruction (0x9588) is executed.
+	/// The parameter is the SM2:SM1:SM0 sleep mode bits from SMCR (bits 3:1).
+	/// The host simulation can pause the CPU loop in response.
+	/// </summary>
+	public static Action<byte>? OnSleep { get; set; }
+
 	public static void DoAvrInterrupt (Cpu cpu, int address)
 	{
 		OnInterruptDispatch?.Invoke(address, cpu.Pc);

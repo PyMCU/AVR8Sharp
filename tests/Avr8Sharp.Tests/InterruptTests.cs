@@ -154,4 +154,86 @@ public class Interrupt
 			decoder.Decode(cpu);
 		});
 	}
+
+	[Test(Description = "SLEEP instruction (0x9588) invokes OnSleep callback in SwitchDecoder")]
+	public void SleepInstruction_SwitchDecoder_InvokesCallback ()
+	{
+		var program = new ushort[] { 0x9588 };
+		var cpu = new AVR8Sharp.Core.Cpu.Cpu(program);
+
+		// Set SM1:SM0 bits in SMCR (0x53): SM bits are bits 3:1, value 0b0000_0010 → SM0=1 (idle)
+		cpu.Mmio.Data[0x53] = 0b0000_0010; // SM0=1, SM1=0 → sleep mode bits = 0b001 = 1
+
+		byte? capturedMode = null;
+		AvrInterrupt.OnSleep = mode => capturedMode = mode;
+		try
+		{
+			var decoder = new AVR8Sharp.Core.Cpu.Decoders.SwitchDecoder();
+			decoder.Decode(cpu);
+			Assert.That(capturedMode, Is.Not.Null, "OnSleep must be called by SLEEP instruction");
+			Assert.That(capturedMode, Is.EqualTo(1), "Sleep mode bits SM2:SM1:SM0 must match SMCR");
+		}
+		finally
+		{
+			AvrInterrupt.OnSleep = null;
+		}
+	}
+
+	[Test(Description = "SLEEP instruction (0x9588) invokes OnSleep callback in LutDecoder")]
+	public void SleepInstruction_LutDecoder_InvokesCallback ()
+	{
+		var program = new ushort[] { 0x9588 };
+		var cpu = new AVR8Sharp.Core.Cpu.Cpu(program);
+		cpu.Mmio.Data[0x53] = 0b0000_0100; // SM1=1, SM0=0 → sleep mode bits = 0b010 = 2
+
+		byte? capturedMode = null;
+		AvrInterrupt.OnSleep = mode => capturedMode = mode;
+		try
+		{
+			var decoder = new AVR8Sharp.Core.Cpu.Decoders.LutDecoder();
+			decoder.Decode(cpu);
+			Assert.That(capturedMode, Is.Not.Null, "OnSleep must be called by SLEEP instruction in LutDecoder");
+			Assert.That(capturedMode, Is.EqualTo(2));
+		}
+		finally
+		{
+			AvrInterrupt.OnSleep = null;
+		}
+	}
+
+	[Test(Description = "SLEEP instruction (0x9588) invokes OnSleep callback in NativeLutDecoder")]
+	public void SleepInstruction_NativeLutDecoder_InvokesCallback ()
+	{
+		var program = new ushort[] { 0x9588 };
+		var cpu = new AVR8Sharp.Core.Cpu.Cpu(program);
+		cpu.Mmio.Data[0x53] = 0b0000_0110; // SM1=1, SM0=1 → sleep mode bits = 0b011 = 3
+
+		byte? capturedMode = null;
+		AvrInterrupt.OnSleep = mode => capturedMode = mode;
+		try
+		{
+			var decoder = new AVR8Sharp.Core.Cpu.Decoders.NativeLutDecoder();
+			decoder.Decode(cpu);
+			Assert.That(capturedMode, Is.Not.Null, "OnSleep must be called by SLEEP instruction in NativeLutDecoder");
+			Assert.That(capturedMode, Is.EqualTo(3));
+		}
+		finally
+		{
+			AvrInterrupt.OnSleep = null;
+		}
+	}
+
+	[Test(Description = "SLEEP without OnSleep registered does not crash")]
+	public void SleepInstruction_NoCallback_DoesNotCrash ()
+	{
+		var program = new ushort[] { 0x9588 };
+		var cpu = new AVR8Sharp.Core.Cpu.Cpu(program);
+		AvrInterrupt.OnSleep = null;
+
+		Assert.DoesNotThrow(() =>
+		{
+			var decoder = new AVR8Sharp.Core.Cpu.Decoders.SwitchDecoder();
+			decoder.Decode(cpu);
+		});
+	}
 }
