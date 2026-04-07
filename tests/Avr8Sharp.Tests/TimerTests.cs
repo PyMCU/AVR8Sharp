@@ -223,10 +223,10 @@ public class Timer
 		var tcnt = cpu.ReadData(TCNT0);
         Assert.Multiple(() =>
         {
-            Assert.That(tcnt, Is.EqualTo(2)); // TCNT should be 2 (one tick above + 2 cycles for interrupt)
+            Assert.That(tcnt, Is.EqualTo(3)); // TCNT = 3 (one tick + 3 interrupt-dispatch cycles, AVR spec)
             Assert.That(cpu.ReadData(TIFR0) & TOV0, Is.Zero);
             Assert.That(cpu.Pc, Is.EqualTo(0x20));
-            Assert.That(cpu.Cycles, Is.EqualTo(4));
+            Assert.That(cpu.Cycles, Is.EqualTo(5)); // cycles: 2 (tick) + 3 (DoAvrInterrupt) = 5
         });
     }
 	
@@ -250,10 +250,10 @@ public class Timer
 		var tcnt = cpu.ReadData(TCNT0);
 		Assert.Multiple(() =>
 		{
-			Assert.That(tcnt, Is.EqualTo(2)); // TCNT should be 2 (one tick above + 2 cycles for interrupt)
+			Assert.That(tcnt, Is.EqualTo(3)); // TCNT = 3 (one tick + 3 interrupt-dispatch cycles, AVR spec)
 			Assert.That(cpu.ReadData(TIFR0) & 2, Is.Zero);
 			Assert.That(cpu.Pc, Is.EqualTo(0x20));
-			Assert.That(cpu.Cycles, Is.EqualTo(4));
+			Assert.That(cpu.Cycles, Is.EqualTo(5)); // cycles: 2 (tick) + 3 (DoAvrInterrupt) = 5
 		});
 	}
 	
@@ -518,10 +518,10 @@ public class Timer
 		var tcnt = cpu.ReadData(TCNT0);
 		Assert.Multiple(() =>
 		{
-			Assert.That(tcnt, Is.EqualTo(0x23)); // TCNT should be 0x23 (one tick above + 2 cycles for interrupt)
+			Assert.That(tcnt, Is.EqualTo(0x24)); // TCNT = 0x24 (one tick + 3 interrupt-dispatch cycles, AVR spec)
 			Assert.That(cpu.ReadData(TIFR0) & OCF0A, Is.Zero);
 			Assert.That(cpu.Pc, Is.EqualTo(0x1c));
-			Assert.That(cpu.Cycles, Is.EqualTo(4));
+			Assert.That(cpu.Cycles, Is.EqualTo(5)); // cycles: 2 (tick) + 3 (DoAvrInterrupt) = 5
 		});
 	}
 	
@@ -566,10 +566,10 @@ public class Timer
 		var tcnt = cpu.ReadData(TCNT0);
 		Assert.Multiple(() =>
 		{
-			Assert.That(tcnt, Is.EqualTo(0x23)); // TCNT should be 0x23 (one tick above + 2 cycles for interrupt)
+			Assert.That(tcnt, Is.EqualTo(0x24)); // TCNT = 0x24 (one tick + 3 interrupt-dispatch cycles, AVR spec)
 			Assert.That(cpu.ReadData(TIFR0) & OCF0B, Is.Zero);
 			Assert.That(cpu.Pc, Is.EqualTo(0x1e));
-			Assert.That(cpu.Cycles, Is.EqualTo(4));
+			Assert.That(cpu.Cycles, Is.EqualTo(5)); // cycles: 2 (tick) + 3 (DoAvrInterrupt) = 5
 		});
 	}
 	
@@ -1332,10 +1332,10 @@ public class Timer
 			cpu.ReadData(TCNT1); // Refresh TCNT1
 			Assert.Multiple(() =>
 			{
-				Assert.That(cpu.Mmio.DataView.GetUint16(TCNT1, true), Is.EqualTo(2));
+				Assert.That(cpu.Mmio.DataView.GetUint16(TCNT1, true), Is.EqualTo(3)); // TCNT = 3 (3 interrupt-dispatch cycles)
 				Assert.That(cpu.ReadData(TIFR1) & TOV1, Is.Zero);
 				Assert.That(cpu.Pc, Is.EqualTo(0x1a));
-				Assert.That(cpu.Cycles, Is.EqualTo(5));
+				Assert.That(cpu.Cycles, Is.EqualTo(6)); // cycles: 3 (pre-interrupt) + 3 (DoAvrInterrupt) = 6
 			});
 		}
 		
@@ -1724,6 +1724,294 @@ public class Timer
 			cpu.Cycles = 3;
 			cpu.Tick();
 			Assert.That(cpu.ReadData(TCNT0), Is.EqualTo(1));
+		}
+	}
+
+	// ── Timer1 Input Capture (ICR) ────────────────────────────────────────────
+	[TestFixture]
+	public class InputCapture
+	{
+		const int TIFR1  = 0x36;
+		const int TIMSK1 = 0x6f;
+		const int TCCR1A = 0x80;
+		const int TCCR1B = 0x81;
+		const int TCNT1  = 0x84;
+		const int ICR1   = 0x86;
+		const int ICR1H  = 0x87;
+		const int CS10   = 1;
+		const int ICF1   = 1 << 5;  // TIFR1 bit 5
+		const int ICIE1  = 1 << 5;  // TIMSK1 bit 5
+
+		[Test (Description = "TriggerCapture latches TCNT into ICR and sets ICF1 flag")]
+		public void TriggerCapture_LatchesTcntAndSetsFlag ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[0x1000]);
+			var timer = new AvrTimer (cpu, AvrTimer.Timer1Config);
+
+			cpu.WriteData (TCCR1A, 0);      // Normal mode
+			cpu.WriteData (TCCR1B, CS10);   // prescaler /1
+			cpu.Cycles = 1;
+			cpu.Tick ();
+			cpu.Cycles = 10;
+			cpu.Tick ();
+			cpu.ReadData (TCNT1); // refresh _tcnt
+
+			var tcntBefore = cpu.Mmio.DataView.GetUint16 (TCNT1, true);
+
+			timer.TriggerCapture ();
+
+			// ICR must hold the value that was in TCNT at the moment of capture
+			var icr = cpu.Mmio.DataView.GetUint16 (ICR1, true);
+			Assert.That (icr, Is.EqualTo (tcntBefore), "ICR must equal TCNT at moment of capture");
+
+			// ICF1 flag must be set
+			Assert.That (cpu.Mmio.Data[TIFR1] & ICF1, Is.EqualTo (ICF1), "ICF1 flag must be set after capture");
+		}
+
+		[Test (Description = "TriggerCapture fires capture interrupt when ICIE1 is enabled")]
+		public void TriggerCapture_FiresInterruptWhenEnabled ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[0x1000]);
+			var timer = new AvrTimer (cpu, AvrTimer.Timer1Config);
+
+			cpu.WriteData (TCCR1A, 0);
+			cpu.WriteData (TCCR1B, CS10);
+			cpu.WriteData (TIMSK1, ICIE1);   // enable input capture interrupt
+			cpu.Mmio.Data[95] = 0x80;        // SREG: I-------
+
+			timer.TriggerCapture ();
+			cpu.Tick ();
+
+			// PC must jump to the capture ISR vector (0x14 = address of TIMER1_CAPT)
+			Assert.That (cpu.Pc, Is.EqualTo (0x14), "PC must jump to TIMER1_CAPT ISR vector 0x14");
+			Assert.That (cpu.Mmio.Data[TIFR1] & ICF1, Is.EqualTo (0), "ICF1 must be cleared when interrupt is acknowledged");
+		}
+
+		[Test (Description = "Clearing ICF1 by writing 1 to TIFR1 removes the pending interrupt")]
+		public void ClearICF1_ByWritingTIFR1 ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[0x1000]);
+			var timer = new AvrTimer (cpu, AvrTimer.Timer1Config);
+
+			cpu.WriteData (TCCR1B, CS10);
+			cpu.WriteData (TIMSK1, ICIE1);
+
+			timer.TriggerCapture ();
+			Assert.That (cpu.Mmio.Data[TIFR1] & ICF1, Is.EqualTo (ICF1));
+
+			// Writing 1 to a TIFR bit clears it (write-1-to-clear per AVR spec)
+			cpu.WriteData (TIFR1, ICF1);
+			Assert.That (cpu.Mmio.Data[TIFR1] & ICF1, Is.EqualTo (0), "ICF1 must clear when 1 is written to TIFR1");
+		}
+
+		[Test (Description = "TriggerCapture on a timer without capture configured is a no-op")]
+		public void TriggerCapture_NoOp_OnTimer0 ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[0x1000]);
+			var timer = new AvrTimer (cpu, AvrTimer.Timer0Config); // Timer0 has no capture
+
+			Assert.DoesNotThrow (() => timer.TriggerCapture (),
+				"TriggerCapture must not throw on a timer without capture support");
+		}
+	}
+
+	// ── Timer OCFC output compare C ──────────────────────────────────────────
+	[TestFixture]
+	public class OutputCompareC
+	{
+		const int TIFR1  = 0x36;
+		const int TIMSK1 = 0x6f;
+		const int TCCR1A = 0x80;
+		const int TCCR1B = 0x81;
+		const int TCNT1  = 0x84;
+		const int OCR1C  = 0x8c;
+		const int OCR1CH = 0x8d;
+		const int OCF1C  = 1 << 3; // TIFR1 bit 3
+		const int OCIE1C = 1 << 3; // TIMSK1 bit 3
+		const int CS10   = 1;
+		const int SREG   = 95;
+
+		[Test (Description = "OCF1C flag is set when TCNT1 matches OCR1C")]
+		public void OCF1C_SetOnMatch ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[0x1000]);
+			var timer = new AvrTimer (cpu, AvrTimer.Timer1Config.CreateNew (
+				ocrc: OCR1C, ocfc: OCF1C));
+
+			cpu.WriteData (TCCR1A, 0);
+			cpu.WriteData (TCCR1B, CS10);
+			cpu.WriteData (OCR1CH, 0);
+			cpu.WriteData (OCR1C,  5);
+
+			cpu.Cycles = 1; cpu.Tick ();
+			cpu.Cycles = 6; cpu.Tick ();
+			cpu.ReadData (TCNT1);
+
+			Assert.That (cpu.Mmio.Data[TIFR1] & OCF1C, Is.EqualTo (OCF1C), "OCF1C must be set when TCNT reaches OCR1C");
+		}
+
+		[Test (Description = "OCF1C flag can be cleared by writing 1 to TIFR1")]
+		public void OCF1C_ClearedByWritingTIFR1 ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[0x1000]);
+			var timer = new AvrTimer (cpu, AvrTimer.Timer1Config.CreateNew (
+				ocrc: OCR1C, ocfc: OCF1C));
+
+			cpu.WriteData (TCCR1B, CS10);
+			cpu.WriteData (OCR1CH, 0);
+			cpu.WriteData (OCR1C,  5);
+			cpu.Cycles = 1; cpu.Tick ();
+			cpu.Cycles = 6; cpu.Tick ();
+
+			Assert.That (cpu.Mmio.Data[TIFR1] & OCF1C, Is.EqualTo (OCF1C));
+			cpu.WriteData (TIFR1, OCF1C); // write-1-to-clear
+			Assert.That (cpu.Mmio.Data[TIFR1] & OCF1C, Is.EqualTo (0), "OCF1C must clear via TIFR1 write");
+		}
+
+		[Test (Description = "OCIE1C in TIMSK1 enables OCF1C interrupt")]
+		public void OCIE1C_EnablesInterrupt ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[0x1000]);
+			var timer = new AvrTimer (cpu, AvrTimer.Timer1Config.CreateNew (
+				ocrc: OCR1C, ocfc: OCF1C, ociec: OCIE1C,
+				comparatorCInterrupt: 0x1c)); // some interrupt vector
+
+			cpu.WriteData (TCCR1B, CS10);
+			cpu.WriteData (OCR1CH, 0);
+			cpu.WriteData (OCR1C,  5);
+			cpu.WriteData (TIMSK1, OCIE1C);
+			cpu.Mmio.Data[SREG] = 0x80;
+
+			cpu.Cycles = 1; cpu.Tick ();
+			cpu.Cycles = 6; cpu.Tick ();
+			cpu.Tick (); // fire interrupt
+
+			Assert.That (cpu.Pc, Is.EqualTo (0x1c), "PC must jump to OCF1C ISR vector");
+		}
+	}
+
+	// ── ATtiny85 Timer1 + MmioController hook chaining ───────────────────────
+	[TestFixture]
+	public class Tiny85Timer1
+	{
+		// ATtiny85 Timer1 register addresses (from ATtiny85Simulation.cs)
+		const int TCCR1  = 0x30;   // single control register (CS bits)
+		const int TCNT1  = 0x2F;
+		const int TIFR   = 0x58;   // shared with Timer0
+		const int TIMSK  = 0x59;   // shared with Timer0
+		const int TOV1   = 0x10;   // TIFR bit 4
+		const int TOIE1  = 0x10;   // TIMSK bit 4
+
+		private static AvrTimerConfig MakeTiny85Timer1Config ()
+		{
+			return new AvrTimerConfig (
+				bits: 8,
+				dividers: [0, 1, 2, 4, 8, 16, 32, 64],
+				captureInterrupt:     0,
+				comparatorAInterrupt: 0x03,
+				comparatorBInterrupt: 0x09,
+				comparatorCInterrupt: 0,
+				overflowInterrupt:    0x04,
+				tccra: 0x00,
+				tccrb: TCCR1,
+				tccrc: 0,
+				tcnt:  TCNT1,
+				ocra:  0x2E,
+				ocrb:  0x2B,
+				ocrc:  0,
+				icr:   0,
+				timsk: TIMSK,
+				tifr:  TIFR,
+				comparatorPortA: 0, comparatorPinA: 0,
+				comparatorPortB: 0, comparatorPinB: 0,
+				comparatorPortC: 0, comparatorPinC: 0,
+				externalClockPort: 0, externalClockPin: 0,
+				tov:  TOV1,  ocfa: 0x40, ocfb: 0x20, ocfc: 0,
+				toie: TOIE1, ociea: 0x40, ocieb: 0x20, ociec: 0);
+		}
+
+		[Test (Description = "ATtiny85 Timer1 counts up with prescaler /1 (CS10=1)")]
+		public void Timer1_Counts ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[0x1000]);
+			var timer1 = new AvrTimer (cpu, MakeTiny85Timer1Config ());
+
+			cpu.WriteData (TCCR1, 1); // CS10 = /1
+			cpu.Cycles = 1; cpu.Tick ();
+			cpu.Cycles = 5; cpu.Tick ();
+
+			var tcnt = cpu.ReadData (TCNT1);
+			Assert.That (tcnt, Is.GreaterThan (0), "ATtiny85 Timer1 must count when enabled");
+		}
+
+		[Test (Description = "ATtiny85 Timer0 and Timer1 can share TIFR/TIMSK without clobbering each other (hook chaining)")]
+		public void SharedTifrTimsk_BothTimersWork ()
+		{
+			// This tests the MmioController write-hook chaining: both timers register
+			// write hooks for the same TIFR/TIMSK registers.  Without chaining the
+			// second registration overwrites the first and only one timer responds.
+			const int TCCR0B = 0x53;
+			const int TCNT0  = 0x52;
+			const int TOV0   = 0x02;  // TIFR bit 1
+
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[0x1000]);
+
+			// ATtiny85 Timer0 config (uses same TIFR/TIMSK as Timer1)
+			var timer0Config = AvrTimer.Timer0Config.CreateNew (
+				tov:  TOV0, ocfa: 0x10, ocfb: 0x08,
+				toie: TOV0, ociea: 0x10, ocieb: 0x08,
+				tccra: 0x4A, tccrb: (byte)TCCR0B, tcnt: (byte)TCNT0,
+				tifr: TIFR, timsk: TIMSK);
+
+			var timer0 = new AvrTimer (cpu, timer0Config);
+			var timer1 = new AvrTimer (cpu, MakeTiny85Timer1Config ());
+
+			// Start both timers with prescaler /1
+			cpu.WriteData (TCCR0B, 1);
+			cpu.WriteData (TCCR1,  1);
+
+			cpu.Cycles = 1; cpu.Tick ();
+			cpu.Cycles = 10; cpu.Tick ();
+
+			var tcnt0 = cpu.ReadData (TCNT0);
+			var tcnt1 = cpu.ReadData (TCNT1);
+
+			Assert.That (tcnt0, Is.GreaterThan (0), "Timer0 must count with shared TIFR/TIMSK");
+			Assert.That (tcnt1, Is.GreaterThan (0), "Timer1 must count with shared TIFR/TIMSK");
+		}
+
+		[Test (Description = "ATtiny85 Timer1 overflow sets TOV1 in shared TIFR and fires interrupt")]
+		public void Timer1_OverflowInterrupt ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[0x1000]);
+			var timer1 = new AvrTimer (cpu, MakeTiny85Timer1Config ());
+
+			// Start just before overflow
+			cpu.WriteData (TCNT1, 0xFF);
+			cpu.WriteData (TCCR1, 1); // /1
+			cpu.Cycles = 1; cpu.Tick ();
+
+			// TOV1 should be set after overflow
+			cpu.Cycles = 2; cpu.Tick ();
+			cpu.ReadData (TCNT1);
+
+			Assert.That (cpu.Mmio.Data[TIFR] & TOV1, Is.EqualTo (TOV1),
+				"TOV1 must be set in shared TIFR after Timer1 overflow");
+		}
+
+		[Test (Description = "MmioController chains write hooks: second registration does not overwrite first")]
+		public void MmioController_HookChaining ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[0x1000]);
+
+			var calls = new List<int>();
+			cpu.Mmio.RegisterWrite (0x50, (v, o, a, m) => { calls.Add(1); return false; });
+			cpu.Mmio.RegisterWrite (0x50, (v, o, a, m) => { calls.Add(2); return false; });
+
+			cpu.WriteData (0x50, 0xFF);
+
+			Assert.That (calls, Is.EquivalentTo (new[] { 1, 2 }),
+				"Both registered write hooks must be called (hook chaining)");
 		}
 	}
 }

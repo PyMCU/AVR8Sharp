@@ -65,7 +65,7 @@ public class Twi
 		Assert.Multiple(() =>
 		{
 			Assert.That (cpu.Pc, Is.EqualTo(0x30)); // 2-wire Serial Interface Vector
-			Assert.That (cpu.Cycles, Is.EqualTo(2));
+			Assert.That (cpu.Cycles, Is.EqualTo(3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
 			Assert.That ((cpu.ReadData(TWCR) & TWINT), Is.EqualTo(0));
 		});
 	}

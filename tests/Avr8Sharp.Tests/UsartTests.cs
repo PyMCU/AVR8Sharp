@@ -290,7 +290,7 @@ public class Usart
             Assert.Multiple(() =>
             {
                 Assert.That(cpu.Pc, Is.EqualTo(PC_INT_UDRE));
-                Assert.That(cpu.Cycles, Is.EqualTo(2));
+                Assert.That(cpu.Cycles, Is.EqualTo(3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
                 Assert.That((cpu.Mmio.Data[UCSR0A] & UDRE), Is.EqualTo(0));
             });
         }
@@ -309,7 +309,7 @@ public class Usart
             Assert.Multiple(() =>
             {
                 Assert.That(cpu.Pc, Is.EqualTo(PC_INT_TXC));
-                Assert.That(cpu.Cycles, Is.EqualTo(1_000_000 + 2));
+                Assert.That(cpu.Cycles, Is.EqualTo(1_000_000 + 3)); // 3 cycles from DoAvrInterrupt
                 Assert.That((cpu.Mmio.Data[UCSR0A] & TXC), Is.EqualTo(0));
             });
         }
@@ -484,6 +484,37 @@ public class Usart
                 Assert.That(cpu.ReadData(UDR0), Is.EqualTo(0x42));
                 Assert.That (cpu.ReadData(UDR0), Is.EqualTo(0));
             });
+		}
+	}
+
+	[TestFixture]
+	public class NineBitFrame
+	{
+		const int FREQ_16MHZ = 16_000_000;
+		const int UCSR0B = 0xc1;
+		const int UCSR0C = 0xc2;
+		const int UCSZ0  = 2;
+		const int UCSZ1  = 4;
+		const int UCSZ2  = 4; // in UCSR0B
+		const int RXEN   = 16;
+
+		[Test (Description = "RxMasks[9] must be 0x1ff so the 9th data bit is not silently discarded")]
+		public void RxMask_NineBit_Is_0x1ff ()
+		{
+			Assert.That(AvrUsart.RxMasks[9], Is.EqualTo(0x1ff),
+				"9-bit RX mask must be 0x1ff so bit 8 survives; was incorrectly 0xff before fix");
+		}
+
+		[Test (Description = "BitsPerChar returns 9 when UCSZ2:0 = 7")]
+		public void BitsPerChar_Nine ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
+			var usart = new AvrUsart (cpu, AvrUsart.Usart0Config, FREQ_16MHZ);
+
+			cpu.WriteData (UCSR0C, UCSZ0 | UCSZ1);
+			cpu.WriteData (UCSR0B, UCSZ2);
+
+			Assert.That (usart.BitsPerChar, Is.EqualTo (9));
 		}
 	}
 }
