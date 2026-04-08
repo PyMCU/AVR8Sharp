@@ -9,8 +9,8 @@ namespace AVR8Sharp.Core.Cpu;
 public class Cpu
 {
 	#region Constants
-	const int RegisterSpace = 0x100;
-	const int MaxInterrupts = 128;
+	private const int RegisterSpace = 0x100;
+	private const int MaxInterrupts = 256;
 	#endregion
 
 	#region Private Properties
@@ -18,9 +18,9 @@ public class Cpu
 	private ClockEventEntry[] _clockEvents = new ClockEventEntry[64];
 	private int _clockEventCount = 0;
 	private readonly byte[] _ram;
-	int _nextEventCycle = int.MaxValue;
-	short _nextInterrupt = -1;
-	short _maxInterrupt = 0;
+	private int _nextEventCycle = int.MaxValue;
+	private short _nextInterrupt = -1;
+	private short _maxInterrupt = 0;
     #endregion
 
 	#region Public Properties
@@ -79,6 +79,7 @@ public class Cpu
 	{
 		// Reset the CPU
 		Sp = (ushort)(Mmio.Data.Length - 1);
+		Mmio.Data[95] = 0; // Clear SREG (all flags including global interrupt enable)
 		Pc = 0;
 		for (var i = 0; i < _pendingInterrupts.Length; i++) {
 			_pendingInterrupts[i] = null;

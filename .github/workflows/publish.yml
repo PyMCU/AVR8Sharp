@@ -1,21 +1,5 @@
 name: Publish NuGet
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Publishes NuGet packages for Avr8Sharp and Avr8Sharp.TestKit.
-#
-# Triggers
-# ────────
-#   • Push a version tag  (e.g. v1.2.3  → stable)
-#   • Push to main        → preview build (suffix: -preview.<run_number>)
-#   • Manual dispatch     → choose target and optional version suffix
-#
-# Required secrets (set in repo Settings → Secrets)
-#   NUGET_PRIVATE_SOURCE_URL  – NuGet v3 feed URL (required to push)
-#   NUGET_PRIVATE_API_KEY     – API key / PAT for the private feed
-#
-# Optional secrets
-#   NUGET_PUBLIC_API_KEY      – nuget.org API key; push skipped when absent
-# ─────────────────────────────────────────────────────────────────────────────
 on:
   push:
     tags:
@@ -48,30 +32,22 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
-      # ── Private NuGet source ────────────────────────────────────────────────
-      - name: Add private NuGet source
-        if: ${{ secrets.NUGET_PRIVATE_SOURCE_URL != '' }}
-        run: |
-          dotnet nuget add source "${{ secrets.NUGET_PRIVATE_SOURCE_URL }}" \
-            --name private \
-            --username ci \
-            --password "${{ secrets.NUGET_PRIVATE_API_KEY }}" \
-            --store-password-in-clear-text
-
       # ── Resolve version suffix ───────────────────────────────────────────────
-      # Priority: tag > workflow_dispatch input > auto preview suffix
       - name: Resolve version suffix
         id: versioning
         run: |
           TAG="${{ github.ref }}"
           if [[ "$TAG" == refs/tags/v* ]]; then
-            # Tag push — stable release, no suffix
-            echo "suffix=" >> "$GITHUB_OUTPUT"
+            TAG_VERSION="${TAG#refs/tags/v}"
+          
+            if [[ "$TAG_VERSION" == *-* ]]; then
+              echo "suffix=${TAG_VERSION#*-}" >> "$GITHUB_OUTPUT"
+            else
+              echo "suffix=" >> "$GITHUB_OUTPUT"
+            fi
           elif [[ -n "${{ github.event.inputs.version_suffix }}" ]]; then
-            # Manual dispatch with explicit suffix
             echo "suffix=${{ github.event.inputs.version_suffix }}" >> "$GITHUB_OUTPUT"
           else
-            # Automatic preview build from main
             echo "suffix=preview.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
           fi
 
@@ -108,24 +84,17 @@ jobs:
           --output ./nupkgs
           ${{ steps.versioning.outputs.suffix != '' && format('--version-suffix {0}', steps.versioning.outputs.suffix) || '' }}
 
-      # ── Push to private feed ─────────────────────────────────────────────────
-      - name: Push to private NuGet
-        if: ${{ secrets.NUGET_PRIVATE_SOURCE_URL != '' }}
-        run: >
-          dotnet nuget push "./nupkgs/*.nupkg"
-          --source private
-          --api-key "${{ secrets.NUGET_PRIVATE_API_KEY }}"
-          --skip-duplicate
-
       # ── Push to nuget.org (optional) ─────────────────────────────────────────
       - name: Push to nuget.org
+        env:
+          API_KEY: ${{ secrets.NUGET_API_KEY }}
         if: >
           ${{ github.server_url == 'https://github.com' &&
-              secrets.NUGET_PUBLIC_API_KEY != '' &&
+              env.API_KEY != '' &&
               (startsWith(github.ref, 'refs/tags/v') ||
               github.event.inputs.push_public == 'true') }}
         run: >
           dotnet nuget push "./nupkgs/*.nupkg"
           --source https://api.nuget.org/v3/index.json
-          --api-key "${{ secrets.NUGET_PUBLIC_API_KEY }}"
+          --api-key "${{ secrets.NUGET_API_KEY }}"
           --skip-duplicate

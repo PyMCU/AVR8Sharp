@@ -288,6 +288,27 @@ public class Eeprom
 		}
 	}
 
+	[Test (Description = "EEPM=11 (reserved mode) must not write or erase — treated as no-op")]
+	public void EepmMode3_DoesNotWrite ()
+	{
+		var cpu     = new AVR8Sharp.Core.Cpu.Cpu (new ushort[0x1000]);
+		var backend = new EepromMemoryBackend (1024);
+		var eeprom  = new AvrEeprom (cpu, backend);
+
+		backend.WriteMemory (5, 0xAB); // seed a known value
+
+		// Set EEPM=11 (both EEPM0 and EEPM1), EEMPE, then EEPE
+		// EECR bits: EEPM0=bit4, EEPM1=bit5, EEMPE=bit2, EEPE=bit1
+		cpu.Mmio.Data[EEARL - 0x20] = 5;   // address 5 (OUT uses I/O space)
+		cpu.Mmio.Data[EEDR - 0x20]  = 0xFF; // data to "write"
+		cpu.Mmio.Data[EECR - 0x20]  = EEPM0 | EEPM1 | EEMPE;
+		// Trigger EEPE — passes through the write hook on EECR
+		cpu.WriteData ((ushort)(EECR - 0x20), (byte)(EEPM0 | EEPM1 | EEMPE | EEPE));
+
+		Assert.That (backend.ReadMemory (5), Is.EqualTo (0xAB),
+			"EEPM=11 is reserved; memory must remain unchanged");
+	}
+
 	[Test(Description = "Should only erase the memory when EEPM0 is high")]
 	public void Erase()
 	{

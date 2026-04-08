@@ -123,8 +123,8 @@ void loop() {
 			.AddTimer (AvrTimer.Timer0Config, out _)
 			.AddTimer (AvrTimer.Timer1Config, out _)
 			.AddTimer (AvrTimer.Timer2Config, out _)
+			.UseSwitchDecoder()
 			.Build ();
-		var decoder = new SwitchDecoder();
 		
 		var builder = new StringBuilder ();
 		usart.OnByteTransmit = b => {
@@ -133,7 +133,7 @@ void loop() {
 		const int fiveSecs = 5 * 16_000_000;
 		var watch = Stopwatch.StartNew ();
 		while (runner.Cpu.Cycles < fiveSecs) {
-			runner.Execute (ref decoder);
+			runner.Execute ();
 		}
 		watch.Stop ();
 		Assert.That (builder.ToString (), Does.Contain ("Blink"));
@@ -153,9 +153,8 @@ void loop() {
 			.SetWorkUnitCycles (1)
 			.AddGpioPort (attinyPortB, out var port)
 			.AddTimer (attinyTimer0, out var timer)
+			.UseSwitchDecoder()
 			.Build ();
-		
-		var decoder = new SwitchDecoder();
 		
 		var stringBuilder = new StringBuilder ();
 		port.AddListener ((value, oldValue) => {
@@ -164,7 +163,7 @@ void loop() {
 		
 		const int fiveSecs = 5 * 16_000_000;
 		while (runner.Cpu.Cycles < fiveSecs) {
-			runner.Execute (ref decoder);
+			runner.Execute ();
 		}
 		
 		Assert.True (true);

@@ -87,6 +87,13 @@ public class AvrEeprom
 
                 var eedr = cpu.Mmio.Data[_config.EEDR];
 
+                // EEPM=11 is reserved/undefined per ATmega datasheet — treat as no-op
+                if ((eecr & (EEPM0 | EEPM1)) == (EEPM0 | EEPM1))
+                {
+                    cpu.Mmio.Data[_config.EECR] &= ~EEPE & 0xFF;
+                    return true;
+                }
+
                 _writeCompleteCycles = (uint)cpu.Cycles;
 
                 // Erase

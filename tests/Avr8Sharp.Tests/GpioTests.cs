@@ -341,7 +341,7 @@ public class Gpio
 			
 			Assert.Multiple (() => {
 				Assert.That (cpu.Pc, Is.EqualTo (PC_INT_INT0));
-				Assert.That (cpu.Cycles, Is.EqualTo (2));
+				Assert.That (cpu.Cycles, Is.EqualTo (3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
 				Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (0));
 			});
 			
@@ -369,7 +369,7 @@ public class Gpio
 			
 			Assert.Multiple (() => {
 				Assert.That (cpu.Pc, Is.EqualTo (PC_INT_INT0));
-				Assert.That (cpu.Cycles, Is.EqualTo (2));
+				Assert.That (cpu.Cycles, Is.EqualTo (3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
 				Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (0));
 			});
 		}
@@ -417,7 +417,7 @@ public class Gpio
 			cpu.Tick ();
 			Assert.Multiple (() => {
 				Assert.That (cpu.Pc, Is.EqualTo (PC_INT_INT0));
-				Assert.That (cpu.Cycles, Is.EqualTo (2));
+				Assert.That (cpu.Cycles, Is.EqualTo (3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
 			});
 			
 			// Flag shouldn't be cleared, as the interrupt is sticky
@@ -449,7 +449,7 @@ public class Gpio
 			
 			Assert.Multiple (() => {
 				Assert.That (cpu.Pc, Is.EqualTo (PC_INT_PCINT0));
-				Assert.That (cpu.Cycles, Is.EqualTo(2));
+				Assert.That (cpu.Cycles, Is.EqualTo(3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
 				Assert.That (cpu.Mmio.Data[PCIFR], Is.EqualTo (0));
 			});
 		}
@@ -473,7 +473,7 @@ public class Gpio
 			
 			Assert.Multiple (() => {
 				Assert.That (cpu.Pc, Is.EqualTo (PC_INT_PCINT0));
-				Assert.That (cpu.Cycles, Is.EqualTo(2));
+				Assert.That (cpu.Cycles, Is.EqualTo(3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
 				Assert.That (cpu.Mmio.Data[PCIFR], Is.EqualTo (0));
 			});
 		}
@@ -483,15 +483,73 @@ public class Gpio
 		{
 			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
 			var port = new AvrIoPort (cpu, AvrIoPort.PortBConfig);
-			
+
 			cpu.WriteData (PCICR, 1 << PCIE0);
 			cpu.WriteData (PCMSK0, 1 << PCINT3);
-			
+
 			port.SetPinValue (PB3, true);
 			Assert.That (cpu.Mmio.Data[PCIFR], Is.EqualTo (1 << PCIE0));
-			
+
 			cpu.WriteData (PCIFR, 1 << PCIE0);
 			Assert.That (cpu.Mmio.Data[PCIFR], Is.EqualTo (0));
+		}
+	}
+
+	[TestFixture]
+	public class PcmskIsolation
+	{
+		// PCMSK addresses
+		const int PCMSK0 = 0x6b; // Port B  (PCINT0 group)
+		const int PCMSK1 = 0x6c; // Port C  (PCINT1 group)
+		const int PCICR  = 0x68;
+		const int PCIFR  = 0x3b;
+
+		[Test (Description = "Writing PCMSK0 must not affect PortC PCINT1 interrupt enable state")]
+		public void WritePcmsk0_DoesNotAffectPortC ()
+		{
+			// Regression for bug: PCMSK write previously called UpdateInterruptEnable on ALL
+			// GPIO ports using the PCMSK VALUE (not PCICR), which could erroneously clear
+			// or queue other port groups' interrupts.
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
+			var portB = new AvrIoPort (cpu, AvrIoPort.PortBConfig);
+			var portC = new AvrIoPort (cpu, AvrIoPort.PortCConfig);
+
+			// Enable both PCINT groups in PCICR
+			cpu.WriteData (PCICR, 0x03); // PCIE0 | PCIE1
+
+			// Manually raise the PCINT1 (Port C) flag in PCIFR so the interrupt is pending
+			cpu.Mmio.Data[PCIFR] = 0x02; // PCINT1 flag bit
+
+			// Now write PCMSK0 — old code passed this VALUE (0x08) to UpdateInterruptEnable for
+			// ALL ports; since 0x08 & PCIE1_mask=2 = 0, it would ClearInterrupt(portC_pcint).
+			cpu.WriteData (PCMSK0, 1 << 3); // PCINT3
+
+			// PCIFR bit for PCINT1 must still be set — writing PCMSK0 must not touch PCINT1
+			Assert.That (cpu.Mmio.Data[PCIFR] & 0x02, Is.EqualTo(0x02),
+				"Writing PCMSK0 must not clear the PCINT1 flag in PCIFR");
+		}
+
+		[Test (Description = "Writing PCMSK0 only re-evaluates Port B interrupt — Port C PCINT1 state unchanged")]
+		public void WritePcmsk0_PortB_InterruptStaysArmed ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
+			var portB = new AvrIoPort (cpu, AvrIoPort.PortBConfig);
+			var portC = new AvrIoPort (cpu, AvrIoPort.PortCConfig);
+
+			// Enable PCINT1 group
+			cpu.WriteData (PCICR, 0x02); // PCIE1
+
+			// Trigger a Port C pin change to arm the PCINT1 interrupt
+			cpu.WriteData (PCMSK1, 0x01); // PCINT8
+			portC.SetPinValue (0, true);
+			Assert.That (cpu.Mmio.Data[PCIFR] & 0x02, Is.EqualTo(0x02), "PCINT1 should be pending");
+
+			// Write PCMSK0 (Port B mask) — must not affect PCINT1
+			cpu.WriteData (PCMSK0, 0xFF);
+
+			// PCINT1 must still be pending
+			Assert.That (cpu.Mmio.Data[PCIFR] & 0x02, Is.EqualTo(0x02),
+				"PCINT1 must remain armed after unrelated PCMSK0 write");
 		}
 	}
 }

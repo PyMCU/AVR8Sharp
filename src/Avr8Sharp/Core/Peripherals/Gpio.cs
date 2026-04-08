@@ -266,16 +266,13 @@ public class AvrIoPort
 
 	private bool DelegateWritePcmsk(byte value, byte oldValue, ushort v1, byte v2)
 	{
-		if (_portConfig.PinChange == null) return false;
-    
+		if (_portConfig.PinChange == null || _pcint == null) return false;
+
 		_cpu.Mmio.Data[_portConfig.PinChange.PCMSK] = value;
-		foreach (var gpio in _cpu.GpioPorts) 
-		{
-			if (gpio._pcint != null) 
-			{
-				_cpu.UpdateInterruptEnable(gpio._pcint, value);
-			}
-		}
+		// Re-evaluate only this port group's interrupt enable using PCICR (not PCMSK).
+		// Previously iterated all GPIO ports with the PCMSK value, which incorrectly
+		// cleared/queued other port groups' PCINT interrupts.
+		_cpu.UpdateInterruptEnable(_pcint, _cpu.Mmio.Data[_portConfig.PinChange.PCICR]);
 		return true;
 	}
 	

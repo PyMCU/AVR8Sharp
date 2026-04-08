@@ -640,6 +640,19 @@ public static class Opcodes
     public static void NOP(ref Cpu cpu, ref ushort opcode) { }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void BREAK(ref Cpu cpu, ref ushort opcode)
+    {
+        AvrInterrupt.OnBreakpoint?.Invoke(cpu.Pc);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void SLEEP(ref Cpu cpu, ref ushort opcode)
+    {
+        // Invoke OnSleep with SM2:SM1:SM0 bits from SMCR register (0x53), bits 3:1
+        AvrInterrupt.OnSleep?.Invoke((byte)((cpu.Mmio.Data[0x53] >> 1) & 0x07));
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void OR(ref Cpu cpu, ref ushort opcode)
     {
         var R = cpu.Mmio.Data[(opcode & 0x1f0) >> 4] | cpu.Mmio.Data[(opcode & 0xf) | ((opcode & 0x200) >> 5)];

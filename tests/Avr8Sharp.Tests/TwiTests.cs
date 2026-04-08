@@ -65,7 +65,7 @@ public class Twi
 		Assert.Multiple(() =>
 		{
 			Assert.That (cpu.Pc, Is.EqualTo(0x30)); // 2-wire Serial Interface Vector
-			Assert.That (cpu.Cycles, Is.EqualTo(2));
+			Assert.That (cpu.Cycles, Is.EqualTo(3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
 			Assert.That ((cpu.ReadData(TWCR) & TWINT), Is.EqualTo(0));
 		});
 	}
@@ -525,6 +525,152 @@ public class Twi
 			{
 				ReadBytePredicate?.Invoke (ack);
 			}
+		}
+	}
+
+	[TestFixture (Description = "TWI slave-mode tests")]
+	public class TwiSlave
+	{
+		const int FREQ_16MHZ = 16_000_000;
+		const int TWSR = 0xb9;
+		const int TWAR = 0xba;
+		const int TWDR = 0xbb;
+		const int TWCR = 0xbc;
+		const int TWAMR = 0xbd;
+		const int SREG = 95;
+
+		const int TWIE = 1;
+		const int TWEN = 4;
+		const int TWEA = 0x40;
+		const int TWINT = 0x80;
+
+		const int STATUS_SLAVE_SLAW_ACK = 0x60;
+		const int STATUS_SLAVE_GCALL_ACK = 0x70;
+		const int STATUS_SLAVE_DATA_RX_ACK = 0x80;
+		const int STATUS_SLAVE_SLAR_ACK = 0xA8;
+		const int TWSR_TWS_MASK = 0xf8;
+
+		[Test (Description = "Address match: TWINT is set and TWSR=0x60 when SLA+W matches TWAR")]
+		public void SlaveAddressMatch_SetsInterrupt ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
+			var twi = new AvrTwi (cpu, AvrTwi.TwiConfig, FREQ_16MHZ);
+
+			// Own address = 0x48, written into TWAR bits 7:1
+			cpu.Mmio.Data[TWAR] = (byte)(0x48 << 1);
+
+			// Clear TWINT left from construction
+			cpu.WriteData ((ushort)TWCR, (byte)(TWEN | TWINT));
+
+			var matched = twi.SimulateIncomingAddress (0x48, isWrite: true);
+
+			Assert.Multiple (() => {
+				Assert.That (matched, Is.True, "SimulateIncomingAddress must return true on match");
+				Assert.That (cpu.Mmio.Data[TWSR] & TWSR_TWS_MASK, Is.EqualTo (STATUS_SLAVE_SLAW_ACK),
+					"TWSR must be 0x60 after SLA+W match");
+				Assert.That (cpu.Mmio.Data[TWCR] & TWINT, Is.EqualTo (TWINT),
+					"TWINT must be set after address match");
+			});
+		}
+
+		[Test (Description = "Address mismatch: TWINT stays clear when address does not match TWAR")]
+		public void SlaveAddressNoMatch_NoInterrupt ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
+			var twi = new AvrTwi (cpu, AvrTwi.TwiConfig, FREQ_16MHZ);
+
+			cpu.Mmio.Data[TWAR] = (byte)(0x48 << 1);
+
+			// Clear TWINT
+			cpu.WriteData ((ushort)TWCR, (byte)(TWEN | TWINT));
+
+			var matched = twi.SimulateIncomingAddress (0x50, isWrite: true);
+
+			Assert.Multiple (() => {
+				Assert.That (matched, Is.False, "SimulateIncomingAddress must return false on mismatch");
+				Assert.That (cpu.Mmio.Data[TWCR] & TWINT, Is.Zero,
+					"TWINT must not be set when address does not match");
+			});
+		}
+
+		[Test (Description = "Slave receive: SimulateIncomingData stores byte in TWDR and raises TWINT")]
+		public void SlaveReceive_DeliversByte ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
+			var twi = new AvrTwi (cpu, AvrTwi.TwiConfig, FREQ_16MHZ);
+
+			cpu.Mmio.Data[TWAR] = (byte)(0x48 << 1);
+			cpu.WriteData ((ushort)TWCR, (byte)(TWEN | TWEA | TWINT));
+
+			twi.SimulateIncomingAddress (0x48, isWrite: true);
+			// Clear TWINT before data phase
+			cpu.WriteData ((ushort)TWCR, (byte)(TWEN | TWEA | TWINT));
+			twi.SimulateIncomingData (0x5A);
+
+			Assert.Multiple (() => {
+				Assert.That (cpu.Mmio.Data[TWDR], Is.EqualTo (0x5A), "TWDR must hold the received byte");
+				Assert.That (cpu.Mmio.Data[TWSR] & TWSR_TWS_MASK, Is.EqualTo (STATUS_SLAVE_DATA_RX_ACK),
+					"TWSR must be 0x80 (data received, ACK)");
+				Assert.That (cpu.Mmio.Data[TWCR] & TWINT, Is.EqualTo (TWINT), "TWINT must be set");
+			});
+		}
+
+		[Test (Description = "General call: TWINT is set and TWSR=0x70 when TWAR bit0=1 and address=0x00")]
+		public void GeneralCall_WhenEnabled ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
+			var twi = new AvrTwi (cpu, AvrTwi.TwiConfig, FREQ_16MHZ);
+
+			// Own address 0x48, general call enable (bit 0)
+			cpu.Mmio.Data[TWAR] = (byte)((0x48 << 1) | 0x01);
+			cpu.WriteData ((ushort)TWCR, (byte)(TWEN | TWINT));
+
+			var matched = twi.SimulateIncomingAddress (0x00, isWrite: true);
+
+			Assert.Multiple (() => {
+				Assert.That (matched, Is.True, "General call must match when TWGCE=1");
+				Assert.That (cpu.Mmio.Data[TWSR] & TWSR_TWS_MASK, Is.EqualTo (STATUS_SLAVE_GCALL_ACK),
+					"TWSR must be 0x70 for general call");
+			});
+		}
+
+		[Test (Description = "TWAMR: masked address bits are ignored during address comparison")]
+		public void TWAMR_MasksAddressBits ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
+			var twi = new AvrTwi (cpu, AvrTwi.TwiConfig, FREQ_16MHZ);
+
+			// Own address = 0x48 (0b1001000), mask upper bit so 0x48 and 0x08 both match
+			cpu.Mmio.Data[TWAR] = (byte)(0x48 << 1);
+			cpu.Mmio.Data[TWAMR] = (byte)(0x40 << 1); // mask bit 6 of address
+
+			cpu.WriteData ((ushort)TWCR, (byte)(TWEN | TWINT));
+
+			// 0x08 differs from 0x48 only in bit 6, which is masked → should match
+			var matched = twi.SimulateIncomingAddress (0x08, isWrite: true);
+
+			Assert.That (matched, Is.True, "Address differing only in masked bits must still match");
+		}
+
+		[Test (Description = "SLA+R: TWSR=0xA8 when SLA+R matches and ReadSlaveTransmitByte returns TWDR")]
+		public void SlaveTransmit_AddressMatch ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
+			var twi = new AvrTwi (cpu, AvrTwi.TwiConfig, FREQ_16MHZ);
+
+			cpu.Mmio.Data[TWAR] = (byte)(0x48 << 1);
+			cpu.Mmio.Data[TWDR] = 0xDE; // firmware loads TX byte
+			cpu.WriteData ((ushort)TWCR, (byte)(TWEN | TWINT));
+
+			var matched = twi.SimulateIncomingAddress (0x48, isWrite: false);
+
+			Assert.Multiple (() => {
+				Assert.That (matched, Is.True);
+				Assert.That (cpu.Mmio.Data[TWSR] & TWSR_TWS_MASK, Is.EqualTo (STATUS_SLAVE_SLAR_ACK),
+					"TWSR must be 0xA8 for SLA+R match");
+				Assert.That (twi.ReadSlaveTransmitByte (), Is.EqualTo (0xDE),
+					"ReadSlaveTransmitByte must return the byte firmware placed in TWDR");
+			});
 		}
 	}
 }

@@ -6,9 +6,16 @@ namespace Avr8Sharp.TestKit.Boards;
 /// Pre-configured simulation for the <b>ATtiny85</b>.
 /// <para>
 /// All standard peripherals are created automatically:
-/// Port B (the only GPIO port) and Timer 0.
+/// Port B (the only GPIO port), Timer 0, and Timer 1.
 /// The ATtiny85 has no hardware USART; use the USI peripheral via
 /// <see cref="AvrTestSimulation.AddUsart"/> if needed.
+/// </para>
+/// <para>
+/// Timer 1 note: the ATtiny85 TC1 is an 8-bit timer with a single TCCR1 register
+/// (no TCCRA/TCCRB split). This simulation maps TCCR1 (0x30) as the clock-select
+/// register (CS13:CS10). Prescalers /1–/64 (CS10-CS12) are supported; /128 and above
+/// (CS13=1) are not because the existing timer engine only reads the low 3 CS bits.
+/// CTC and PWM modes (CTC1, PWM1A bits in TCCR1) are not emulated — Normal mode only.
 /// </para>
 /// </summary>
 /// <example>
@@ -63,6 +70,47 @@ public sealed class ATtiny85Simulation : AvrTestSimulation
         tov: 2, ocfa: 16, ocfb: 8, ocfc: 0,
         toie: 2, ociea: 16, ocieb: 8, ociec: 0);
 
+    // ── ATtiny85 Timer 1 config ───────────────────────────────────────────────
+    // 8-bit TC1. Single control register TCCR1 at 0x30.
+    // TCCRA is mapped to address 0x00 (R0 — always 0 in well-behaved code → WGM = Normal mode).
+    // TCCRB is mapped to TCCR1 (0x30) so CS10–CS12 select the prescaler.
+    // Prescalers for CS10:CS12 on ATtiny85 TC1:
+    //   1→/1, 2→/2, 3→/4, 4→/8, 5→/16, 6→/32, 7→/64
+    // TIFR (0x58) and TIMSK (0x59) are shared with Timer0; MmioController hook-chaining
+    // allows both timers to handle their own bits in the same register.
+    // ATtiny85 datasheet interrupt vectors (word addresses):
+    //   TIMER1_OVF  = 0x004, TIMER1_COMPA = 0x003, TIMER1_COMPB = 0x009
+    private static readonly AvrTimerConfig Tiny85Timer1Config = new(
+        bits: 8,
+        dividers: [0, 1, 2, 4, 8, 16, 32, 64], // CS10:CS12 → /1../64
+        captureInterrupt:     0,
+        comparatorAInterrupt: 0x03,  // TIMER1_COMPA vector
+        comparatorBInterrupt: 0x09,  // TIMER1_COMPB vector
+        comparatorCInterrupt: 0,
+        overflowInterrupt:    0x04,  // TIMER1_OVF vector
+        tccra: 0x00,  // R0 — always 0 → forces Normal WGM mode
+        tccrb: 0x30,  // TCCR1 — contains CS13:CS10
+        tccrc: 0x00,
+        tcnt:  0x2F,  // TCNT1
+        ocra:  0x2E,  // OCR1A
+        ocrb:  0x2B,  // OCR1B
+        ocrc:  0,
+        icr:   0,
+        timsk: 0x59,  // shared TIMSK (Timer0 uses bits 0-2, Timer1 uses bits 4-6)
+        tifr:  0x58,  // shared TIFR  (Timer0 uses bits 0-2, Timer1 uses bits 4-6)
+        comparatorPortA: Tiny85PortBConfig.PORT, comparatorPinA: 1, // OC1A on PB1
+        comparatorPortB: Tiny85PortBConfig.PORT, comparatorPinB: 4, // OC1B on PB4
+        comparatorPortC: 0, comparatorPinC: 0,
+        externalClockPort: 0, externalClockPin: 0,
+        tov:  0x10,  // TOV1  = TIFR bit 4
+        ocfa: 0x40,  // OCF1A = TIFR bit 6
+        ocfb: 0x20,  // OCF1B = TIFR bit 5
+        ocfc: 0,
+        toie:  0x10, // TOIE1  = TIMSK bit 4
+        ociea: 0x40, // OCIE1A = TIMSK bit 6
+        ocieb: 0x20, // OCIE1B = TIMSK bit 5
+        ociec: 0);
+
     // ── GPIO ──────────────────────────────────────────────────────────────────
     /// <summary>
     /// Port B — the only I/O port on the ATtiny85.
@@ -74,11 +122,18 @@ public sealed class ATtiny85Simulation : AvrTestSimulation
     /// <summary>Timer 0 — 8-bit, OC0A on PB0, OC0B on PB1.</summary>
     public AvrTimer Timer0 { get; }
 
+    /// <summary>
+    /// Timer 1 — 8-bit TC1 (ATtiny85-specific). Normal mode only; prescalers /1–/64.
+    /// OC1A on PB1, OC1B on PB4.
+    /// </summary>
+    public AvrTimer Timer1 { get; }
+
     public ATtiny85Simulation() : base(Flash, Sram)
     {
         WithFrequency(Frequency);
 
         AddGpio(Tiny85PortBConfig, out var portB); PortB = portB;
         AddTimer(Tiny85Timer0Config, out var t0);  Timer0 = t0;
+        AddTimer(Tiny85Timer1Config, out var t1);  Timer1 = t1;
     }
 }

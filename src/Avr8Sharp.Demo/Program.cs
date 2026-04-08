@@ -204,10 +204,9 @@ void loop() {
 		};
 		Console.WriteLine ("Running...");
 		const int fiveSecs = (int)(5.5 * 16_000_000);
-		var decoder = new NativeLutDecoder();
 		// Run the program for 5.5 seconds
 		while (runner.Cpu.Cycles < fiveSecs) {
-			runner.Execute (ref decoder);
+			runner.Execute ();
 		}
 		watch.Stop ();
 		Console.WriteLine (builder.ToString ());

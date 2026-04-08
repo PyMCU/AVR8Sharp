@@ -1,36 +1,37 @@
 using System.Runtime.CompilerServices;
-using AVR8Sharp.Core.Cpu;
 using AVR8Sharp.Core.Cpu.Decoders;
-using AVR8Sharp.Core.Peripherals;
+
 namespace AVR8Sharp.Core.Utils;
 
-public class AvrRunner
+public enum DecoderType { Switch, Lut, NativeLut }
+
+public class AvrRunner(byte[] program, int sramBytes)
 {
 	public const int FLASH = 0x8000;
 
-	public readonly Cpu.Cpu Cpu;
-	private uint speed = 16_000_000U; // 16 MHz
-	private int workUnitCycles = 500000;
+	public readonly Cpu.Cpu Cpu = new(program, sramBytes);
+	private int _workUnitCycles = 500000;
 	
-	public uint Speed {
-		get {
-			return speed;
-		}
+	public uint Speed { get; private set; } = 16_000_000U;
+
+	private DecoderType _activeDecoder = DecoderType.NativeLut;
+	private LutDecoder _lutDecoder = new LutDecoder ();
+	private SwitchDecoder _switchDecoder = new SwitchDecoder ();
+	private NativeLutDecoder _nativeLutDecoder = new NativeLutDecoder ();
+
+	public void SetSpeed (uint speed)
+	{
+		Speed = speed;
 	}
 
-	public AvrRunner (byte[] program, int sramBytes)
+	internal void SetDecoder(DecoderType type)
 	{
-		Cpu = new Cpu.Cpu (program, sramBytes);
-	}
-	
-	public void SetSpeed (uint _speed)
-	{
-		this.speed = _speed;
+		_activeDecoder = type;
 	}
 	
 	public void SetWorkUnitCycles (int cycles)
 	{
-		workUnitCycles = cycles;
+		_workUnitCycles = cycles;
 	}
 	
 	public void LoadProgram (byte[] program)
@@ -60,7 +61,7 @@ public class AvrRunner
 
 	public void Execute<TDecoder> (ref TDecoder decoder, Action<Cpu.Cpu> callback) where TDecoder : struct, IInstructionDecoder
 	{
-		var cyclesToRun = Cpu.Cycles + workUnitCycles;
+		var cyclesToRun = Cpu.Cycles + _workUnitCycles;
 		while (Cpu.Cycles < cyclesToRun) {
 			decoder.Decode (Cpu);
 			Cpu.Tick ();
@@ -69,13 +70,31 @@ public class AvrRunner
 	}
 	
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	public void Execute<TDecoder> (ref TDecoder decoder) where TDecoder : struct, IInstructionDecoder
+	public void ExecuteInternal<TDecoder> (ref TDecoder decoder) where TDecoder : struct, IInstructionDecoder
 	{
-		var cpu = this.Cpu;
-		var cyclesToRun = cpu.Cycles + workUnitCycles;
+		var cpu = Cpu;
+		var cyclesToRun = cpu.Cycles + _workUnitCycles;
 		while (cpu.Cycles < cyclesToRun) {
 			decoder.Decode (cpu);
 			cpu.Tick ();
+		}
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public void Execute()
+	{
+		switch(_activeDecoder) {
+			case DecoderType.Switch:
+				ExecuteInternal (ref _switchDecoder);
+				break;
+			case DecoderType.Lut:
+				ExecuteInternal (ref _lutDecoder);
+				break;
+			case DecoderType.NativeLut:
+				ExecuteInternal (ref _nativeLutDecoder);
+				break;
+			default:
+				throw new NotImplementedException("Decoder type not implemented");
 		}
 	}
 }

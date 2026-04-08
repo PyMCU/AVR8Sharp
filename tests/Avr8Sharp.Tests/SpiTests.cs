@@ -257,6 +257,91 @@ public class Spi
 		});
 	}
 	
+	[TestFixture (Description = "SPI slave-mode tests")]
+	public class SpiSlave
+	{
+		const int FREQ_16MHZ = 16_000_000;
+		const int SPCR = 0x4c;
+		const int SPSR = 0x4d;
+		const int SPDR = 0x4e;
+		const int SREG = 95;
+		const int SPE = 0x40;
+		const int SPIE = 0x80;
+		const int SPIF = 0x80;
+
+		[Test (Description = "Slave mode: SimulateIncomingMasterByte stores byte in SPDR and sets SPIF")]
+		public void SlaveMode_ReceivesByte ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
+			var spi = new AvrSpi (cpu, AvrSpi.SpiConfig, FREQ_16MHZ);
+
+			// Slave mode: MSTR=0, SPE=1
+			cpu.WriteData (SPCR, SPE);
+
+			spi.SimulateIncomingMasterByte (0xAB);
+
+			Assert.Multiple (() => {
+				Assert.That (cpu.ReadData (SPDR), Is.EqualTo (0xAB), "SPDR must hold the received byte");
+				Assert.That (cpu.ReadData (SPSR) & SPIF, Is.EqualTo (SPIF), "SPIF must be set after receive");
+			});
+		}
+
+		[Test (Description = "Slave mode: OnSlaveTransfer callback is invoked with the received byte")]
+		public void SlaveMode_TransmitsByte ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
+			var spi = new AvrSpi (cpu, AvrSpi.SpiConfig, FREQ_16MHZ);
+
+			cpu.WriteData (SPCR, SPE);
+
+			byte? captured = null;
+			spi.OnSlaveTransfer = b => captured = b;
+
+			spi.SimulateIncomingMasterByte (0xCD);
+
+			Assert.That (captured, Is.EqualTo (0xCD), "OnSlaveTransfer must be invoked with received byte");
+		}
+
+		[Test (Description = "Slave mode: SPI interrupt fires when SPIE=1 and a byte is received")]
+		public void SlaveMode_Interrupt_Fires ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
+			var spi = new AvrSpi (cpu, AvrSpi.SpiConfig, FREQ_16MHZ);
+
+			cpu.WriteData (SPCR, SPE | SPIE);
+			cpu.Mmio.Data[SREG] = 0x80; // global interrupt enable
+
+			spi.SimulateIncomingMasterByte (0x77);
+			cpu.Tick ();
+
+			Assert.That (cpu.Pc, Is.EqualTo (0x22), "CPU must jump to SPI interrupt vector");
+		}
+	}
+
+	[Test (Description = "Shift register: byte is moved to SPDR only when transfer completes")]
+	public void ShiftRegister_ByteMovedToSpdr ()
+	{
+		var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
+		var spi = new AvrSpi (cpu, AvrSpi.SpiConfig, FREQ_16MHZ);
+
+		spi.OnByte = b => {
+			cpu.AddClockEvent (() => spi.CompleteTransfer (0xA5), spi.TransferCycles);
+		};
+
+		cpu.WriteData (SPCR, SPE | MSTR);
+		cpu.WriteData (SPDR, 0x00); // initiate transfer
+
+		// SPDR must still hold the old value during transfer
+		Assert.That (cpu.ReadData (SPDR), Is.Zero, "SPDR must not update while transfer is in progress");
+
+		// Advance past transfer (8 bits * 4 cycles/bit = 32)
+		cpu.Cycles += 32;
+		cpu.Tick ();
+
+		Assert.That (cpu.ReadData (SPDR), Is.EqualTo (0xA5),
+			"Byte must be moved from shift register to SPDR on transfer completion");
+	}
+
 	[Test (Description = "Should should only update SPDR when tranfer finishes (double buffering)")]
 	public void DoubleBuffering ()
 	{

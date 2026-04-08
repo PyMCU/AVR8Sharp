@@ -6,16 +6,10 @@ namespace Avr8Sharp.TestKit.Boards;
 /// <summary>
 /// Pre-configured simulation for the <b>Arduino Mega 2560</b> (ATmega2560).
 /// <para>
-/// Includes all 11 GPIO ports (A–L), five timers (0–4), and four USART
+/// Includes all 11 GPIO ports (A–L), six timers (0–5), and four USART
 /// channels (Serial0–3). Each serial channel is captured in a
 /// <see cref="SerialProbe"/> accessible via <see cref="Serial0"/>–<see cref="Serial3"/>.
 /// </para>
-/// <remarks>
-/// Timer5 and USART3 are not included because their I/O registers live above
-/// address 0xFF, which exceeds the current <c>byte</c> addressing in the Core
-/// peripheral configs.  Use <see cref="AvrTestSimulation"/> directly to add
-/// them manually when ATmega2560-specific register addresses are supported.
-/// </remarks>
 /// </summary>
 /// <example>
 /// <code>
@@ -97,6 +91,37 @@ public sealed class ArduinoMegaSimulation : AvrTestSimulation
         tov: 1, ocfa: 2, ocfb: 4, ocfc: 8,
         toie: 1, ociea: 2, ocieb: 4, ociec: 8);
 
+    // Timer 5 — 16-bit, registers 0x120–0x12D, TIMSK5 0x73, TIFR5 0x3A
+    private static readonly AvrTimerConfig Mega2560Timer5Config = new AvrTimerConfig(
+        bits:                 16,
+        dividers:             AvrTimer.Timer01Dividers,
+        captureInterrupt:     0xB8,   // vector 46
+        comparatorAInterrupt: 0xBC,   // vector 47
+        comparatorBInterrupt: 0xC0,   // vector 48
+        comparatorCInterrupt: 0xC4,   // vector 49
+        overflowInterrupt:    0xC8,   // vector 50
+        tccra: 0x120, tccrb: 0x121, tccrc: 0x122,
+        tcnt:  0x124, icr:   0x126,
+        ocra:  0x128, ocrb:  0x12A, ocrc: 0x12C,
+        timsk: 0x73,  tifr:  0x3A,
+        comparatorPortA: AvrIoPort.PortLConfig.PORT, comparatorPinA: 3,
+        comparatorPortB: AvrIoPort.PortLConfig.PORT, comparatorPinB: 4,
+        comparatorPortC: AvrIoPort.PortLConfig.PORT, comparatorPinC: 5,
+        externalClockPort: AvrIoPort.PortLConfig.PORT, externalClockPin: 2,
+        tov: 1, ocfa: 2, ocfb: 4, ocfc: 8,
+        toie: 1, ociea: 2, ocieb: 4, ociec: 8,
+        icf: 0x20, icie: 0x20);
+
+    // USART3 — registers 0x130–0x136
+    private static readonly AvrUsartConfig Mega2560Usart3Config = new AvrUsartConfig
+    {
+        RxCompleteInterrupt        = 0xD8,  // vector 54
+        DataRegisterEmptyInterrupt = 0xDC,  // vector 55
+        TxCompleteInterrupt        = 0xE0,  // vector 56
+        UCSRA = 0x130, UCSRB = 0x131, UCSRC = 0x132,
+        UBRRL = 0x134, UBRRH = 0x135, UDR   = 0x136,
+    };
+
     // USART1 — registers 0xC8–0xCE
     private static readonly AvrUsartConfig Mega2560Usart1Config = new AvrUsartConfig
     {
@@ -152,6 +177,8 @@ public sealed class ArduinoMegaSimulation : AvrTestSimulation
     public AvrTimer Timer3 { get; }
     /// <summary>Timer 4 — 16-bit, OC4A/B/C on Port H pins 3/4/5.</summary>
     public AvrTimer Timer4 { get; }
+    /// <summary>Timer 5 — 16-bit, OC5A/B/C on Port L pins 3/4/5.</summary>
+    public AvrTimer Timer5 { get; }
 
     // ── USART ─────────────────────────────────────────────────────────────────
     /// <summary>Captures USART0 output (TX = PE1, "Serial" in Arduino IDE).</summary>
@@ -160,6 +187,8 @@ public sealed class ArduinoMegaSimulation : AvrTestSimulation
     public SerialProbe Serial1 { get; }
     /// <summary>Captures USART2 output (TX = PH1, "Serial2" in Arduino IDE).</summary>
     public SerialProbe Serial2 { get; }
+    /// <summary>Captures USART3 output (TX = PJ1, "Serial3" in Arduino IDE).</summary>
+    public SerialProbe Serial3 { get; }
 
     public ArduinoMegaSimulation() : base(Flash, Sram)
     {
@@ -182,9 +211,11 @@ public sealed class ArduinoMegaSimulation : AvrTestSimulation
         AddTimer(Mega2560Timer2Config, out var t2); Timer2 = t2;
         AddTimer(Mega2560Timer3Config, out var t3); Timer3 = t3;
         AddTimer(Mega2560Timer4Config, out var t4); Timer4 = t4;
+        AddTimer(Mega2560Timer5Config, out var t5); Timer5 = t5;
 
         AddUsart(AvrUsart.Usart0Config,    out var s0); Serial0 = s0;
         AddUsart(Mega2560Usart1Config,     out var s1); Serial1 = s1;
         AddUsart(Mega2560Usart2Config,     out var s2); Serial2 = s2;
+        AddUsart(Mega2560Usart3Config,     out var s3); Serial3 = s3;
     }
 }

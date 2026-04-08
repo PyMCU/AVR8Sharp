@@ -290,7 +290,7 @@ public class Usart
             Assert.Multiple(() =>
             {
                 Assert.That(cpu.Pc, Is.EqualTo(PC_INT_UDRE));
-                Assert.That(cpu.Cycles, Is.EqualTo(2));
+                Assert.That(cpu.Cycles, Is.EqualTo(3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
                 Assert.That((cpu.Mmio.Data[UCSR0A] & UDRE), Is.EqualTo(0));
             });
         }
@@ -309,7 +309,7 @@ public class Usart
             Assert.Multiple(() =>
             {
                 Assert.That(cpu.Pc, Is.EqualTo(PC_INT_TXC));
-                Assert.That(cpu.Cycles, Is.EqualTo(1_000_000 + 2));
+                Assert.That(cpu.Cycles, Is.EqualTo(1_000_000 + 3)); // 3 cycles from DoAvrInterrupt
                 Assert.That((cpu.Mmio.Data[UCSR0A] & TXC), Is.EqualTo(0));
             });
         }
@@ -484,6 +484,111 @@ public class Usart
                 Assert.That(cpu.ReadData(UDR0), Is.EqualTo(0x42));
                 Assert.That (cpu.ReadData(UDR0), Is.EqualTo(0));
             });
+		}
+	}
+
+	[TestFixture]
+	public class NineBitFrame
+	{
+		const int FREQ_16MHZ = 16_000_000;
+		const int UCSR0B = 0xc1;
+		const int UCSR0C = 0xc2;
+		const int UCSZ0  = 2;
+		const int UCSZ1  = 4;
+		const int UCSZ2  = 4; // in UCSR0B
+		const int RXEN   = 16;
+
+		[Test (Description = "RxMasks[9] must be 0x1ff so the 9th data bit is not silently discarded")]
+		public void RxMask_NineBit_Is_0x1ff ()
+		{
+			Assert.That(AvrUsart.RxMasks[9], Is.EqualTo(0x1ff),
+				"9-bit RX mask must be 0x1ff so bit 8 survives; was incorrectly 0xff before fix");
+		}
+
+		[Test (Description = "BitsPerChar returns 9 when UCSZ2:0 = 7")]
+		public void BitsPerChar_Nine ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
+			var usart = new AvrUsart (cpu, AvrUsart.Usart0Config, FREQ_16MHZ);
+
+			cpu.WriteData (UCSR0C, UCSZ0 | UCSZ1);
+			cpu.WriteData (UCSR0B, UCSZ2);
+
+			Assert.That (usart.BitsPerChar, Is.EqualTo (9));
+		}
+	}
+
+	[TestFixture]
+	public class Usart3
+	{
+		// ATmega2560 USART3 register addresses (extended I/O, > 0xFF)
+		const ushort UCSR3A = 0x130;
+		const ushort UCSR3B = 0x131;
+		const ushort UCSR3C = 0x132;
+		const ushort UBRR3L = 0x134;
+		const ushort UBRR3H = 0x135;
+		const ushort UDR3   = 0x136;
+
+		const int FREQ_16MHZ = 16_000_000;
+		const int TXEN = 8;
+		const int RXEN = 16;
+		const int RXC  = 0x80;
+
+		private static readonly AvrUsartConfig Usart3Config = new AvrUsartConfig
+		{
+			RxCompleteInterrupt        = 0xD8,
+			DataRegisterEmptyInterrupt = 0xDC,
+			TxCompleteInterrupt        = 0xE0,
+			UCSRA = UCSR3A, UCSRB = UCSR3B, UCSRC = UCSR3C,
+			UBRRL = UBRR3L, UBRRH = UBRR3H, UDR = UDR3,
+		};
+
+		[Test (Description = "USART3 (ATmega2560) can be instantiated with ushort register addresses > 0xFF")]
+		public void Usart3_CanBeCreated ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[0x20000]);
+			Assert.DoesNotThrow (() => new AvrUsart (cpu, Usart3Config, FREQ_16MHZ),
+				"AvrUsart must accept ushort register addresses");
+		}
+
+		[Test (Description = "USART3 transmits a byte and invokes OnByteTransmit callback")]
+		public void Usart3_Transmit ()
+		{
+			var cpu   = new AVR8Sharp.Core.Cpu.Cpu (new ushort[0x20000]);
+			var usart = new AvrUsart (cpu, Usart3Config, FREQ_16MHZ);
+
+			byte? received = null;
+			usart.OnByteTransmit = b => received = b;
+
+			// Enable TX, then write a byte — OnByteTransmit fires immediately
+			cpu.WriteData (UCSR3B, TXEN);
+			cpu.WriteData (UDR3, 0x55);
+
+			Assert.That (received, Is.EqualTo (0x55), "USART3 must invoke OnByteTransmit with the transmitted byte");
+		}
+
+		[Test (Description = "USART3 receives a byte and sets RXC flag")]
+		public void Usart3_Receive ()
+		{
+			var cpu   = new AVR8Sharp.Core.Cpu.Cpu (new ushort[0x20000]);
+			var usart = new AvrUsart (cpu, Usart3Config, FREQ_16MHZ);
+
+			// Enable RX, baud 9600 @ 16 MHz
+			cpu.WriteData (UCSR3B, RXEN);
+			cpu.Mmio.Data[UBRR3L] = 103;
+
+			// WriteByte simulates an incoming byte (as if arriving on the RX pin)
+			usart.WriteByte (0xAB);
+
+			// Advance clock to complete reception (10 bits @ 9600 baud)
+			cpu.Cycles += 16_800;
+			cpu.Tick ();
+
+			Assert.Multiple (() =>
+			{
+				Assert.That (cpu.Mmio.Data[UCSR3A] & RXC, Is.EqualTo (RXC), "RXC must be set after receive");
+				Assert.That (cpu.ReadData (UDR3), Is.EqualTo (0xAB), "UDR3 must hold the received byte");
+			});
 		}
 	}
 }

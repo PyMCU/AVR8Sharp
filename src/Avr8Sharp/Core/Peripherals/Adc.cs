@@ -45,8 +45,10 @@ public class AvrAdc
     public const int ADPS_MASK = 0x7;
     public const int ADIE = 0x8;
     public const int ADIF = 0x10;
+    public const int ADATE = 0x20; // ADC Auto Trigger Enable (in ADCSRA)
     public const int ADSC = 0x40;
     public const int ADEN = 0x80;
+    public const int ADTS_MASK = 0x7; // Auto Trigger Source bits in ADCSRB (000 = free-running)
 
     public const int MUX_MASK = 0x1f;
     public const int ADLAR = 0x20;
@@ -138,6 +140,13 @@ public class AvrAdc
 
     public double[] ChannelValues { get; }
 
+    /// <summary>
+    /// Voltage returned by the internal temperature sensor channel (mux input 8 on ATmega328P).
+    /// Defaults to ~0.378 V which corresponds to approximately 25 °C.
+    /// Set this to simulate a different ambient temperature.
+    /// </summary>
+    public double TemperatureVoltage { get; set; } = 0.378125;
+
     public AvrAdc(Cpu.Cpu cpu, AvrAdcConfig config)
     {
         _cpu = cpu;
@@ -209,7 +218,7 @@ public class AvrAdc
             AdcMuxInputType.Constant => input.Voltage,
             AdcMuxInputType.SingleEnded => ChannelValues[input.Channel],
             AdcMuxInputType.Differential => input.Gain * (ChannelValues[input.PositiveChannel] - ChannelValues[input.NegativeChannel]),
-            AdcMuxInputType.Temperature => 0.378125,
+            AdcMuxInputType.Temperature => TemperatureVoltage,
             _ => 0.0
         };
 
@@ -241,6 +250,20 @@ public class AvrAdc
 
         _cpu.Mmio.Data[adcsra] &= ~ADSC & 0xff;
         _cpu.SetInterruptFlag(_adc);
+
+        // Auto-trigger: free-running mode (ADATE=1, ADTS=000 in ADCSRB)
+        if ((_cpu.Mmio.Data[adcsra] & ADEN) != 0 &&
+            (_cpu.Mmio.Data[adcsra] & ADATE) != 0 &&
+            (_cpu.Mmio.Data[_config.ADCSRB] & ADTS_MASK) == 0)
+        {
+            _converting = true;
+            var channel = _cpu.Mmio.Data[_config.ADMUX] & MUX_MASK;
+            if ((_cpu.Mmio.Data[_config.ADCSRB] & MUX5) != 0)
+            {
+                channel |= 0x20;
+            }
+            OnADCRead(_muxArray[channel & 0x1F]);
+        }
     }
 
     private void UpdateCaches()
