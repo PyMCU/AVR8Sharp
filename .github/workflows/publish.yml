@@ -1,21 +1,5 @@
 name: Publish NuGet
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Publishes NuGet packages for Avr8Sharp and Avr8Sharp.TestKit.
-#
-# Triggers
-# ────────
-#   • Push a version tag  (e.g. v1.2.3  → stable)
-#   • Push to main        → preview build (suffix: -preview.<run_number>)
-#   • Manual dispatch     → choose target and optional version suffix
-#
-# Required secrets (set in repo Settings → Secrets)
-#   NUGET_PRIVATE_SOURCE_URL  – NuGet v3 feed URL (required to push)
-#   NUGET_PRIVATE_API_KEY     – API key / PAT for the private feed
-#
-# Optional secrets
-#   NUGET_PUBLIC_API_KEY      – nuget.org API key; push skipped when absent
-# ─────────────────────────────────────────────────────────────────────────────
 on:
   push:
     tags:
@@ -49,19 +33,21 @@ jobs:
           dotnet-version: "10.0.x"
 
       # ── Resolve version suffix ───────────────────────────────────────────────
-      # Priority: tag > workflow_dispatch input > auto preview suffix
       - name: Resolve version suffix
         id: versioning
         run: |
           TAG="${{ github.ref }}"
           if [[ "$TAG" == refs/tags/v* ]]; then
-            # Tag push — stable release, no suffix
-            echo "suffix=" >> "$GITHUB_OUTPUT"
+            TAG_VERSION="${TAG#refs/tags/v}"
+          
+            if [[ "$TAG_VERSION" == *-* ]]; then
+              echo "suffix=${TAG_VERSION#*-}" >> "$GITHUB_OUTPUT"
+            else
+              echo "suffix=" >> "$GITHUB_OUTPUT"
+            fi
           elif [[ -n "${{ github.event.inputs.version_suffix }}" ]]; then
-            # Manual dispatch with explicit suffix
             echo "suffix=${{ github.event.inputs.version_suffix }}" >> "$GITHUB_OUTPUT"
           else
-            # Automatic preview build from main
             echo "suffix=preview.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
           fi
 
