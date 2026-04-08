@@ -48,16 +48,6 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
-      # ── Private NuGet source ────────────────────────────────────────────────
-      - name: Add private NuGet source
-        if: ${{ secrets.NUGET_PRIVATE_SOURCE_URL != '' }}
-        run: |
-          dotnet nuget add source "${{ secrets.NUGET_PRIVATE_SOURCE_URL }}" \
-            --name private \
-            --username ci \
-            --password "${{ secrets.NUGET_PRIVATE_API_KEY }}" \
-            --store-password-in-clear-text
-
       # ── Resolve version suffix ───────────────────────────────────────────────
       # Priority: tag > workflow_dispatch input > auto preview suffix
       - name: Resolve version suffix
