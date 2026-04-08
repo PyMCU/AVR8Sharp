@@ -1,4 +1,4 @@
-name: CI
+name: Build and Test
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Triggered on every push and pull-request to any branch.
