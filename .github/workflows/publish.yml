@@ -98,20 +98,13 @@ jobs:
           --output ./nupkgs
           ${{ steps.versioning.outputs.suffix != '' && format('--version-suffix {0}', steps.versioning.outputs.suffix) || '' }}
 
-      # ── Push to private feed ─────────────────────────────────────────────────
-      - name: Push to private NuGet
-        if: ${{ secrets.NUGET_PRIVATE_SOURCE_URL != '' }}
-        run: >
-          dotnet nuget push "./nupkgs/*.nupkg"
-          --source private
-          --api-key "${{ secrets.NUGET_PRIVATE_API_KEY }}"
-          --skip-duplicate
-
       # ── Push to nuget.org (optional) ─────────────────────────────────────────
       - name: Push to nuget.org
+        env:
+          PUBLIC_API_KEY: ${{ secrets.NUGET_PUBLIC_API_KEY }}
         if: >
           ${{ github.server_url == 'https://github.com' &&
-              secrets.NUGET_PUBLIC_API_KEY != '' &&
+              env.PUBLIC_API_KEY != '' &&
               (startsWith(github.ref, 'refs/tags/v') ||
               github.event.inputs.push_public == 'true') }}
         run: >
