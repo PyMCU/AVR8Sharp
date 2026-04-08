@@ -47,6 +47,12 @@ public class AvrUsi
     private readonly int _dataPin;
     private readonly int _clockPin;
 
+    /// <summary>Called when a TWI start condition is detected (SCL high, SDA falling).</summary>
+    public Action? OnStartCondition { get; set; }
+
+    /// <summary>Called when a TWI stop condition is detected (SCL high, SDA rising).</summary>
+    public Action? OnStopCondition { get; set; }
+
     private readonly ushort _PIN;
     private readonly ushort _PORT;
 
@@ -74,14 +80,16 @@ public class AvrUsi
         {
             if ((value & (1 << _clockPin)) != 0 && (value & (1 << _dataPin)) == 0)
             {
-                // Start condition detected
+                // Start condition detected: SCL high, SDA low
                 _cpu.SetInterruptFlag(_start);
+                OnStartCondition?.Invoke();
             }
 
             if ((value & (1 << _clockPin)) != 0 && (value & (1 << _dataPin)) != 0)
             {
-                // Stop condition detected
+                // Stop condition detected: SCL high, SDA high
                 _cpu.Mmio.Data[USISR] |= USIPF;
+                OnStopCondition?.Invoke();
             }
         }
     }
@@ -100,8 +108,8 @@ public class AvrUsi
         _cpu.Mmio.Data[USICR] = (byte)(value & ~(USICLK | USITC));
         _cpu.UpdateInterruptEnable(_start, value);
         _cpu.UpdateInterruptEnable(_overflow, value);
-        var clockSrc = value & ((USICS1 | USICS0) >> 2);
-        var mode = value & ((USIWM1 | USIWM0) >> 4);
+        var clockSrc = (value & (USICS1 | USICS0)) >> 2;
+        var mode = (value & (USIWM1 | USIWM0)) >> 4;
         var usiClk = value & USICLK;
         _port.OpenCollector = (byte)(mode >= 2 ? (1 << _dataPin) : 0);
         var inputValue = (_cpu.Mmio.Data[_PIN] & (1 << _dataPin)) != 0 ? 1 : 0;
