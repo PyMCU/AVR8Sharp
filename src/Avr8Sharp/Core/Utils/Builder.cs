@@ -82,6 +82,24 @@ public class AvrBuilder (AvrRunner @base, int flashSize = AvrRunner.FLASH)
 		watchdog = new AvrWatchdog (@base.Cpu, config, clock);
 		return this;
 	}
+
+	public AvrBuilder UseLutDecoder()
+	{
+		@base.SetDecoder(DecoderType.Lut);
+		return this;
+	}
+
+	public AvrBuilder UseNativeDecoder()
+	{
+		@base.SetDecoder(DecoderType.NativeLut);
+		return this;
+	}
+
+	public AvrBuilder UseSwitchDecoder()
+	{
+		@base.SetDecoder(DecoderType.Switch);
+		return this;
+	}
 	
 	public AvrRunner Build()
 	{
