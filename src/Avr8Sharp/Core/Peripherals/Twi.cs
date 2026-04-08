@@ -36,8 +36,13 @@ public class AvrTwi
     const int STATUS_DATA_RECEIVED_ACK = 0x50;
 
     const int STATUS_DATA_RECEIVED_NACK = 0x58;
-    // Slave states
-    // TODO: Implement slave states
+    // Slave receive states
+    const int STATUS_SLAVE_SLAW_ACK = 0x60;      // SLA+W received, ACK returned
+    const int STATUS_SLAVE_GCALL_ACK = 0x70;     // General call received, ACK returned
+    const int STATUS_SLAVE_DATA_RX_ACK = 0x80;   // Data byte received, ACK returned
+    const int STATUS_SLAVE_DATA_RX_NACK = 0x88;  // Data byte received, NACK returned
+    // Slave transmit states
+    const int STATUS_SLAVE_SLAR_ACK = 0xA8;      // SLA+R received, ACK returned
 
     public static readonly AvrTwiConfig TwiConfig = new AvrTwiConfig
     {
@@ -193,6 +198,45 @@ public class AvrTwi
         _cpu.Mmio.Data[_config.TWDR] = data;
         this.UpdateStatus(ack ? STATUS_DATA_RECEIVED_ACK : STATUS_DATA_RECEIVED_NACK);
     }
+
+    /// <summary>
+    /// Simulate an external I2C master addressing this device.
+    /// Returns true when the address matches TWAR (respecting TWAMR mask and general-call flag).
+    /// On match, TWSR is set to 0x60 (write) or 0xA8 (read) and TWINT is raised.
+    /// </summary>
+    public bool SimulateIncomingAddress (byte address, bool isWrite)
+    {
+        var ownAddress = (_cpu.Mmio.Data[_config.TWAR] & TWAR_TWA_MASK) >> 1;
+        var generalCallEnabled = (_cpu.Mmio.Data[_config.TWAR] & TWAR_TWGCE) != 0;
+        var mask = (_cpu.Mmio.Data[_config.TWAMR] & TWAR_TWA_MASK) >> 1;
+
+        var isGeneralCall = address == 0 && generalCallEnabled;
+        var addressMatch = ((address ^ ownAddress) & ~mask) == 0;
+
+        if (!isGeneralCall && !addressMatch)
+            return false;
+
+        UpdateStatus (isGeneralCall ? STATUS_SLAVE_GCALL_ACK
+                    : isWrite      ? STATUS_SLAVE_SLAW_ACK
+                                   : STATUS_SLAVE_SLAR_ACK);
+        return true;
+    }
+
+    /// <summary>
+    /// Simulate a data byte delivered by the external master in slave-receive mode.
+    /// Stores the byte in TWDR, sets TWSR to 0x80 (ACK) or 0x88 (NACK) per TWEA, and raises TWINT.
+    /// </summary>
+    public void SimulateIncomingData (byte data)
+    {
+        _cpu.Mmio.Data[_config.TWDR] = data;
+        var ack = (_cpu.Mmio.Data[_config.TWCR] & TWCR_TWEA) != 0;
+        UpdateStatus (ack ? STATUS_SLAVE_DATA_RX_ACK : STATUS_SLAVE_DATA_RX_NACK);
+    }
+
+    /// <summary>
+    /// Read the byte firmware placed in TWDR for slave-transmit mode.
+    /// </summary>
+    public byte ReadSlaveTransmitByte () => _cpu.Mmio.Data[_config.TWDR];
 
     private void UpdateStatus(int value)
     {
