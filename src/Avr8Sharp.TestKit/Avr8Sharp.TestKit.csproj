@@ -14,9 +14,11 @@
         <RepositoryUrl>https://github.com/begeistert/avr8sharp</RepositoryUrl>
         <PackageTags>Arduino;AVR;Simulator;Testing;FluentAssertions</PackageTags>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
-        <Version>1.0.0-alpha2</Version>
+        <Version>1.1.0-beta1</Version>
         <PackageProjectUrl>https://github.com/begeistert/avr8sharp</PackageProjectUrl>
         <Company>Iván Montiel</Company>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <LangVersion>default</LangVersion>
     </PropertyGroup>
 
     <ItemGroup>
@@ -25,6 +27,10 @@
 
     <ItemGroup>
       <ProjectReference Include="..\Avr8Sharp\Avr8Sharp.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="..\..\README.md" Pack="true" PackagePath="\"/>
     </ItemGroup>
 
 </Project>
