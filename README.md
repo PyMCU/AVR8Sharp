@@ -1,6 +1,6 @@
 # AVR8Sharp
 
-![Build Status](https://github.com/begeistert/AVR8Sharp/actions/workflows/build-nugets.yml/badge.svg)
+![Build Status](https://github.com/begeistert/AVR8Sharp/actions/workflows/ci.yml/badge.svg)
 [![NuGet](https://img.shields.io/nuget/v/AVR8Sharp.svg)](https://www.nuget.org/packages/AVR8Sharp)
 [![License](https://img.shields.io/github/license/begeistert/AVR8Sharp)](https://github.com/begeistert/avr8sharp/blob/master/LICENSE)
 
