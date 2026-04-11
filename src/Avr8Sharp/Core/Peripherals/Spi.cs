@@ -110,7 +110,7 @@ public class AvrSpi
 		cpu.Mmio.RegisterWrite(_config.SPDR, (value,_ ,_ ,_ ) => {
 			if ((_cpu.Mmio.Data[_config.SPCR] & SPCR_SPE) == 0) {
 				// SPI not enabled, ignore write
-				return false;
+				return true;
 			}
 			
 			// Write collision
