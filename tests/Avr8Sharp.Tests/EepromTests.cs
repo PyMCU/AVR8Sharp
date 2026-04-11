@@ -75,13 +75,24 @@ public class Eeprom
 			cpu.WriteData (EEARL, 15);
 			cpu.WriteData (EEARH, 0);
 			cpu.WriteData (EECR, EEMPE);
+
 			cpu.WriteData (EECR, EEPE);
 			cpu.Tick ();
+
 			Assert.Multiple(() =>
 			{
-				Assert.That(cpu.Cycles, Is.EqualTo(2));
-				Assert.That(backend.ReadMemory (15), Is.EqualTo(0x55));
-				Assert.That(cpu.ReadData(EECR) & EEPE, Is.EqualTo(EEPE));
+				Assert.That(cpu.Cycles, Is.EqualTo(2), "It should have 2 penalty cycles");
+				Assert.That(backend.ReadMemory (15), Is.EqualTo(0xff), "After 2 cycles, the backend should not have the data yet");
+				Assert.That(cpu.ReadData(EECR) & EEPE, Is.EqualTo(EEPE), "The EEPE bit should be 1 (Occupied)");
+			});
+
+			cpu.Cycles += 60000;
+			cpu.Tick();
+
+			Assert.Multiple(() =>
+			{
+				Assert.That(backend.ReadMemory (15), Is.EqualTo(0x55), "After write completion, data should be in backend");
+				Assert.That(cpu.ReadData(EECR) & EEPE, Is.EqualTo(0), "EEPE bit should automatically return to 0");
 			});
 		}
 		
@@ -90,7 +101,6 @@ public class Eeprom
 		{
 			var program = new AsmProgram ($@"
 				  ; register addresses
-		          _REPLACE TWSR, {EECR - 0x20}
         		  _REPLACE EEARL, {EEARL - 0x20}
 		          _REPLACE EEDR, {EEDR - 0x20}
 		          _REPLACE EECR, {EECR - 0x20}
@@ -112,6 +122,9 @@ public class Eeprom
 			
 			var runner = new TestProgramRunner (cpu);
 			runner.RunInstructions (program.InstructionCount);
+
+			cpu.Cycles += 30000;
+			cpu.Tick ();
 			
 			Assert.That (backend.ReadMemory (9), Is.EqualTo(0x05));
 		}
@@ -241,13 +254,19 @@ public class Eeprom
 			cpu.WriteData (EECR, EEMPE);
 			cpu.WriteData (EECR, EEPE);
 			cpu.Tick ();
+
+			Assert.That (cpu.Cycles, Is.LessThan(10));
+
+			// Wait long enough time for the first write to finish
+			cpu.Cycles += 6_0000;
+			cpu.Tick ();
 			
 			// Ensure that second write didn't happen
 			Assert.Multiple(() =>
 			{
-				Assert.That (cpu.Cycles, Is.EqualTo(2));
 				Assert.That (backend.ReadMemory (15), Is.EqualTo(0x55));
 				Assert.That (backend.ReadMemory (16), Is.EqualTo(0xff));
+				Assert.That (cpu.ReadData(EECR) & EEPE, Is.EqualTo(0));
 			});
 		}
 		
@@ -279,11 +298,15 @@ public class Eeprom
 			cpu.WriteData (EECR, EEMPE);
 			cpu.WriteData (EECR, EEPE);
 			cpu.Tick ();
+
+			// Wait long enough time for the second write to finish
+			cpu.Cycles += 10_000_000;
+			cpu.Tick ();
 			
 			// Ensure both writes took place
 			Assert.Multiple(() =>
 			{
-				Assert.That (cpu.Cycles, Is.EqualTo(10_000_004));
+				Assert.That (cpu.Cycles, Is.EqualTo(20_000_004));
 				Assert.That (backend.ReadMemory (15), Is.EqualTo(0x55));
 				Assert.That (backend.ReadMemory (16), Is.EqualTo(0x66));
 			});
@@ -301,9 +324,9 @@ public class Eeprom
 
 		// Set EEPM=11 (both EEPM0 and EEPM1), EEMPE, then EEPE
 		// EECR bits: EEPM0=bit4, EEPM1=bit5, EEMPE=bit2, EEPE=bit1
-		cpu.Mmio.Data[EEARL - 0x20] = 5;   // address 5 (OUT uses I/O space)
-		cpu.Mmio.Data[EEDR - 0x20]  = 0xFF; // data to "write"
-		cpu.Mmio.Data[EECR - 0x20]  = EEPM0 | EEPM1 | EEMPE;
+		cpu.WriteData (EEARL, 5);
+		cpu.WriteData (EEDR, 0xFF);
+		cpu.WriteData (EECR, (byte)(EEPM0 | EEPM1 | EEMPE));
 		// Trigger EEPE — passes through the write hook on EECR
 		cpu.WriteData ((ushort)(EECR - 0x20), (byte)(EEPM0 | EEPM1 | EEMPE | EEPE));
 
@@ -324,20 +347,87 @@ public class Eeprom
 			      OUT EEDR, r16
 				  LDI r16, 9
 				  OUT EEARL, r16
+
 				  SBI EECR, 4     ; EECR |= EEPM0
 				  SBI EECR, 2     ; EECR |= EEMPE
 			      SBI EECR, 1     ; EECR |= EEPE
 			").Compile();
-		
+
 		var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 		var backend = new EepromMemoryBackend (1024);
 		var avrEeprom = new AvrEeprom (cpu, backend);
-		
+
 		backend.WriteMemory (9, 0x22);
-		
+
 		var runner = new TestProgramRunner (cpu);
 		runner.RunInstructions (program.InstructionCount);
-		
+
+		cpu.Cycles += 30000;
+		cpu.Tick ();
+
 		Assert.That (backend.ReadMemory (9), Is.EqualTo(0xff));
+	}
+
+	[Test(Description = "Latching: Changing EEAR or EEDR while EEPE is high should not affect the current write")]
+	public void WriteLatching_RegistersCanChangeDuringWrite()
+	{
+		var cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x1000]);
+		var backend = new EepromMemoryBackend(1024);
+		var eeprom = new AvrEeprom(cpu, backend);
+
+		cpu.WriteData(EEARL, 10);
+		cpu.WriteData(EEDR, 0xAA);
+		cpu.WriteData(EECR, (byte)EEMPE);
+		cpu.WriteData(EECR, (byte)EEPE);
+
+		cpu.WriteData(EEARL, 20);
+		cpu.WriteData(EEDR, 0xBB);
+
+		cpu.Cycles += 100_000;
+		cpu.Tick();
+
+		Assert.Multiple(() =>
+		{
+			Assert.That(backend.ReadMemory(10), Is.EqualTo(0xAA), "The original value should be preserved");
+			Assert.That(backend.ReadMemory(20), Is.EqualTo(0xFF), "The new address should not be affected");
+		});
+	}
+
+	[Test(Description = "Safety: Setting EEPE more than 4 cycles after EEMPE should not trigger a write")]
+	public void EempeTimeout_ShouldFailAfterFourCycles()
+	{
+		var cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x1000]);
+		var backend = new EepromMemoryBackend(1024);
+		var eeprom = new AvrEeprom(cpu, backend);
+
+		cpu.WriteData(EEDR, 0x55);
+		cpu.WriteData(EEARL, 15);
+
+		cpu.WriteData(EECR, (byte)EEMPE);
+
+		cpu.Cycles += 5;
+
+		cpu.WriteData(EECR, (byte)EEPE);
+		cpu.Tick();
+
+		Assert.Multiple(() =>
+		{
+			Assert.That(backend.ReadMemory(15), Is.EqualTo(0xFF), "The writing should have failed because of EEMPE timeout");
+			Assert.That(cpu.ReadData(EECR) & EEPE, Is.Zero, "The EEPE bit should be 0");
+		});
+	}
+
+	[Test(Description = "Timing: Reading EEPROM must halt the CPU for 4 clock cycles")]
+	public void ReadHaltCycles_ShouldHaltCpuForFourCycles()
+	{
+		var cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x1000]);
+		var eeprom = new AvrEeprom(cpu, new EepromMemoryBackend(1024));
+
+		var cyclesBefore = cpu.Cycles;
+
+		cpu.WriteData(EEARL, 0);
+		cpu.WriteData(EECR, (byte)EERE);
+
+		Assert.That(cpu.Cycles - cyclesBefore, Is.GreaterThanOrEqualTo(4));
 	}
 }

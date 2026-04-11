@@ -85,34 +85,34 @@ public class AvrEeprom
                     return true;
                 }
 
-                var eedr = cpu.Mmio.Data[_config.EEDR];
+                var capturedAddr = (ushort)((cpu.Mmio.Data[_config.EEARH] << 8) | cpu.Mmio.Data[_config.EEARL]);
+                var capturedData = cpu.Mmio.Data[_config.EEDR];
+
+                var duration = 0;
+                var doErase = (eecr & EEPM1) == 0;
+                var doWrite = (eecr & EEPM0) == 0;
+
+                if (doErase) duration += (int)_config.EraseCycles;
+                if (doWrite) duration += (int)_config.WriteCycles;
 
                 // EEPM=11 is reserved/undefined per ATmega datasheet — treat as no-op
-                if ((eecr & (EEPM0 | EEPM1)) == (EEPM0 | EEPM1))
+                if (!doErase && !doWrite)
                 {
                     cpu.Mmio.Data[_config.EECR] &= ~EEPE & 0xFF;
                     return true;
                 }
 
-                _writeCompleteCycles = (uint)cpu.Cycles;
-
-                // Erase
-                if ((eecr & EEPM1) == 0)
-                {
-                    _backend.EraseMemory(addr);
-                    _writeCompleteCycles += _config.EraseCycles;
-                }
-
-                // Write
-                if ((eecr & EEPM0) == 0)
-                {
-                    _backend.WriteMemory(addr, eedr);
-                    _writeCompleteCycles += _config.WriteCycles;
-                }
-
+                _writeCompleteCycles = (uint)(cpu.Cycles + duration);
                 cpu.Mmio.Data[_config.EECR] |= EEPE;
 
-                cpu.AddClockEvent(() => { cpu.SetInterruptFlag(_eer); }, (int)(_writeCompleteCycles - cpu.Cycles));
+                cpu.AddClockEvent(() => {
+                    if (doErase) _backend.EraseMemory(capturedAddr);
+                    if (doWrite) _backend.WriteMemory(capturedAddr, capturedData);
+
+                    cpu.Mmio.Data[_config.EECR] &= ~EEPE & 0xFF;
+
+                    cpu.SetInterruptFlag(_eer);
+                }, duration);
 
                 cpu.Cycles += 2;
             }
