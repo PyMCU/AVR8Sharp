@@ -522,6 +522,7 @@ public class Twi
         const int STATUS_SLAVE_SLAW_ACK = 0x60;
         const int STATUS_SLAVE_GCALL_ACK = 0x70;
         const int STATUS_SLAVE_DATA_RX_ACK = 0x80;
+        const int STATUS_SLAVE_DATA_RX_NACK = 0x88;
         const int STATUS_SLAVE_SLAR_ACK = 0xA8;
         const int TWSR_TWS_MASK = 0xf8;
 
@@ -794,6 +795,28 @@ public class Twi
             {
                 Assert.That(transmittedByte, Is.EqualTo(0xDE), "The AVR firmware did not place the byte 0xDE in the TWDR register");
                 Assert.That(_cpu.Mmio.Data[17], Is.EqualTo(0x42), "The assembler did not reach the success instruction");
+            });
+        }
+
+        [Test (Description = "TWEA=0: SimulateIncomingData returns NACK status when TWEA is cleared")]
+        public void ShouldReturnNackWhenTweaIsClearedDuringReceive ()
+        {
+            _cpu.Mmio.Data[TWAR] = 0x48 << 1;
+
+            _cpu.WriteData (TWCR, TWEN | TWINT);
+
+            _twi.SimulateIncomingAddress (0x48, isWrite: true);
+
+            _cpu.WriteData (TWCR, TWEN | TWINT);
+            _twi.SimulateIncomingData (0x5A);
+
+            Assert.Multiple (() => {
+                Assert.That (_cpu.Mmio.Data[TWDR], Is.EqualTo (0x5A), "TWDR must still hold the received byte");
+
+                Assert.That (_cpu.Mmio.Data[TWSR] & TWSR_TWS_MASK, Is.EqualTo (STATUS_SLAVE_DATA_RX_NACK),
+                    "TWSR must be 0x88 (data received, NACK) because TWEA was 0");
+
+                Assert.That (_cpu.Mmio.Data[TWCR] & TWINT, Is.EqualTo (TWINT), "TWINT must be set");
             });
         }
     }
