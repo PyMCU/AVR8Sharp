@@ -1,62 +1,16 @@
+using Avr8Sharp.Tests.Utils;
+
 namespace Avr8Sharp.Tests;
 
 [TestFixture]
-public class Instruction
+public class Instruction : AvrTestBase
 {
-	const int r0 = 0;
-	const int r1 = 1;
-	const int r2 = 2;
-	const int r3 = 3;
-	const int r4 = 4;
-	const int r5 = 5;
-	const int r6 = 6;
-	const int r7 = 7;
-	const int r8 = 8;
-	const int r9 = 9;
-	const int r10 = 10;
-	const int r11 = 11;
-	const int r12 = 12;
-	const int r13 = 13;
-	const int r14 = 14;
-	const int r15 = 15;
-	const int r16 = 16;
-	const int r17 = 17;
-	const int r18 = 18;
-	const int r19 = 19;
-	const int r20 = 20;
-	const int r21 = 21;
-	const int r22 = 22;
-	const int r23 = 23;
-	const int r24 = 24;
-	const int r25 = 25;
-	const int r26 = 26;
-	const int r27 = 27;
-	const int r31 = 31;
-	const int X = 26;
-	const int Y = 28;
-	const int Z = 30;
-	const int RAMPZ = 0x5B;
-	const int EIND = 0x5C;
-	const int SP = 93;
-	const int SPH = 94;
-	const int SREG = 95;
-	
-	// SREG Bits: I-HSVNZC
-	const int SREG_C = 0b00000001;
-	const int SREG_Z = 0b00000010;
-	const int SREG_N = 0b00000100;
-	const int SREG_V = 0b00001000;
-	const int SREG_S = 0b00010000;
-	const int SREG_H = 0b00100000;
-	const int SREG_I = 0b10000000;
-	
-	private AVR8Sharp.Core.Cpu.Cpu cpu;
+	protected override int FlashByteCount => 0x8000;
+
 	private AVR8Sharp.Core.Cpu.Decoders.SwitchDecoder decoder;
-	
-	[SetUp]
-	public void Setup()
+
+	protected override void SetupPeripherals()
 	{
-		cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x8000]);
 		decoder = new AVR8Sharp.Core.Cpu.Decoders.SwitchDecoder();
 	}
 	
@@ -66,16 +20,16 @@ public class Instruction
 		LoadProgram ([
 			"adc r0, r1"
 		]);
-		cpu.Mmio.Data[r0] = 10;
-		cpu.Mmio.Data[r1] = 20;
-		cpu.Mmio.Data[SREG] = SREG_C;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R0] = 10;
+		Cpu.Mmio.Data[R1] = 20;
+		Cpu.Mmio.Data[SREG] = SREG_C;
+		decoder.Decode(Cpu);
         Assert.Multiple(() =>
         {
-            Assert.That(cpu.Pc, Is.EqualTo(1));
-            Assert.That(cpu.Cycles, Is.EqualTo(1));
-            Assert.That(cpu.Mmio.Data[r0], Is.EqualTo(31));
-            Assert.That(cpu.Mmio.Data[SREG], Is.EqualTo(0));
+            Assert.That(Cpu.Pc, Is.EqualTo(1));
+            Assert.That(Cpu.Cycles, Is.EqualTo(1));
+            Assert.That(Cpu.Mmio.Data[R0], Is.EqualTo(31));
+            Assert.That(Cpu.Mmio.Data[SREG], Is.EqualTo(0));
         });
     }
 	
@@ -85,16 +39,16 @@ public class Instruction
 		LoadProgram ([
 			"adc r0, r1"
 		]);
-		cpu.Mmio.Data[r0] = 10;
-		cpu.Mmio.Data[r1] = 245;
-		cpu.Mmio.Data[SREG] = SREG_C;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R0] = 10;
+		Cpu.Mmio.Data[R1] = 245;
+		Cpu.Mmio.Data[SREG] = SREG_C;
+		decoder.Decode(Cpu);
 		Assert.Multiple(() =>
 		{
-			Assert.That(cpu.Pc, Is.EqualTo(1));
-			Assert.That(cpu.Cycles, Is.EqualTo(1));
-			Assert.That(cpu.Mmio.Data[r0], Is.EqualTo(0));
-			Assert.That(cpu.Mmio.Data[SREG], Is.EqualTo(SREG_H | SREG_Z | SREG_C));
+			Assert.That(Cpu.Pc, Is.EqualTo(1));
+			Assert.That(Cpu.Cycles, Is.EqualTo(1));
+			Assert.That(Cpu.Mmio.Data[R0], Is.EqualTo(0));
+			Assert.That(Cpu.Mmio.Data[SREG], Is.EqualTo(SREG_H | SREG_Z | SREG_C));
 		});
 	}
 	
@@ -104,15 +58,15 @@ public class Instruction
 		LoadProgram ([
 			"add r0, r1"
 		]);
-		cpu.Mmio.Data[r0] = 11;
-		cpu.Mmio.Data[r1] = 245;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R0] = 11;
+		Cpu.Mmio.Data[R1] = 245;
+		decoder.Decode(Cpu);
 		Assert.Multiple(() =>
 		{
-			Assert.That(cpu.Pc, Is.EqualTo(1));
-			Assert.That(cpu.Cycles, Is.EqualTo(1));
-			Assert.That(cpu.Mmio.Data[r0], Is.EqualTo(0));
-			Assert.That(cpu.Mmio.Data[SREG], Is.EqualTo(SREG_H | SREG_Z | SREG_C));
+			Assert.That(Cpu.Pc, Is.EqualTo(1));
+			Assert.That(Cpu.Cycles, Is.EqualTo(1));
+			Assert.That(Cpu.Mmio.Data[R0], Is.EqualTo(0));
+			Assert.That(Cpu.Mmio.Data[SREG], Is.EqualTo(SREG_H | SREG_Z | SREG_C));
 		});
 	}
 	
@@ -122,16 +76,16 @@ public class Instruction
 		LoadProgram ([
 			"add r0, r1"
 		]);
-		cpu.Mmio.Data[r0] = 11;
-		cpu.Mmio.Data[r1] = 244;
-		cpu.Mmio.Data[SREG] = SREG_C;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R0] = 11;
+		Cpu.Mmio.Data[R1] = 244;
+		Cpu.Mmio.Data[SREG] = SREG_C;
+		decoder.Decode(Cpu);
 		Assert.Multiple(() =>
 		{
-			Assert.That(cpu.Pc, Is.EqualTo(1));
-			Assert.That(cpu.Cycles, Is.EqualTo(1));
-			Assert.That(cpu.Mmio.Data[r0], Is.EqualTo(255));
-			Assert.That(cpu.Mmio.Data[SREG], Is.EqualTo(SREG_S | SREG_N));
+			Assert.That(Cpu.Pc, Is.EqualTo(1));
+			Assert.That(Cpu.Cycles, Is.EqualTo(1));
+			Assert.That(Cpu.Mmio.Data[R0], Is.EqualTo(255));
+			Assert.That(Cpu.Mmio.Data[SREG], Is.EqualTo(SREG_S | SREG_N));
 		});
 	}
 	
@@ -141,16 +95,16 @@ public class Instruction
 		LoadProgram ([
 			"add r0, r1"
 		]);
-		cpu.Mmio.Data[r0] = 11;
-		cpu.Mmio.Data[r1] = 245;
-		cpu.Mmio.Data[SREG] = SREG_C;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R0] = 11;
+		Cpu.Mmio.Data[R1] = 245;
+		Cpu.Mmio.Data[SREG] = SREG_C;
+		decoder.Decode(Cpu);
 		Assert.Multiple(() =>
 		{
-			Assert.That(cpu.Pc, Is.EqualTo(1));
-			Assert.That(cpu.Cycles, Is.EqualTo(1));
-			Assert.That(cpu.Mmio.Data[r0], Is.EqualTo(0));
-			Assert.That(cpu.Mmio.Data[SREG], Is.EqualTo(SREG_H | SREG_Z | SREG_C));
+			Assert.That(Cpu.Pc, Is.EqualTo(1));
+			Assert.That(Cpu.Cycles, Is.EqualTo(1));
+			Assert.That(Cpu.Mmio.Data[R0], Is.EqualTo(0));
+			Assert.That(Cpu.Mmio.Data[SREG], Is.EqualTo(SREG_H | SREG_Z | SREG_C));
 		});
 	}
 	
@@ -160,13 +114,13 @@ public class Instruction
 		LoadProgram ([
 			"bclr 2"
 		]);
-		cpu.Mmio.Data[SREG] = 0xff;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[SREG] = 0xff;
+		decoder.Decode(Cpu);
 		Assert.Multiple(() =>
 		{
-			Assert.That(cpu.Pc, Is.EqualTo(1));
-			Assert.That(cpu.Cycles, Is.EqualTo(1));
-			Assert.That(cpu.Mmio.Data[SREG], Is.EqualTo(0xfb));
+			Assert.That(Cpu.Pc, Is.EqualTo(1));
+			Assert.That(Cpu.Cycles, Is.EqualTo(1));
+			Assert.That(Cpu.Mmio.Data[SREG], Is.EqualTo(0xfb));
 		});
 	}
 	
@@ -176,15 +130,15 @@ public class Instruction
 		LoadProgram ([
 			"bld r4, 7"
 		]);
-		cpu.Mmio.Data[r4] = 0x15;
-		cpu.Mmio.Data[SREG] = 0x40;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R4] = 0x15;
+		Cpu.Mmio.Data[SREG] = 0x40;
+		decoder.Decode(Cpu);
 		Assert.Multiple(() =>
 		{
-			Assert.That(cpu.Pc, Is.EqualTo(1));
-			Assert.That(cpu.Cycles, Is.EqualTo(1));
-			Assert.That(cpu.Mmio.Data[r4], Is.EqualTo(0x95));
-			Assert.That(cpu.Mmio.Data[SREG], Is.EqualTo(0x40));
+			Assert.That(Cpu.Pc, Is.EqualTo(1));
+			Assert.That(Cpu.Cycles, Is.EqualTo(1));
+			Assert.That(Cpu.Mmio.Data[R4], Is.EqualTo(0x95));
+			Assert.That(Cpu.Mmio.Data[SREG], Is.EqualTo(0x40));
 		});
 	}
 
@@ -194,12 +148,12 @@ public class Instruction
 		LoadProgram ([
 			"brbc 0, +8",
 		]);
-		cpu.Mmio.Data[SREG] = SREG_V;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[SREG] = SREG_V;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1 + 8 / 2));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Pc, Is.EqualTo (1 + 8 / 2));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
 		});
 	}
 	
@@ -209,12 +163,12 @@ public class Instruction
 		LoadProgram ([
 			"brbc 0, +8",
 		]);
-		cpu.Mmio.Data[SREG] = SREG_C;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[SREG] = SREG_C;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
 		});
 	}
 	
@@ -224,12 +178,12 @@ public class Instruction
 		LoadProgram ([
 			"brbs 3, +92",
 		]);
-		cpu.Mmio.Data[SREG] = SREG_V;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[SREG] = SREG_V;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1 + 92 / 2));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Pc, Is.EqualTo (1 + 92 / 2));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
 		});
 	}
 	
@@ -239,13 +193,13 @@ public class Instruction
 		LoadProgram ([
 			"brbs 3, -4",
 		]);
-		cpu.Mmio.Data[SREG] = SREG_V;
-		decoder.Decode(cpu);
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[SREG] = SREG_V;
+		decoder.Decode(Cpu);
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (0));
-			Assert.That (cpu.Cycles, Is.EqualTo (3));
+			Assert.That (Cpu.Pc, Is.EqualTo (0));
+			Assert.That (Cpu.Cycles, Is.EqualTo (3));
 		});
 	}
 	
@@ -255,12 +209,12 @@ public class Instruction
 		LoadProgram ([
 			"brbs 3, -4",
 		]);
-		cpu.Mmio.Data[SREG] = 0x0;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[SREG] = 0x0;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
 		});
 	}
 	
@@ -270,34 +224,34 @@ public class Instruction
 		LoadProgram ([
 			"call 0xb8",
 		]);
-		cpu.Mmio.Data[SPH] = 0x00;
-		cpu.Mmio.Data[SP] = 150;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[SPH] = 0x00;
+		Cpu.Mmio.Data[SP] = 150;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (0x5c));
-			Assert.That (cpu.Cycles, Is.EqualTo (4));
-			Assert.That (cpu.Mmio.Data[150], Is.EqualTo (2)); // Return address low byte
-			Assert.That (cpu.Mmio.Data[SP], Is.EqualTo (148)); // SP should be decremented 
+			Assert.That (Cpu.Pc, Is.EqualTo (0x5c));
+			Assert.That (Cpu.Cycles, Is.EqualTo (4));
+			Assert.That (Cpu.Mmio.Data[150], Is.EqualTo (2)); // Return address low byte
+			Assert.That (Cpu.Mmio.Data[SP], Is.EqualTo (148)); // SP should be decremented 
 		});
 	}
 	
 	[Test (Description = "Should push 3-byte return address when executing CALL instruction on device with >128k flash")]
 	public void CALL_3Byte ()
 	{
-		cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
+		Cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
 		LoadProgram ([
 			"call 0xb8",
 		]);
-		cpu.Mmio.Data[SPH] = 0x00;
-		cpu.Mmio.Data[SP] = 150;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[SPH] = 0x00;
+		Cpu.Mmio.Data[SP] = 150;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (0x5c));
-			Assert.That (cpu.Cycles, Is.EqualTo (5));
-			Assert.That (cpu.Mmio.Data[150], Is.EqualTo (2)); // Return address low byte
-			Assert.That (cpu.Mmio.Data[SP], Is.EqualTo (147)); // SP should be incremented by 3 
+			Assert.That (Cpu.Pc, Is.EqualTo (0x5c));
+			Assert.That (Cpu.Cycles, Is.EqualTo (5));
+			Assert.That (Cpu.Mmio.Data[150], Is.EqualTo (2)); // Return address low byte
+			Assert.That (Cpu.Mmio.Data[SP], Is.EqualTo (147)); // SP should be incremented by 3 
 		});
 	}
 	
@@ -307,13 +261,13 @@ public class Instruction
 		LoadProgram ([
 			"cbi 0x0c, 5",
 		]);
-		cpu.Mmio.Data[0x2c] = 0b11111111;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[0x2c] = 0b11111111;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
-			Assert.That (cpu.Mmio.Data[0x2c], Is.EqualTo (0b11011111));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Mmio.Data[0x2c], Is.EqualTo (0b11011111));
 		});
 	}
 	
@@ -323,14 +277,14 @@ public class Instruction
 		LoadProgram ([
 			"cpc r27, r18",
 		]);
-		cpu.Mmio.Data[r18] = 0x1;
-		cpu.Mmio.Data[r27] = 0x1;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R18] = 0x1;
+		Cpu.Mmio.Data[R27] = 0x1;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
-			Assert.That (cpu.Mmio.Data[SREG], Is.EqualTo (0));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (0));
 		});
 	}
 	
@@ -340,15 +294,15 @@ public class Instruction
 		LoadProgram ([
 			"cpc r24, r1",
 		]);
-		cpu.Mmio.Data[r1] = 0;
-		cpu.Mmio.Data[r24] = 0;
-		cpu.Mmio.Data[SREG] = SREG_I | SREG_C;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R1] = 0;
+		Cpu.Mmio.Data[R24] = 0;
+		Cpu.Mmio.Data[SREG] = SREG_I | SREG_C;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
-			Assert.That (cpu.Mmio.Data[SREG], Is.EqualTo (SREG_I | SREG_H | SREG_S | SREG_N | SREG_C));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_I | SREG_H | SREG_S | SREG_N | SREG_C));
 		});
 	}
 	
@@ -358,13 +312,13 @@ public class Instruction
 		LoadProgram ([
 			"cpi r26, 0x9",
 		]);
-		cpu.Mmio.Data[r26] = 0x8;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R26] = 0x8;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
-			Assert.That (cpu.Mmio.Data[SREG], Is.EqualTo (SREG_H | SREG_S | SREG_N | SREG_C));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_H | SREG_S | SREG_N | SREG_C));
 		});
 	}
 	
@@ -374,13 +328,13 @@ public class Instruction
 		LoadProgram ([
 			"cpse r2, r3"
 		]);
-		cpu.Mmio.Data[r2] = 10;
-		cpu.Mmio.Data[r3] = 11;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R2] = 10;
+		Cpu.Mmio.Data[R3] = 11;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
 		});
 	}
 	
@@ -390,13 +344,13 @@ public class Instruction
 		LoadProgram ([
 			"cpse r2, r3"
 		]);
-		cpu.Mmio.Data[r2] = 10;
-		cpu.Mmio.Data[r3] = 10;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R2] = 10;
+		Cpu.Mmio.Data[R3] = 10;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (2));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Pc, Is.EqualTo (2));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
 		});
 	}
 	
@@ -407,13 +361,13 @@ public class Instruction
 			"cpse r2, r3",
 			"call 8",
 		]);
-		cpu.Mmio.Data[r2] = 10;
-		cpu.Mmio.Data[r3] = 10;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R2] = 10;
+		Cpu.Mmio.Data[R3] = 10;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (3));
-			Assert.That (cpu.Cycles, Is.EqualTo (3));
+			Assert.That (Cpu.Pc, Is.EqualTo (3));
+			Assert.That (Cpu.Cycles, Is.EqualTo (3));
 		});
 	}
 	
@@ -423,110 +377,110 @@ public class Instruction
 		LoadProgram ([
 			"eicall",
 		]);
-		cpu.Mmio.Data[SPH] = 0x00;
-		cpu.Mmio.Data[SP] = 0x80;
-		cpu.Mmio.Data[EIND] = 0x01;
-		cpu.Mmio.DataView.SetUint16 (Z, 0x1234, true);
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[SPH] = 0x00;
+		Cpu.Mmio.Data[SP] = 0x80;
+		Cpu.Mmio.Data[EIND] = 0x01;
+		Cpu.Mmio.DataView.SetUint16 (Z, 0x1234, true);
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (0x1234));
-			Assert.That (cpu.Cycles, Is.EqualTo (4));
-			Assert.That (cpu.Mmio.Data[0x80], Is.EqualTo (1)); // Return address low byte
-			Assert.That (cpu.Mmio.Data[SP], Is.EqualTo (0x80 - 3)); // SP should be decremented 
+			Assert.That (Cpu.Pc, Is.EqualTo (0x1234));
+			Assert.That (Cpu.Cycles, Is.EqualTo (4));
+			Assert.That (Cpu.Mmio.Data[0x80], Is.EqualTo (1)); // Return address low byte
+			Assert.That (Cpu.Mmio.Data[SP], Is.EqualTo (0x80 - 3)); // SP should be decremented 
 		});
 	}
 	
 	[Test (Description = "Should execute EIJMP instruction")]
 	public void EIJMP ()
 	{
-		cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
+		Cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
 		LoadProgram ([
 			"eijmp",
 		]);
-		cpu.Mmio.Data[EIND] = 0x01;
-		cpu.Mmio.DataView.SetUint16 (Z, 0x1040, true);
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[EIND] = 0x01;
+		Cpu.Mmio.DataView.SetUint16 (Z, 0x1040, true);
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (0x11040));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Pc, Is.EqualTo (0x11040));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
 		});
 	}
 	
 	[Test (Description = "Should execute ELPM instruction")]
 	public void ELPM ()
 	{
-		cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
+		Cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
 		LoadProgram ([
 			"elpm",
 		]);
-		cpu.Mmio.Data[Z] = 0x50;
-		cpu.Mmio.Data[RAMPZ] = 0x2;
-		cpu.SetProgramByte (0x20050, 0x62);
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[Z] = 0x50;
+		Cpu.Mmio.Data[RAMPZ] = 0x2;
+		Cpu.SetProgramByte (0x20050, 0x62);
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (3));
-			Assert.That (cpu.Mmio.Data[r0], Is.EqualTo (0x62));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (3));
+			Assert.That (Cpu.Mmio.Data[R0], Is.EqualTo (0x62));
 		});
 	}
 	
 	[Test (Description = "Should execute ELPM r5, Z instruction")]
 	public void ELPM_Register ()
 	{
-		cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
+		Cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
 		LoadProgram ([
 			"elpm r5, Z",
 		]);
-		cpu.Mmio.Data[Z] = 0x11;
-		cpu.Mmio.Data[RAMPZ] = 0x1;
-		cpu.SetProgramByte (0x10011, 0x99);
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[Z] = 0x11;
+		Cpu.Mmio.Data[RAMPZ] = 0x1;
+		Cpu.SetProgramByte (0x10011, 0x99);
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (3));
-			Assert.That (cpu.Mmio.Data[r5], Is.EqualTo (0x99));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (3));
+			Assert.That (Cpu.Mmio.Data[R5], Is.EqualTo (0x99));
 		});
 	}
 	
 	[Test (Description = "Should execute ELPM r6, Z+ instruction")]
 	public void ELPM_Register_PostIncrement ()
 	{
-		cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
+		Cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
 		LoadProgram ([
 			"elpm r6, Z+",
 		]);
-		cpu.Mmio.DataView.SetUint16 (Z, 0xffff, true);
-		cpu.Mmio.Data[RAMPZ] = 0x2;
-		cpu.SetProgramByte (0x2ffff, 0x22);
-		decoder.Decode(cpu);
+		Cpu.Mmio.DataView.SetUint16 (Z, 0xffff, true);
+		Cpu.Mmio.Data[RAMPZ] = 0x2;
+		Cpu.SetProgramByte (0x2ffff, 0x22);
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (3));
-			Assert.That (cpu.Mmio.Data[r6], Is.EqualTo (0x22)); // Check that the value was loaded to r6
-			Assert.That (cpu.Mmio.DataView.GetUint16 (Z, true), Is.EqualTo (0x0000)); // Check that Z was incremented
-			Assert.That (cpu.Mmio.Data[RAMPZ], Is.EqualTo (3)); // Check that RAMPZ was incremented
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (3));
+			Assert.That (Cpu.Mmio.Data[R6], Is.EqualTo (0x22)); // Check that the value was loaded to r6
+			Assert.That (Cpu.Mmio.DataView.GetUint16 (Z, true), Is.EqualTo (0x0000)); // Check that Z was incremented
+			Assert.That (Cpu.Mmio.Data[RAMPZ], Is.EqualTo (3)); // Check that RAMPZ was incremented
 		});
 	}
 	
 	[Test (Description = "Should clamp RAMPZ when executing ELPM r6, Z+ instruction")]
 	public void ELPM_Register_PostIncrement_RAMPZ ()
 	{
-		cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
+		Cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
 		LoadProgram ([
 			"elpm r6, Z+",
 		]);
-		cpu.Mmio.DataView.SetUint16 (Z, 0xffff, true);
-		cpu.Mmio.Data[RAMPZ] = 0x3;
-		cpu.SetProgramByte (0x2ffff, 0x22);
-		decoder.Decode(cpu);
+		Cpu.Mmio.DataView.SetUint16 (Z, 0xffff, true);
+		Cpu.Mmio.Data[RAMPZ] = 0x3;
+		Cpu.SetProgramByte (0x2ffff, 0x22);
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Mmio.Data[RAMPZ], Is.EqualTo (0x0)); // Verify that RAMPZ was reset to zero
+			Assert.That (Cpu.Mmio.Data[RAMPZ], Is.EqualTo (0x0)); // Verify that RAMPZ was reset to zero
 		});
 	}
 	
@@ -536,36 +490,36 @@ public class Instruction
 		LoadProgram ([
 			"icall",
 		]);
-		cpu.Mmio.Data[SPH] = 0x00;
-		cpu.Mmio.Data[SP] = 0x80;
-		cpu.Mmio.DataView.SetUint16 (Z, 0x2020, true);
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[SPH] = 0x00;
+		Cpu.Mmio.Data[SP] = 0x80;
+		Cpu.Mmio.DataView.SetUint16 (Z, 0x2020, true);
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (0x2020));
-			Assert.That (cpu.Cycles, Is.EqualTo (3));
-			Assert.That (cpu.Mmio.Data[0x80], Is.EqualTo (1)); // Return address low byte
-			Assert.That (cpu.Mmio.Data[SP], Is.EqualTo (0x7e)); // SP should be decremented 
+			Assert.That (Cpu.Pc, Is.EqualTo (0x2020));
+			Assert.That (Cpu.Cycles, Is.EqualTo (3));
+			Assert.That (Cpu.Mmio.Data[0x80], Is.EqualTo (1)); // Return address low byte
+			Assert.That (Cpu.Mmio.Data[SP], Is.EqualTo (0x7e)); // SP should be decremented 
 		});
 	}
 	
 	[Test (Description = "Should push 3-byte return address when executing ICALL instruction on device with >128k flash")]
 	public void ICALL_3Byte ()
 	{
-		cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
+		Cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
 		LoadProgram ([
 			"icall",
 		]);
-		cpu.Mmio.Data[SPH] = 0x00;
-		cpu.Mmio.Data[SP] = 0x80;
-		cpu.Mmio.DataView.SetUint16 (Z, 0x2020, true);
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[SPH] = 0x00;
+		Cpu.Mmio.Data[SP] = 0x80;
+		Cpu.Mmio.DataView.SetUint16 (Z, 0x2020, true);
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (0x2020));
-			Assert.That (cpu.Cycles, Is.EqualTo (4));
-			Assert.That (cpu.Mmio.Data[0x80], Is.EqualTo (1)); // Return address low byte
-			Assert.That (cpu.Mmio.Data[SP], Is.EqualTo (0x7d)); // SP should be decremented by 3 
+			Assert.That (Cpu.Pc, Is.EqualTo (0x2020));
+			Assert.That (Cpu.Cycles, Is.EqualTo (4));
+			Assert.That (Cpu.Mmio.Data[0x80], Is.EqualTo (1)); // Return address low byte
+			Assert.That (Cpu.Mmio.Data[SP], Is.EqualTo (0x7d)); // SP should be decremented by 3 
 		});
 	}
 	
@@ -575,12 +529,12 @@ public class Instruction
 		LoadProgram ([
 			"ijmp",
 		]);
-		cpu.Mmio.DataView.SetUint16 (Z, 0x1040, true);
-		decoder.Decode(cpu);
+		Cpu.Mmio.DataView.SetUint16 (Z, 0x1040, true);
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (0x1040));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Pc, Is.EqualTo (0x1040));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
 		});
 	}
 	
@@ -590,13 +544,13 @@ public class Instruction
 		LoadProgram ([
 			"in r5, 0xb",
 		]);
-		cpu.Mmio.Data[0x2b] = 0xaf;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[0x2b] = 0xaf;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
-			Assert.That (cpu.Mmio.Data[r5], Is.EqualTo (0xaf));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Mmio.Data[R5], Is.EqualTo (0xaf));
 		});
 	}
 	
@@ -606,14 +560,14 @@ public class Instruction
 		LoadProgram ([
 			"inc r5",
 		]);
-		cpu.Mmio.Data[r5] = 0x7f;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R5] = 0x7f;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
-			Assert.That (cpu.Mmio.Data[r5], Is.EqualTo (0x80));
-			Assert.That (cpu.Mmio.Data[SREG], Is.EqualTo (SREG_N | SREG_V));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Mmio.Data[R5], Is.EqualTo (0x80));
+			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_N | SREG_V));
 		});
 	}
 	
@@ -623,14 +577,14 @@ public class Instruction
 		LoadProgram ([
 			"inc r5",
 		]);
-		cpu.Mmio.Data[r5] = 0xff;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R5] = 0xff;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
-			Assert.That (cpu.Mmio.Data[r5], Is.EqualTo (0x00));
-			Assert.That (cpu.Mmio.Data[SREG], Is.EqualTo ( SREG_Z));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Mmio.Data[R5], Is.EqualTo (0x00));
+			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo ( SREG_Z));
 		});
 	}
 	
@@ -640,11 +594,11 @@ public class Instruction
 		LoadProgram ([
 			"jmp 0xb8",
 		]);
-		decoder.Decode(cpu);
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (0x5c));
-			Assert.That (cpu.Cycles, Is.EqualTo (3));
+			Assert.That (Cpu.Pc, Is.EqualTo (0x5c));
+			Assert.That (Cpu.Cycles, Is.EqualTo (3));
 		});
 	}
 	
@@ -654,17 +608,17 @@ public class Instruction
 		LoadProgram ([
 			"lac Z, r19",
 		]);
-		cpu.Mmio.Data[r19] = 0x02;
-		cpu.Mmio.DataView.SetUint16 (Z, 0x100, true);
-		cpu.Mmio.Data[0x100] = 0x96;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R19] = 0x02;
+		Cpu.Mmio.DataView.SetUint16 (Z, 0x100, true);
+		Cpu.Mmio.Data[0x100] = 0x96;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
-			Assert.That (cpu.Mmio.Data[r19], Is.EqualTo (0x96));
-			Assert.That (cpu.Mmio.DataView.GetUint16 (Z, true), Is.EqualTo (0x100));
-			Assert.That (cpu.Mmio.Data[0x100], Is.EqualTo (0x94));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Mmio.Data[R19], Is.EqualTo (0x96));
+			Assert.That (Cpu.Mmio.DataView.GetUint16 (Z, true), Is.EqualTo (0x100));
+			Assert.That (Cpu.Mmio.Data[0x100], Is.EqualTo (0x94));
 		});
 	}
 	
@@ -674,17 +628,17 @@ public class Instruction
 		LoadProgram ([
 			"las Z, r17",
 		]);
-		cpu.Mmio.Data[r17] = 0x11;
-		cpu.Mmio.Data[Z] = 0x80;
-		cpu.Mmio.Data[0x80] = 0x44;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R17] = 0x11;
+		Cpu.Mmio.Data[Z] = 0x80;
+		Cpu.Mmio.Data[0x80] = 0x44;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
-			Assert.That (cpu.Mmio.Data[r17], Is.EqualTo (0x44));
-			Assert.That (cpu.Mmio.Data[Z], Is.EqualTo (0x80));
-			Assert.That (cpu.Mmio.Data[0x80], Is.EqualTo (0x55));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Mmio.Data[R17], Is.EqualTo (0x44));
+			Assert.That (Cpu.Mmio.Data[Z], Is.EqualTo (0x80));
+			Assert.That (Cpu.Mmio.Data[0x80], Is.EqualTo (0x55));
 		});
 	}
 	
@@ -694,17 +648,17 @@ public class Instruction
 		LoadProgram ([
 			"lat Z, r0",
 		]);
-		cpu.Mmio.Data[r0] = 0x33;
-		cpu.Mmio.Data[Z] = 0x80;
-		cpu.Mmio.Data[0x80] = 0x66;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R0] = 0x33;
+		Cpu.Mmio.Data[Z] = 0x80;
+		Cpu.Mmio.Data[0x80] = 0x66;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
-			Assert.That (cpu.Mmio.Data[r0], Is.EqualTo (0x66));
-			Assert.That (cpu.Mmio.Data[Z], Is.EqualTo (0x80));
-			Assert.That (cpu.Mmio.Data[0x80], Is.EqualTo (0x55));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Mmio.Data[R0], Is.EqualTo (0x66));
+			Assert.That (Cpu.Mmio.Data[Z], Is.EqualTo (0x80));
+			Assert.That (Cpu.Mmio.Data[0x80], Is.EqualTo (0x55));
 		});
 	}
 	
@@ -714,15 +668,15 @@ public class Instruction
 		LoadProgram ([
 			"ld r1, X",
 		]);
-		cpu.Mmio.Data[0xc0] = 0x15;
-		cpu.Mmio.Data[X] = 0xc0;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[0xc0] = 0x15;
+		Cpu.Mmio.Data[X] = 0xc0;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[r1], Is.EqualTo (0x15));
-			Assert.That (cpu.Mmio.Data[X], Is.EqualTo (0xc0)); // X should not be modified
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[R1], Is.EqualTo (0x15));
+			Assert.That (Cpu.Mmio.Data[X], Is.EqualTo (0xc0)); // X should not be modified
 		});
 	}
 	
@@ -732,15 +686,15 @@ public class Instruction
 		LoadProgram ([
 			"ld r17, X+",
 		]);
-		cpu.Mmio.Data[0xc0] = 0x15;
-		cpu.Mmio.Data[X] = 0xc0;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[0xc0] = 0x15;
+		Cpu.Mmio.Data[X] = 0xc0;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[r17], Is.EqualTo (0x15));
-			Assert.That (cpu.Mmio.Data[X], Is.EqualTo (0xc1)); // X should be incremented
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[R17], Is.EqualTo (0x15));
+			Assert.That (Cpu.Mmio.Data[X], Is.EqualTo (0xc1)); // X should be incremented
 		});
 	}
 	
@@ -750,15 +704,15 @@ public class Instruction
 		LoadProgram ([
 			"ld r1, -X",
 		]);
-		cpu.Mmio.Data[0x98] = 0x22;
-		cpu.Mmio.Data[X] = 0x99;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[0x98] = 0x22;
+		Cpu.Mmio.Data[X] = 0x99;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[r1], Is.EqualTo (0x22));
-			Assert.That (cpu.Mmio.Data[X], Is.EqualTo (0x98)); // X should be decremented
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[R1], Is.EqualTo (0x22));
+			Assert.That (Cpu.Mmio.Data[X], Is.EqualTo (0x98)); // X should be decremented
 		});
 	}
 	
@@ -768,15 +722,15 @@ public class Instruction
 		LoadProgram ([
 			"ld r8, Y",
 		]);
-		cpu.Mmio.Data[0xc0] = 0x15;
-		cpu.Mmio.Data[Y] = 0xc0;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[0xc0] = 0x15;
+		Cpu.Mmio.Data[Y] = 0xc0;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[r8], Is.EqualTo (0x15));
-			Assert.That (cpu.Mmio.Data[Y], Is.EqualTo (0xc0)); // Y should not be modified
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[R8], Is.EqualTo (0x15));
+			Assert.That (Cpu.Mmio.Data[Y], Is.EqualTo (0xc0)); // Y should not be modified
 		});
 	}
 	
@@ -786,15 +740,15 @@ public class Instruction
 		LoadProgram ([
 			"ld r3, Y+",
 		]);
-		cpu.Mmio.Data[0xc0] = 0x15;
-		cpu.Mmio.Data[Y] = 0xc0;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[0xc0] = 0x15;
+		Cpu.Mmio.Data[Y] = 0xc0;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[r3], Is.EqualTo (0x15));
-			Assert.That (cpu.Mmio.Data[Y], Is.EqualTo (0xc1)); // Y should be incremented
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[R3], Is.EqualTo (0x15));
+			Assert.That (Cpu.Mmio.Data[Y], Is.EqualTo (0xc1)); // Y should be incremented
 		});
 	}
 	
@@ -804,15 +758,15 @@ public class Instruction
 		LoadProgram ([
 			"ld r0, -Y",
 		]);
-		cpu.Mmio.Data[0x98] = 0x22;
-		cpu.Mmio.Data[Y] = 0x99;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[0x98] = 0x22;
+		Cpu.Mmio.Data[Y] = 0x99;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[r0], Is.EqualTo (0x22));
-			Assert.That (cpu.Mmio.Data[Y], Is.EqualTo (0x98)); // Y should be decremented
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[R0], Is.EqualTo (0x22));
+			Assert.That (Cpu.Mmio.Data[Y], Is.EqualTo (0x98)); // Y should be decremented
 		});
 	}
 	
@@ -822,15 +776,15 @@ public class Instruction
 		LoadProgram ([
 			"ldd r4, Y+2",
 		]);
-		cpu.Mmio.Data[0x82] = 0x33;
-		cpu.Mmio.Data[Y] = 0x80;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[0x82] = 0x33;
+		Cpu.Mmio.Data[Y] = 0x80;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[r4], Is.EqualTo (0x33));
-			Assert.That (cpu.Mmio.Data[Y], Is.EqualTo (0x80)); // Y should not be modified
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[R4], Is.EqualTo (0x33));
+			Assert.That (Cpu.Mmio.Data[Y], Is.EqualTo (0x80)); // Y should not be modified
 		});
 	}
 	
@@ -840,15 +794,15 @@ public class Instruction
 		LoadProgram ([
 			"ld r5, Z",
 		]);
-		cpu.Mmio.Data[0xcc] = 0xf5;
-		cpu.Mmio.Data[Z] = 0xcc;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[0xcc] = 0xf5;
+		Cpu.Mmio.Data[Z] = 0xcc;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[r5], Is.EqualTo (0xf5));
-			Assert.That (cpu.Mmio.Data[Z], Is.EqualTo (0xcc)); // Z should not be modified
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[R5], Is.EqualTo (0xf5));
+			Assert.That (Cpu.Mmio.Data[Z], Is.EqualTo (0xcc)); // Z should not be modified
 		});
 	}
 	
@@ -858,15 +812,15 @@ public class Instruction
 		LoadProgram ([
 			"ld r7, Z+",
 		]);
-		cpu.Mmio.Data[0xc0] = 0x25;
-		cpu.Mmio.Data[Z] = 0xc0;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[0xc0] = 0x25;
+		Cpu.Mmio.Data[Z] = 0xc0;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[r7], Is.EqualTo (0x25));
-			Assert.That (cpu.Mmio.Data[Z], Is.EqualTo (0xc1)); // Z should be incremented
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[R7], Is.EqualTo (0x25));
+			Assert.That (Cpu.Mmio.Data[Z], Is.EqualTo (0xc1)); // Z should be incremented
 		});
 	}
 	
@@ -876,15 +830,15 @@ public class Instruction
 		LoadProgram ([
 			"ld r0, -Z",
 		]);
-		cpu.Mmio.Data[0x9e] = 0x66;
-		cpu.Mmio.Data[Z] = 0x9f;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[0x9e] = 0x66;
+		Cpu.Mmio.Data[Z] = 0x9f;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[r0], Is.EqualTo (0x66));
-			Assert.That (cpu.Mmio.Data[Z], Is.EqualTo (0x9e)); // Z should be decremented
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[R0], Is.EqualTo (0x66));
+			Assert.That (Cpu.Mmio.Data[Z], Is.EqualTo (0x9e)); // Z should be decremented
 		});
 	}
 	
@@ -894,15 +848,15 @@ public class Instruction
 		LoadProgram ([
 			"ldd r15, Z+31",
 		]);
-		cpu.Mmio.Data[0x9f] = 0x33;
-		cpu.Mmio.Data[Z] = 0x80;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[0x9f] = 0x33;
+		Cpu.Mmio.Data[Z] = 0x80;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[r15], Is.EqualTo (0x33));
-			Assert.That (cpu.Mmio.Data[Z], Is.EqualTo (0x80)); // Z should not be modified
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[R15], Is.EqualTo (0x33));
+			Assert.That (Cpu.Mmio.Data[Z], Is.EqualTo (0x80)); // Z should not be modified
 		});
 	}
 	
@@ -912,12 +866,12 @@ public class Instruction
 		LoadProgram ([
 			"ldi r28, 0xff",
 		]);
-		decoder.Decode(cpu);
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
-			Assert.That (cpu.Mmio.Data[Y], Is.EqualTo (0xff));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Mmio.Data[Y], Is.EqualTo (0xff));
 		});
 	}
 	
@@ -927,32 +881,32 @@ public class Instruction
 		LoadProgram ([
 			"lds r5, 0x150",
 		]);
-		cpu.Mmio.Data[0x150] = 0x7a;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[0x150] = 0x7a;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (2));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[r5], Is.EqualTo (0x7a));
+			Assert.That (Cpu.Pc, Is.EqualTo (2));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[R5], Is.EqualTo (0x7a));
 		});
 	}
 	
 	[Test (Description = "Should execute LPM instruction")]
 	public void LPM ()
 	{
-		cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
+		Cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
 		LoadProgram ([
 			"lpm",
 		]);
-		cpu.SetProgramWord (0x40, 0xa0);
-		cpu.Mmio.Data[Z] = 0x80;
-		decoder.Decode(cpu);
+		Cpu.SetProgramWord (0x40, 0xa0);
+		Cpu.Mmio.Data[Z] = 0x80;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (3));
-			Assert.That (cpu.Mmio.Data[r0], Is.EqualTo (0xa0));
-			Assert.That (cpu.Mmio.Data[Z], Is.EqualTo (0x80)); // Z should not be modified
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (3));
+			Assert.That (Cpu.Mmio.Data[R0], Is.EqualTo (0xa0));
+			Assert.That (Cpu.Mmio.Data[Z], Is.EqualTo (0x80)); // Z should not be modified
 		});
 	}
 	
@@ -962,15 +916,15 @@ public class Instruction
 		LoadProgram ([
 			"lpm r2, Z",
 		]);
-		cpu.Mmio.Data[Z] = 0x80;
-		cpu.SetProgramWord (0x40, 0xa0);
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[Z] = 0x80;
+		Cpu.SetProgramWord (0x40, 0xa0);
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (3));
-			Assert.That (cpu.Mmio.Data[r2], Is.EqualTo (0xa0));
-			Assert.That (cpu.Mmio.Data[Z], Is.EqualTo (0x80)); // Z should not be modified
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (3));
+			Assert.That (Cpu.Mmio.Data[R2], Is.EqualTo (0xa0));
+			Assert.That (Cpu.Mmio.Data[Z], Is.EqualTo (0x80)); // Z should not be modified
 		});
 	}
 	
@@ -980,15 +934,15 @@ public class Instruction
 		LoadProgram ([
 			"lpm r1, Z+",
 		]);
-		cpu.Mmio.Data[Z] = 0x80;
-		cpu.SetProgramWord (0x40, 0xa0);
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[Z] = 0x80;
+		Cpu.SetProgramWord (0x40, 0xa0);
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (3));
-			Assert.That (cpu.Mmio.Data[r1], Is.EqualTo (0xa0));
-			Assert.That (cpu.Mmio.Data[Z], Is.EqualTo (0x81)); // Z should be incremented
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (3));
+			Assert.That (Cpu.Mmio.Data[R1], Is.EqualTo (0xa0));
+			Assert.That (Cpu.Mmio.Data[Z], Is.EqualTo (0x81)); // Z should be incremented
 		});
 	}
 	
@@ -998,14 +952,14 @@ public class Instruction
 		LoadProgram ([
 			"lsr r7",
 		]);
-		cpu.Mmio.Data[r7] = 0x45;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R7] = 0x45;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
-			Assert.That (cpu.Mmio.Data[r7], Is.EqualTo (0x22));
-			Assert.That (cpu.Mmio.Data[SREG], Is.EqualTo (SREG_S | SREG_V | SREG_C));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Mmio.Data[R7], Is.EqualTo (0x22));
+			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_S | SREG_V | SREG_C));
 		});
 	}
 	
@@ -1015,13 +969,13 @@ public class Instruction
 		LoadProgram ([
 			"mov r7, r8",
 		]);
-		cpu.Mmio.Data[r8] = 0x45;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R8] = 0x45;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
-			Assert.That (cpu.Mmio.Data[r7], Is.EqualTo (0x45));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Mmio.Data[R7], Is.EqualTo (0x45));
 		});
 	}
 	
@@ -1031,15 +985,15 @@ public class Instruction
 		LoadProgram ([
 			"movw r26, r22",
 		]);
-		cpu.Mmio.Data[r22] = 0x45;
-		cpu.Mmio.Data[r23] = 0x9a;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R22] = 0x45;
+		Cpu.Mmio.Data[R23] = 0x9a;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
-			Assert.That (cpu.Mmio.Data[r26], Is.EqualTo (0x45));
-			Assert.That (cpu.Mmio.Data[r27], Is.EqualTo (0x9a));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Mmio.Data[R26], Is.EqualTo (0x45));
+			Assert.That (Cpu.Mmio.Data[R27], Is.EqualTo (0x9a));
 		});
 	}
 	
@@ -1049,15 +1003,15 @@ public class Instruction
 		LoadProgram ([
 			"mul r5, r6",
 		]);
-		cpu.Mmio.Data[r5] = 100;
-		cpu.Mmio.Data[r6] = 5;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R5] = 100;
+		Cpu.Mmio.Data[R6] = 5;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.DataView.GetUint16 (0, true), Is.EqualTo (500));
-			Assert.That (cpu.Mmio.Data[SREG], Is.EqualTo (0));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.DataView.GetUint16 (0, true), Is.EqualTo (500));
+			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (0));
 		});
 	}
 	
@@ -1067,15 +1021,15 @@ public class Instruction
 		LoadProgram ([
 			"mul r5, r6",
 		]);
-		cpu.Mmio.Data[r5] = 200;
-		cpu.Mmio.Data[r6] = 200;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R5] = 200;
+		Cpu.Mmio.Data[R6] = 200;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.DataView.GetUint16 (0, true), Is.EqualTo (40000));
-			Assert.That (cpu.Mmio.Data[SREG], Is.EqualTo (SREG_C));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.DataView.GetUint16 (0, true), Is.EqualTo (40000));
+			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_C));
 		});
 	}
 	
@@ -1085,15 +1039,15 @@ public class Instruction
 		LoadProgram ([
 			"mul r0, r1",
 		]);
-		cpu.Mmio.Data[r0] = 0;
-		cpu.Mmio.Data[r1] = 9;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R0] = 0;
+		Cpu.Mmio.Data[R1] = 9;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.DataView.GetUint16 (0, true), Is.EqualTo (0));
-			Assert.That (cpu.Mmio.Data[SREG], Is.EqualTo (SREG_Z));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.DataView.GetUint16 (0, true), Is.EqualTo (0));
+			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_Z));
 		});
 	}
 	
@@ -1103,15 +1057,15 @@ public class Instruction
 		LoadProgram ([
 			"muls r18, r19",
 		]);
-		cpu.Mmio.Data[r18] = (-5) & 0xff;
-		cpu.Mmio.Data[r19] = 100;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R18] = (-5) & 0xff;
+		Cpu.Mmio.Data[R19] = 100;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.DataView.GetInt16 (0, true), Is.EqualTo (-500));
-			Assert.That (cpu.Mmio.Data[SREG], Is.EqualTo (SREG_C));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.DataView.GetInt16 (0, true), Is.EqualTo (-500));
+			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_C));
 		});
 	}
 	
@@ -1121,15 +1075,15 @@ public class Instruction
 		LoadProgram ([
 			"mulsu r16, r17",
 		]);
-		cpu.Mmio.Data[r16] = (-5) & 0xff;
-		cpu.Mmio.Data[r17] = 200;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R16] = (-5) & 0xff;
+		Cpu.Mmio.Data[R17] = 200;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.DataView.GetInt16 (0, true), Is.EqualTo (-1000));
-			Assert.That (cpu.Mmio.Data[SREG], Is.EqualTo (SREG_C));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.DataView.GetInt16 (0, true), Is.EqualTo (-1000));
+			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_C));
 		});
 	}
 	
@@ -1139,14 +1093,14 @@ public class Instruction
 		LoadProgram ([
 			"neg r20",
 		]);
-		cpu.Mmio.Data[r20] = 0x56;
-		decoder.Decode(cpu);     
+		Cpu.Mmio.Data[R20] = 0x56;
+		decoder.Decode(Cpu);     
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
-			Assert.That (cpu.Mmio.Data[r20], Is.EqualTo (0xaa));
-			Assert.That (cpu.Mmio.Data[SREG], Is.EqualTo (SREG_S | SREG_N | SREG_C));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Mmio.Data[R20], Is.EqualTo (0xaa));
+			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_S | SREG_N | SREG_C));
 		});
 	}
 	
@@ -1156,11 +1110,11 @@ public class Instruction
 		LoadProgram ([
 			"nop",
 		]);
-		decoder.Decode(cpu);
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
 		});
 	}
 
@@ -1170,13 +1124,13 @@ public class Instruction
 		LoadProgram ([
 			"out 0x3f, r1",
 		]);
-		cpu.Mmio.Data[r1] = 0x5a;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R1] = 0x5a;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
-			Assert.That (cpu.Mmio.Data[0x5f], Is.EqualTo (0x5a));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Mmio.Data[0x5f], Is.EqualTo (0x5a));
 		});
 	}
 	
@@ -1186,16 +1140,16 @@ public class Instruction
 		LoadProgram ([
 			"pop r26",
 		]);
-		cpu.Mmio.Data[SPH] = 0;
-		cpu.Mmio.Data[SP] = 0xff;
-		cpu.Mmio.Data[0x100] = 0x1a;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[SPH] = 0;
+		Cpu.Mmio.Data[SP] = 0xff;
+		Cpu.Mmio.Data[0x100] = 0x1a;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[X], Is.EqualTo (0x1a));
-			Assert.That (cpu.Mmio.DataView.GetUint16 (SP, true), Is.EqualTo (0x100));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[X], Is.EqualTo (0x1a));
+			Assert.That (Cpu.Mmio.DataView.GetUint16 (SP, true), Is.EqualTo (0x100));
 		});
 	}
 	
@@ -1205,16 +1159,16 @@ public class Instruction
 		LoadProgram ([
 			"push r11",
 		]);
-		cpu.Mmio.Data[SPH] = 0;
-		cpu.Mmio.Data[SP] = 0xff;
-		cpu.Mmio.Data[r11] = 0x2a;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[SPH] = 0;
+		Cpu.Mmio.Data[SP] = 0xff;
+		Cpu.Mmio.Data[R11] = 0x2a;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[0xff], Is.EqualTo (0x2a));
-			Assert.That (cpu.Mmio.DataView.GetUint16 (SP, true), Is.EqualTo (0xfe));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[0xff], Is.EqualTo (0x2a));
+			Assert.That (Cpu.Mmio.DataView.GetUint16 (SP, true), Is.EqualTo (0xfe));
 		});
 	}
 	
@@ -1224,15 +1178,15 @@ public class Instruction
 		LoadProgram ([
 			"rcall 6"
 		]);
-		cpu.Mmio.Data[SPH] = 0;
-		cpu.Mmio.Data[SP] = 0x80;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[SPH] = 0;
+		Cpu.Mmio.Data[SP] = 0x80;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (4));
-			Assert.That (cpu.Cycles, Is.EqualTo (3));
-			Assert.That (cpu.Mmio.Data[SP], Is.EqualTo (0x7e)); // Return address low byte
-			Assert.That (cpu.Mmio.DataView.GetUint16 (0x80, true), Is.EqualTo (1)); // SP should be decremented 
+			Assert.That (Cpu.Pc, Is.EqualTo (4));
+			Assert.That (Cpu.Cycles, Is.EqualTo (3));
+			Assert.That (Cpu.Mmio.Data[SP], Is.EqualTo (0x7e)); // Return address low byte
+			Assert.That (Cpu.Mmio.DataView.GetUint16 (0x80, true), Is.EqualTo (1)); // SP should be decremented 
 		});
 	}
 	
@@ -1243,35 +1197,35 @@ public class Instruction
 			"nop",
 			"rcall -4"
 		]);
-		cpu.Mmio.Data[SPH] = 0;
-		cpu.Mmio.Data[SP] = 0x80;
-		decoder.Decode(cpu);
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[SPH] = 0;
+		Cpu.Mmio.Data[SP] = 0x80;
+		decoder.Decode(Cpu);
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (0));
-			Assert.That (cpu.Cycles, Is.EqualTo (4));
-			Assert.That (cpu.Mmio.Data[SP], Is.EqualTo (0x7e)); // Return address low byte
-			Assert.That (cpu.Mmio.DataView.GetUint16 (0x80, true), Is.EqualTo (2)); // SP should be decremented 
+			Assert.That (Cpu.Pc, Is.EqualTo (0));
+			Assert.That (Cpu.Cycles, Is.EqualTo (4));
+			Assert.That (Cpu.Mmio.Data[SP], Is.EqualTo (0x7e)); // Return address low byte
+			Assert.That (Cpu.Mmio.DataView.GetUint16 (0x80, true), Is.EqualTo (2)); // SP should be decremented 
 		});
 	}
 	
 	[Test (Description = "Should push 3-byte return address when executing RCALL instruction on device with >128k flash")]
 	public void RCALL_3Byte ()
 	{
-		cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
+		Cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
 		LoadProgram ([
 			"rcall 6"
 		]);
-		cpu.Mmio.Data[SPH] = 0;
-		cpu.Mmio.Data[SP] = 0x80;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[SPH] = 0;
+		Cpu.Mmio.Data[SP] = 0x80;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (4));
-			Assert.That (cpu.Cycles, Is.EqualTo (4));
-			Assert.That (cpu.Mmio.Data[SP], Is.EqualTo (0x7d)); // Return address low byte
-			Assert.That (cpu.Mmio.DataView.GetUint16 (0x80, true), Is.EqualTo (1)); // SP should be decremented by 3 
+			Assert.That (Cpu.Pc, Is.EqualTo (4));
+			Assert.That (Cpu.Cycles, Is.EqualTo (4));
+			Assert.That (Cpu.Mmio.Data[SP], Is.EqualTo (0x7d)); // Return address low byte
+			Assert.That (Cpu.Mmio.DataView.GetUint16 (0x80, true), Is.EqualTo (1)); // SP should be decremented by 3 
 		});
 	}
 	
@@ -1281,35 +1235,35 @@ public class Instruction
 		LoadProgram ([
 			"ret",
 		]);
-		cpu.Mmio.Data[SPH] = 0;
-		cpu.Mmio.Data[SP] = 0x90;
-		cpu.Mmio.Data[0x92] = 16;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[SPH] = 0;
+		Cpu.Mmio.Data[SP] = 0x90;
+		Cpu.Mmio.Data[0x92] = 16;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (16));
-			Assert.That (cpu.Cycles, Is.EqualTo (4));
-			Assert.That (cpu.Mmio.Data[SP], Is.EqualTo (0x92));
+			Assert.That (Cpu.Pc, Is.EqualTo (16));
+			Assert.That (Cpu.Cycles, Is.EqualTo (4));
+			Assert.That (Cpu.Mmio.Data[SP], Is.EqualTo (0x92));
 		});
 	}
 	
 	[Test (Description = "Should execute `RET` instruction on device with >128k flash")]
 	public void RET_3Byte ()
 	{
-		cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
+		Cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
 		LoadProgram ([
 			"ret",
 		]);
-		cpu.Mmio.Data[SPH] = 0;
-		cpu.Mmio.Data[SP] = 0x90;
-		cpu.Mmio.Data[0x91] = 0x1;
-		cpu.Mmio.Data[0x93] = 0x16;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[SPH] = 0;
+		Cpu.Mmio.Data[SP] = 0x90;
+		Cpu.Mmio.Data[0x91] = 0x1;
+		Cpu.Mmio.Data[0x93] = 0x16;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (0x10016));
-			Assert.That (cpu.Cycles, Is.EqualTo (5));
-			Assert.That (cpu.Mmio.Data[SP], Is.EqualTo (0x93));
+			Assert.That (Cpu.Pc, Is.EqualTo (0x10016));
+			Assert.That (Cpu.Cycles, Is.EqualTo (5));
+			Assert.That (Cpu.Mmio.Data[SP], Is.EqualTo (0x93));
 		});
 	}
 	
@@ -1319,37 +1273,37 @@ public class Instruction
 		LoadProgram ([
 			"reti",
 		]);
-		cpu.Mmio.Data[SPH] = 0;
-		cpu.Mmio.Data[SP] = 0xc0;
-		cpu.Mmio.Data[0xc2] = 200;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[SPH] = 0;
+		Cpu.Mmio.Data[SP] = 0xc0;
+		Cpu.Mmio.Data[0xc2] = 200;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (200));
-			Assert.That (cpu.Cycles, Is.EqualTo (4));
-			Assert.That (cpu.Mmio.Data[SP], Is.EqualTo (0xc2));
-			Assert.That (cpu.Mmio.Data[SREG], Is.EqualTo (SREG_I));
+			Assert.That (Cpu.Pc, Is.EqualTo (200));
+			Assert.That (Cpu.Cycles, Is.EqualTo (4));
+			Assert.That (Cpu.Mmio.Data[SP], Is.EqualTo (0xc2));
+			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_I));
 		});
 	}
 	
 	[Test (Description = "Should execute `RETI` instruction on device with >128k flash")]
 	public void RETI_3Byte ()
 	{
-		cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
+		Cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
 		LoadProgram ([
 			"reti",
 		]);
-		cpu.Mmio.Data[SPH] = 0;
-		cpu.Mmio.Data[SP] = 0xc0;
-		cpu.Mmio.Data[0xc1] = 0x1;
-		cpu.Mmio.Data[0xc3] = 0x30;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[SPH] = 0;
+		Cpu.Mmio.Data[SP] = 0xc0;
+		Cpu.Mmio.Data[0xc1] = 0x1;
+		Cpu.Mmio.Data[0xc3] = 0x30;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (0x10030));
-			Assert.That (cpu.Cycles, Is.EqualTo (5));
-			Assert.That (cpu.Mmio.Data[SP], Is.EqualTo (0xc3));
-			Assert.That (cpu.Mmio.Data[SREG], Is.EqualTo (SREG_I));
+			Assert.That (Cpu.Pc, Is.EqualTo (0x10030));
+			Assert.That (Cpu.Cycles, Is.EqualTo (5));
+			Assert.That (Cpu.Mmio.Data[SP], Is.EqualTo (0xc3));
+			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_I));
 		});
 	}
 	
@@ -1359,11 +1313,11 @@ public class Instruction
 		LoadProgram ([
 			"rjmp 2"
 		]);
-		decoder.Decode(cpu);
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (2));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Pc, Is.EqualTo (2));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
 		});
 	}
 	
@@ -1373,14 +1327,14 @@ public class Instruction
 		LoadProgram ([
 			"ror r0",
 		]);
-		cpu.Mmio.Data[r0] = 0x11;
-		decoder.Decode(cpu);     
+		Cpu.Mmio.Data[R0] = 0x11;
+		decoder.Decode(Cpu);     
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
-			Assert.That (cpu.Mmio.Data[r0], Is.EqualTo (0x08));
-			Assert.That (cpu.Mmio.Data[SREG], Is.EqualTo (SREG_S | SREG_V | SREG_C));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Mmio.Data[R0], Is.EqualTo (0x08));
+			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_S | SREG_V | SREG_C));
 		});
 	}
 	
@@ -1390,16 +1344,16 @@ public class Instruction
 		LoadProgram ([
 			"sbc r0, r1",
 		]);
-		cpu.Mmio.Data[r0] = 0x00;
-		cpu.Mmio.Data[r1] = 10;
-		cpu.Mmio.Data[95] = SREG_C;
-		decoder.Decode(cpu);     
+		Cpu.Mmio.Data[R0] = 0x00;
+		Cpu.Mmio.Data[R1] = 10;
+		Cpu.Mmio.Data[95] = SREG_C;
+		decoder.Decode(Cpu);     
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
-			Assert.That (cpu.Mmio.Data[r0], Is.EqualTo (245));
-			Assert.That (cpu.Mmio.Data[SREG], Is.EqualTo (SREG_H | SREG_S | SREG_N | SREG_C));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Mmio.Data[R0], Is.EqualTo (245));
+			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_H | SREG_S | SREG_N | SREG_C));
 		});
 	}
 	
@@ -1409,14 +1363,14 @@ public class Instruction
 		LoadProgram ([
 			"sbci r23, 3",
 		]);
-		cpu.Mmio.Data[r23] = 3;
-		cpu.Mmio.Data[SREG] = SREG_I | SREG_C;
-		decoder.Decode(cpu);     
+		Cpu.Mmio.Data[R23] = 3;
+		Cpu.Mmio.Data[SREG] = SREG_I | SREG_C;
+		decoder.Decode(Cpu);     
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
-			Assert.That (cpu.Mmio.Data[SREG], Is.EqualTo (SREG_I | SREG_H | SREG_S | SREG_N | SREG_C));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_I | SREG_H | SREG_S | SREG_N | SREG_C));
 		});
 	}
 	
@@ -1426,13 +1380,13 @@ public class Instruction
 		LoadProgram ([
 			"sbi 0x0c, 5",
 		]);
-		cpu.Mmio.Data[0x2c] = 0b00001111;
-		decoder.Decode(cpu);     
+		Cpu.Mmio.Data[0x2c] = 0b00001111;
+		decoder.Decode(Cpu);     
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[0x2c], Is.EqualTo (0b00101111));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[0x2c], Is.EqualTo (0b00101111));
 		});
 	}
 	
@@ -1442,12 +1396,12 @@ public class Instruction
 		LoadProgram ([
 			"sbis 0x0c, 5",
 		]);
-		cpu.Mmio.Data[0x2c] = 0b00001111;
-		decoder.Decode(cpu);     
+		Cpu.Mmio.Data[0x2c] = 0b00001111;
+		decoder.Decode(Cpu);     
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
 		});
 	}
 	
@@ -1457,12 +1411,12 @@ public class Instruction
 		LoadProgram ([
 			"sbis 0x0c, 5",
 		]);
-		cpu.Mmio.Data[0x2c] = 0b00101111;
-		decoder.Decode(cpu);     
+		Cpu.Mmio.Data[0x2c] = 0b00101111;
+		decoder.Decode(Cpu);     
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (2));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Pc, Is.EqualTo (2));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
 		});
 	}
 	
@@ -1473,12 +1427,12 @@ public class Instruction
 			"sbis 0x0c, 5",
 			"call 0xb8"
 		]);
-		cpu.Mmio.Data[0x2c] = 0b00101111;
-		decoder.Decode(cpu);     
+		Cpu.Mmio.Data[0x2c] = 0b00101111;
+		decoder.Decode(Cpu);     
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (3));
-			Assert.That (cpu.Cycles, Is.EqualTo (3));
+			Assert.That (Cpu.Pc, Is.EqualTo (3));
+			Assert.That (Cpu.Cycles, Is.EqualTo (3));
 		});
 	}
 	
@@ -1488,15 +1442,15 @@ public class Instruction
 		LoadProgram ([
 			"st X, r1",
 		]);
-		cpu.Mmio.Data[r1] = 0x5a;
-		cpu.Mmio.Data[X] = 0x9a;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R1] = 0x5a;
+		Cpu.Mmio.Data[X] = 0x9a;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[0x9a], Is.EqualTo (0x5a));
-			Assert.That (cpu.Mmio.Data[X], Is.EqualTo (0x9a)); // X should not be modified
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[0x9a], Is.EqualTo (0x5a));
+			Assert.That (Cpu.Mmio.Data[X], Is.EqualTo (0x9a)); // X should not be modified
 		});
 	}
 	
@@ -1506,15 +1460,15 @@ public class Instruction
 		LoadProgram ([
 			"st X+, r1",
 		]);
-		cpu.Mmio.Data[r1] = 0x5a;
-		cpu.Mmio.Data[X] = 0x9a;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R1] = 0x5a;
+		Cpu.Mmio.Data[X] = 0x9a;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[0x9a], Is.EqualTo (0x5a));
-			Assert.That (cpu.Mmio.Data[X], Is.EqualTo (0x9b)); // X should be incremented
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[0x9a], Is.EqualTo (0x5a));
+			Assert.That (Cpu.Mmio.Data[X], Is.EqualTo (0x9b)); // X should be incremented
 		});
 	}
 	
@@ -1524,15 +1478,15 @@ public class Instruction
 		LoadProgram ([
 			"st -X, r17",
 		]);
-		cpu.Mmio.Data[r17] = 0x88;
-		cpu.Mmio.Data[X] = 0x99;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R17] = 0x88;
+		Cpu.Mmio.Data[X] = 0x99;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[0x98], Is.EqualTo (0x88));
-			Assert.That (cpu.Mmio.Data[X], Is.EqualTo (0x98)); // X should be decremented
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[0x98], Is.EqualTo (0x88));
+			Assert.That (Cpu.Mmio.Data[X], Is.EqualTo (0x98)); // X should be decremented
 		});
 	}
 	
@@ -1542,15 +1496,15 @@ public class Instruction
 		LoadProgram ([
 			"st Y, r2",
 		]);
-		cpu.Mmio.Data[r2] = 0x5b;
-		cpu.Mmio.Data[Y] = 0x9a;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R2] = 0x5b;
+		Cpu.Mmio.Data[Y] = 0x9a;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[0x9a], Is.EqualTo (0x5b));
-			Assert.That (cpu.Mmio.Data[Y], Is.EqualTo (0x9a)); // Y should not be modified
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[0x9a], Is.EqualTo (0x5b));
+			Assert.That (Cpu.Mmio.Data[Y], Is.EqualTo (0x9a)); // Y should not be modified
 		});
 	}
 	
@@ -1560,15 +1514,15 @@ public class Instruction
 		LoadProgram ([
 			"st Y+, r1",
 		]);
-		cpu.Mmio.Data[r1] = 0x5a;
-		cpu.Mmio.Data[Y] = 0x9a;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R1] = 0x5a;
+		Cpu.Mmio.Data[Y] = 0x9a;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[0x9a], Is.EqualTo (0x5a));
-			Assert.That (cpu.Mmio.Data[Y], Is.EqualTo (0x9b)); // Y should be incremented
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[0x9a], Is.EqualTo (0x5a));
+			Assert.That (Cpu.Mmio.Data[Y], Is.EqualTo (0x9b)); // Y should be incremented
 		});
 	}
 	
@@ -1578,15 +1532,15 @@ public class Instruction
 		LoadProgram ([
 			"st -Y, r1",
 		]);
-		cpu.Mmio.Data[r1] = 0x5a;
-		cpu.Mmio.Data[Y] = 0x9a;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R1] = 0x5a;
+		Cpu.Mmio.Data[Y] = 0x9a;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[0x99], Is.EqualTo (0x5a));
-			Assert.That (cpu.Mmio.Data[Y], Is.EqualTo (0x99)); // Y should be decremented
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[0x99], Is.EqualTo (0x5a));
+			Assert.That (Cpu.Mmio.Data[Y], Is.EqualTo (0x99)); // Y should be decremented
 		});
 	}
 	
@@ -1596,15 +1550,15 @@ public class Instruction
 		LoadProgram ([
 			"std Y+17, r0",
 		]);
-		cpu.Mmio.Data[r0] = 0xba;
-		cpu.Mmio.Data[Y] = 0x9a;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R0] = 0xba;
+		Cpu.Mmio.Data[Y] = 0x9a;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[0x9a + 17], Is.EqualTo (0xba));
-			Assert.That (cpu.Mmio.Data[Y], Is.EqualTo (0x9a)); // Y should not be modified
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[0x9a + 17], Is.EqualTo (0xba));
+			Assert.That (Cpu.Mmio.Data[Y], Is.EqualTo (0x9a)); // Y should not be modified
 		});
 	}
 	
@@ -1614,15 +1568,15 @@ public class Instruction
 		LoadProgram ([
 			"st Z, r16",
 		]);
-		cpu.Mmio.Data[r16] = 0xdf;
-		cpu.Mmio.Data[Z] = 0x40;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R16] = 0xdf;
+		Cpu.Mmio.Data[Z] = 0x40;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[0x40], Is.EqualTo (0xdf));
-			Assert.That (cpu.Mmio.Data[Z], Is.EqualTo (0x40)); // Z should not be modified
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[0x40], Is.EqualTo (0xdf));
+			Assert.That (Cpu.Mmio.Data[Z], Is.EqualTo (0x40)); // Z should not be modified
 		});
 	}
 	
@@ -1632,15 +1586,15 @@ public class Instruction
 		LoadProgram ([
 			"st Z+, r0",
 		]);
-		cpu.Mmio.Data[r0] = 0x55;
-		cpu.Mmio.DataView.SetUint16 (Z, 0x155, true);
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R0] = 0x55;
+		Cpu.Mmio.DataView.SetUint16 (Z, 0x155, true);
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[0x155], Is.EqualTo (0x55));
-			Assert.That (cpu.Mmio.DataView.GetUint16 (Z, true), Is.EqualTo (0x156)); // Z should be incremented
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[0x155], Is.EqualTo (0x55));
+			Assert.That (Cpu.Mmio.DataView.GetUint16 (Z, true), Is.EqualTo (0x156)); // Z should be incremented
 		});
 	}
 	
@@ -1650,15 +1604,15 @@ public class Instruction
 		LoadProgram ([
 			"st -Z, r16",
 		]);
-		cpu.Mmio.Data[r16] = 0x5a;
-		cpu.Mmio.Data[Z] = 0xff;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R16] = 0x5a;
+		Cpu.Mmio.Data[Z] = 0xff;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[0xfe], Is.EqualTo (0x5a));
-			Assert.That (cpu.Mmio.Data[Z], Is.EqualTo (0xfe)); // Z should be decremented
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[0xfe], Is.EqualTo (0x5a));
+			Assert.That (Cpu.Mmio.Data[Z], Is.EqualTo (0xfe)); // Z should be decremented
 		});
 	}
 	
@@ -1668,15 +1622,15 @@ public class Instruction
 		LoadProgram ([
 			"std Z+1, r0",
 		]);
-		cpu.Mmio.Data[r0] = 0xcc;
-		cpu.Mmio.Data[Z] = 0x50;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R0] = 0xcc;
+		Cpu.Mmio.Data[Z] = 0x50;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[0x51], Is.EqualTo (0xcc));
-			Assert.That (cpu.Mmio.Data[Z], Is.EqualTo (0x50)); // Z should not be modified
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[0x51], Is.EqualTo (0xcc));
+			Assert.That (Cpu.Mmio.Data[Z], Is.EqualTo (0x50)); // Z should not be modified
 		});
 	}
 	
@@ -1686,13 +1640,13 @@ public class Instruction
 		LoadProgram ([
 			"sts 0x151, r31",
 		]);
-		cpu.Mmio.Data[r31] = 0x80;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R31] = 0x80;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (2));
-			Assert.That (cpu.Cycles, Is.EqualTo (2));
-			Assert.That (cpu.Mmio.Data[0x151], Is.EqualTo (0x80));
+			Assert.That (Cpu.Pc, Is.EqualTo (2));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
+			Assert.That (Cpu.Mmio.Data[0x151], Is.EqualTo (0x80));
 		});
 	}
 	
@@ -1702,15 +1656,15 @@ public class Instruction
 		LoadProgram ([
 			"sub r0, r1",
 		]);
-		cpu.Mmio.Data[r0] = 0;
-		cpu.Mmio.Data[r1] = 10;
-		decoder.Decode(cpu);     
+		Cpu.Mmio.Data[R0] = 0;
+		Cpu.Mmio.Data[R1] = 10;
+		decoder.Decode(Cpu);     
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
-			Assert.That (cpu.Mmio.Data[r0], Is.EqualTo (246));
-			Assert.That (cpu.Mmio.Data[SREG], Is.EqualTo (SREG_S | SREG_N | SREG_C | SREG_H));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Mmio.Data[R0], Is.EqualTo (246));
+			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_S | SREG_N | SREG_C | SREG_H));
 		});
 	}
 	
@@ -1720,13 +1674,13 @@ public class Instruction
 		LoadProgram ([
 			"swap r1",
 		]);
-		cpu.Mmio.Data[r1] = 0xa5;
-		decoder.Decode(cpu);     
+		Cpu.Mmio.Data[R1] = 0xa5;
+		decoder.Decode(Cpu);     
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
-			Assert.That (cpu.Mmio.Data[r1], Is.EqualTo (0x5a));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Mmio.Data[R1], Is.EqualTo (0x5a));
 		});
 	}
 	
@@ -1736,11 +1690,11 @@ public class Instruction
 		LoadProgram ([
 			"wdr",
 		]);
-		cpu.OnWatchdogReset = () => {
-			cpu.Mmio.Data[0x100] = 0x1;
+		Cpu.OnWatchdogReset = () => {
+			Cpu.Mmio.Data[0x100] = 0x1;
 		};
-		decoder.Decode(cpu);
-		Assert.That (cpu.Mmio.Data[0x100], Is.EqualTo (0x1));
+		decoder.Decode(Cpu);
+		Assert.That (Cpu.Mmio.Data[0x100], Is.EqualTo (0x1));
 	}
 	
 	[Test (Description = "Should execute XCH Z, r21 instruction")]
@@ -1749,16 +1703,16 @@ public class Instruction
 		LoadProgram ([
 			"xch Z, r21",
 		]);
-		cpu.Mmio.Data[r21] = 0xa1;
-		cpu.Mmio.Data[Z] = 0x50;
-		cpu.Mmio.Data[0x50] = 0xb9;
-		decoder.Decode(cpu);
+		Cpu.Mmio.Data[R21] = 0xa1;
+		Cpu.Mmio.Data[Z] = 0x50;
+		Cpu.Mmio.Data[0x50] = 0xb9;
+		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
-			Assert.That (cpu.Pc, Is.EqualTo (1));
-			Assert.That (cpu.Cycles, Is.EqualTo (1));
-			Assert.That (cpu.Mmio.Data[r21], Is.EqualTo (0xb9));
-			Assert.That (cpu.Mmio.Data[0x50], Is.EqualTo (0xa1));
+			Assert.That (Cpu.Pc, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Mmio.Data[R21], Is.EqualTo (0xb9));
+			Assert.That (Cpu.Mmio.Data[0x50], Is.EqualTo (0xa1));
 		});
 	}
 
@@ -1770,6 +1724,6 @@ public class Instruction
 		if (assembler.Errors.Count > 0) {
 			throw new Exception (string.Join ("\n", assembler.Errors));
 		}
-		cpu.LoadProgram (program);
+		Cpu.LoadProgram (program);
 	}
 }

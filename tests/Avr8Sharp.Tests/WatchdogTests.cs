@@ -1,9 +1,10 @@
+using AVR8Sharp.Core.Peripherals;
 using Avr8Sharp.Tests.Utils;
 
 namespace Avr8Sharp.Tests;
 
 [TestFixture]
-public class Watchdog
+public class Watchdog : AvrTestBase
 {
 	const int R20 = 20;
 
@@ -20,45 +21,44 @@ public class Watchdog
 	const int WDIE = 1 << 6;
 
 	const int INT_WDT = 0xc;
+
+	private AvrWatchdog _watchdog;
+
+	protected override void SetupPeripherals()
+	{
+		_watchdog = new AvrWatchdog(Cpu, AvrWatchdog.WatchdogConfig, Clock);
+	}
 	
 	[Test(Description = "Should correctly calculate the prescaler from WDTCSR")]
 	public void SetPrescaler()
 	{
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[1024]);
-		var clock = new AVR8Sharp.Core.Peripherals.AvrClock(cpu, 16_000_000, AVR8Sharp.Core.Peripherals.AvrClock.ClockConfig);
-		var watchdog = new AVR8Sharp.Core.Peripherals.AvrWatchdog(cpu, AVR8Sharp.Core.Peripherals.AvrWatchdog.WatchdogConfig, clock);
+		Cpu.WriteData (WDTCSR, WDCE | WDE);
+		Cpu.WriteData (WDTCSR, 0);
 		
-		cpu.WriteData (WDTCSR, WDCE | WDE);
-		cpu.WriteData (WDTCSR, 0);
+		Assert.That(_watchdog.Prescaler, Is.EqualTo(2048));
 		
-		Assert.That(watchdog.Prescaler, Is.EqualTo(2048));
+		Cpu.WriteData (WDTCSR, WDP2 | WDP1 | WDP0);
 		
-		cpu.WriteData (WDTCSR, WDP2 | WDP1 | WDP0);
+		Assert.That(_watchdog.Prescaler, Is.EqualTo(256 * 1024));
 		
-		Assert.That(watchdog.Prescaler, Is.EqualTo(256 * 1024));
+		Cpu.WriteData (WDTCSR, WDP3 | WDP0);
 		
-		cpu.WriteData (WDTCSR, WDP3 | WDP0);
-		
-		Assert.That(watchdog.Prescaler, Is.EqualTo(1024 * 1024));
+		Assert.That(_watchdog.Prescaler, Is.EqualTo(1024 * 1024));
 	}
 	
 	[Test(Description = "Should not change the prescaler unless WDCE is set")]
 	public void SetPrescalerWithoutWDCE()
 	{
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[1024]);
-		var clock = new AVR8Sharp.Core.Peripherals.AvrClock(cpu, 16_000_000, AVR8Sharp.Core.Peripherals.AvrClock.ClockConfig);
-		var watchdog = new AVR8Sharp.Core.Peripherals.AvrWatchdog(cpu, AVR8Sharp.Core.Peripherals.AvrWatchdog.WatchdogConfig, clock);
+		Cpu.WriteData (WDTCSR, 0);
+		Assert.That(_watchdog.Prescaler, Is.EqualTo(2048));
 		
-		cpu.WriteData (WDTCSR, 0);
-		Assert.That(watchdog.Prescaler, Is.EqualTo(2048));
+		Cpu.WriteData (WDTCSR, WDP2 | WDP1 | WDP0);
+		Assert.That(_watchdog.Prescaler, Is.EqualTo(2048));
 		
-		cpu.WriteData (WDTCSR, WDP2 | WDP1 | WDP0);
-		Assert.That(watchdog.Prescaler, Is.EqualTo(2048));
-		
-		cpu.WriteData (WDTCSR, WDCE | WDE);
-		cpu.Cycles += 5; // WDCE should expire after 4 cycles
-		cpu.WriteData (WDTCSR, WDP2 | WDP1 | WDP0);
-		Assert.That(watchdog.Prescaler, Is.EqualTo(2048));
+		Cpu.WriteData (WDTCSR, WDCE | WDE);
+		Cpu.Cycles += 5; // WDCE should expire after 4 cycles
+		Cpu.WriteData (WDTCSR, WDP2 | WDP1 | WDP0);
+		Assert.That(_watchdog.Prescaler, Is.EqualTo(2048));
 	}
 	
 	[Test(Description = "Should reset the CPU when the timer expires")]
@@ -79,26 +79,24 @@ public class Watchdog
     break
 ").Compile();
 		
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu(program.Program);
-		var clock = new AVR8Sharp.Core.Peripherals.AvrClock(cpu, 16_000_000, AVR8Sharp.Core.Peripherals.AvrClock.ClockConfig);
-		var watchdog = new AVR8Sharp.Core.Peripherals.AvrWatchdog(cpu, AVR8Sharp.Core.Peripherals.AvrWatchdog.WatchdogConfig, clock);
-		var runner = new TestProgramRunner(cpu);
+		Cpu.LoadProgram(program.Program);
+		var runner = new TestProgramRunner(Cpu);
 		
 		// Setup: enable watchdog timer
 		runner.RunInstructions(4);
-		Assert.That(watchdog.Enabled, Is.True);
+		Assert.That(_watchdog.Enabled, Is.True);
 		
 		// Now we skip 8ms. Watchdog shouldn't fire, yet
-		cpu.Cycles += 16000 * 8;
+		Cpu.Cycles += 16000 * 8;
 		runner.RunInstructions(1);
 		
 		// Now we skip an extra 8ms. Watchdog should fire and reset!
-		cpu.Cycles += 16000 * 8;
-		cpu.Tick();
+		Cpu.Cycles += 16000 * 8;
+		Cpu.Tick();
         Assert.Multiple(() =>
         {
-            Assert.That(cpu.Pc, Is.EqualTo(0));
-            Assert.That(cpu.ReadData(MCUSR), Is.EqualTo(WDRF));
+            Assert.That(Cpu.Pc, Is.EqualTo(0));
+            Assert.That(Cpu.ReadData(MCUSR), Is.EqualTo(WDRF));
         });
     }
 
@@ -120,29 +118,27 @@ public class Watchdog
 
     break").Compile();
 		
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu(program.Program);
-		var clock = new AVR8Sharp.Core.Peripherals.AvrClock(cpu, 16_000_000, AVR8Sharp.Core.Peripherals.AvrClock.ClockConfig);
-		var watchdog = new AVR8Sharp.Core.Peripherals.AvrWatchdog(cpu, AVR8Sharp.Core.Peripherals.AvrWatchdog.WatchdogConfig, clock);
-		var runner = new TestProgramRunner(cpu);
+		Cpu.LoadProgram(program.Program);
+		var runner = new TestProgramRunner(Cpu);
 		
 		// Setup: enable watchdog timer
 		runner.RunInstructions(4);
-		Assert.That(watchdog.Enabled, Is.True);
+		Assert.That(_watchdog.Enabled, Is.True);
 		
 		// Now we skip 8ms. Watchdog shouldn't fire, yet
-		cpu.Cycles += 16000 * 8;
+		Cpu.Cycles += 16000 * 8;
 		runner.RunInstructions(1);
-		Assert.That(cpu.Pc, Is.Not.EqualTo(0));
+		Assert.That(Cpu.Pc, Is.Not.EqualTo(0));
 		
 		// Now we skip an extra 8ms. We extended the timeout with WDR, so watchdog won't fire yet
-		cpu.Cycles += 16000 * 8;
+		Cpu.Cycles += 16000 * 8;
 		runner.RunInstructions(1);
-		Assert.That(cpu.Pc, Is.Not.EqualTo(0));
+		Assert.That(Cpu.Pc, Is.Not.EqualTo(0));
 		
 		// Finally, another 8ms bring us to 16ms since last WDR, and watchdog should fire
-		cpu.Cycles += 16000 * 8;
-		cpu.Tick();
-		Assert.That(cpu.Pc, Is.EqualTo(0));
+		Cpu.Cycles += 16000 * 8;
+		Cpu.Tick();
+		Assert.That(Cpu.Pc, Is.EqualTo(0));
 	}
 	
 	[Test (Description = "Should fire an interrupt when the watchdog expires and WDIE is set")]
@@ -164,25 +160,23 @@ public class Watchdog
     break
 ").Compile();
 		
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu(program.Program);
-		var clock = new AVR8Sharp.Core.Peripherals.AvrClock(cpu, 16_000_000, AVR8Sharp.Core.Peripherals.AvrClock.ClockConfig);
-		var watchdog = new AVR8Sharp.Core.Peripherals.AvrWatchdog(cpu, AVR8Sharp.Core.Peripherals.AvrWatchdog.WatchdogConfig, clock);
-		var runner = new TestProgramRunner(cpu);
+		Cpu.LoadProgram(program.Program);
+		var runner = new TestProgramRunner(Cpu);
 		
 		runner.RunInstructions (4);
-		Assert.That (watchdog.Enabled, Is.True);
+		Assert.That (_watchdog.Enabled, Is.True);
 		
 		// Now we skip 8ms. Watchdog shouldn't fire, yet
-		cpu.Cycles += 16000 * 8;
+		Cpu.Cycles += 16000 * 8;
 		runner.RunInstructions (1);
 		
 		// Now we skip an extra 8ms. Watchdog should fire and jump to the interrupt handler
-		cpu.Cycles += 16000 * 8;
+		Cpu.Cycles += 16000 * 8;
 		runner.RunInstructions (1);
 		
-		Assert.That (cpu.Pc, Is.EqualTo(INT_WDT));
+		Assert.That (Cpu.Pc, Is.EqualTo(INT_WDT));
 		// The watchdog timer should also clean the WDIE bit, so next timeout will reset the MCU.
-		Assert.That ((cpu.ReadData (WDTCSR) & WDIE), Is.EqualTo(0));
+		Assert.That ((Cpu.ReadData (WDTCSR) & WDIE), Is.EqualTo(0));
 	}
 
 	[Test (Description = "Should not reset the CPU if the watchdog has been disabled")]
@@ -209,24 +203,22 @@ public class Watchdog
     break
 ").Compile();
 		
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu(program.Program);
-		var clock = new AVR8Sharp.Core.Peripherals.AvrClock(cpu, 16_000_000, AVR8Sharp.Core.Peripherals.AvrClock.ClockConfig);
-		var watchdog = new AVR8Sharp.Core.Peripherals.AvrWatchdog(cpu, AVR8Sharp.Core.Peripherals.AvrWatchdog.WatchdogConfig, clock);
-		var runner = new TestProgramRunner(cpu);
+		Cpu.LoadProgram(program.Program);
+		var runner = new TestProgramRunner(Cpu);
 		
 		// Setup: enable watchdog timer
 		runner.RunInstructions(4);
-		Assert.That(watchdog.Enabled, Is.True);
+		Assert.That(_watchdog.Enabled, Is.True);
 		
 		// Now we skip 8ms. Watchdog shouldn't fire, yet. We disable it.
-		cpu.Cycles += 16000 * 8;
+		Cpu.Cycles += 16000 * 8;
 		runner.RunInstructions(4);
 		
 		// Now we skip an extra 20ms. Watchdog shouldn't reset!
-		cpu.Cycles += 16000 * 20;
+		Cpu.Cycles += 16000 * 20;
 		runner.RunInstructions(1);
-		Assert.That(cpu.Pc, Is.Not.EqualTo(0));
-		Assert.That(cpu.ReadData(R20), Is.EqualTo(55)); // assert that `ldi r20, 55` ran
+		Assert.That(Cpu.Pc, Is.Not.EqualTo(0));
+		Assert.That(Cpu.ReadData(R20), Is.EqualTo(55)); // assert that `ldi r20, 55` ran
 	}
 
 	[Test(Description = "Should not schedule duplicate CheckWatchdog events on consecutive WDTCSR writes")]
@@ -254,25 +246,23 @@ public class Watchdog
     break
 ").Compile();
 
-       var cpu = new AVR8Sharp.Core.Cpu.Cpu(program.Program);
-       var clock = new AVR8Sharp.Core.Peripherals.AvrClock(cpu, 16_000_000, AVR8Sharp.Core.Peripherals.AvrClock.ClockConfig);
-       var watchdog = new AVR8Sharp.Core.Peripherals.AvrWatchdog(cpu, AVR8Sharp.Core.Peripherals.AvrWatchdog.WatchdogConfig, clock);
-       var runner = new TestProgramRunner(cpu);
+       Cpu.LoadProgram(program.Program);
+       var runner = new TestProgramRunner(Cpu);
 
        runner.RunInstructions(12);
-       Assert.That(watchdog.Enabled, Is.True);
+       Assert.That(_watchdog.Enabled, Is.True);
 
-       cpu.Cycles += 16000 * 8;
+       Cpu.Cycles += 16000 * 8;
        runner.RunInstructions(1);
-       Assert.That(cpu.Pc, Is.Not.EqualTo(0), "CPU should not reset early from duplicate old events");
+       Assert.That(Cpu.Pc, Is.Not.EqualTo(0), "CPU should not reset early from duplicate old events");
 
-       cpu.Cycles += 16000 * 8;
-       cpu.Tick();
+       Cpu.Cycles += 16000 * 8;
+       Cpu.Tick();
 
        Assert.Multiple(() =>
        {
-           Assert.That(cpu.Pc, Is.EqualTo(0), "CPU should reset on timeout");
-           Assert.That(cpu.ReadData(MCUSR), Is.EqualTo(WDRF), "WDRF flag must be set on Watchdog reset");
+           Assert.That(Cpu.Pc, Is.EqualTo(0), "CPU should reset on timeout");
+           Assert.That(Cpu.ReadData(MCUSR), Is.EqualTo(WDRF), "WDRF flag must be set on Watchdog reset");
        });
     }
 }

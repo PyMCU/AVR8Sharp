@@ -4,7 +4,7 @@ using Avr8Sharp.Tests.Utils;
 namespace Avr8Sharp.Tests;
 
 [TestFixture]
-public class Gpio
+public class Gpio : AvrTestBase
 {
 	// CPU registers
 	const int SREG = 95;
@@ -41,75 +41,75 @@ public class Gpio
 	const int PC_INT_INT0 = 2;
 	const int PC_INT_PCINT0 = 6;
 
+	private AvrIoPort portB;
+	private AvrIoPort portC;
+	private AvrIoPort portD;
+
+	protected override void SetupPeripherals()
+	{
+		portB = new AvrIoPort (Cpu, AvrIoPort.PortBConfig);
+		portC = new AvrIoPort (Cpu, AvrIoPort.PortCConfig);
+		portD = new AvrIoPort (Cpu, AvrIoPort.PortDConfig);
+	}
+
+
 	[Test (Description = "Should invoke the listeners when the port is written to")]
 	public void PortWrite ()
 	{
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-		var port = new AvrIoPort (cpu, AvrIoPort.PortBConfig);
+		Cpu.WriteData (DDRB, 0x0f);
 
-		cpu.WriteData (DDRB, 0x0f);
-
-		port.AddListener ((value, oldValue) => {
+		portB.AddListener ((value, oldValue) => {
 			Assert.That (value, Is.EqualTo (0x55));
 		});
 
-		cpu.WriteData (PORTB, 0x55);
+		Cpu.WriteData (PORTB, 0x55);
 
-		Assert.That (cpu.Mmio.Data[0x23], Is.EqualTo (0x5));
+		Assert.That (Cpu.Mmio.Data[0x23], Is.EqualTo (0x5));
 	}
 
 	[Test (Description = "Should invoke the listeners when DDR changes (issue #28)")]
 	public void DdrWrite ()
 	{
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-		var port = new AvrIoPort (cpu, AvrIoPort.PortBConfig);
-
 		var counter = 0;
 
-		cpu.WriteData (PORTB, 0x55);
+		Cpu.WriteData (PORTB, 0x55);
 
-		port.AddListener ((value, oldValue) => {
+		portB.AddListener ((value, oldValue) => {
 			Assert.That (value, Is.EqualTo (0x55));
 		});
 
-		cpu.WriteData (DDRB, 0xf0);
+		Cpu.WriteData (DDRB, 0xf0);
 	}
 
 	[Test (Description = "Should invoke the listeners when pullup register enabled (issue #62)")]
 	public void Pullup ()
 	{
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-		var port = new AvrIoPort (cpu, AvrIoPort.PortBConfig);
-
 		var counter = 0;
 
-		port.AddListener ((value, oldValue) => {
+		portB.AddListener ((value, oldValue) => {
 			Assert.That (value, counter == 0 ? Is.EqualTo (0x55) : Is.EqualTo (0));
 			counter++;
 		});
 
-		cpu.WriteData (PORTB, 0x55);
+		Cpu.WriteData (PORTB, 0x55);
 	}
 
 	[Test (Description = "Should toggle the pin when writing to the PIN register")]
 	public void PinToggle ()
 	{
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-		var port = new AvrIoPort (cpu, AvrIoPort.PortBConfig);
-
 		var calledCorrectly = false;
 
-		port.AddListener ((value, oldValue) => {
+		portB.AddListener ((value, oldValue) => {
 			calledCorrectly |= value == 0x54 && oldValue == 0x55;
 		});
 
-		cpu.WriteData (DDRB, 0x0f);
-		cpu.WriteData (PORTB, 0x55);
-		cpu.WriteData (PINB, 0x01);
+		Cpu.WriteData (DDRB, 0x0f);
+		Cpu.WriteData (PORTB, 0x55);
+		Cpu.WriteData (PINB, 0x01);
 
         Assert.Multiple(() =>
         {
-            Assert.That(cpu.Mmio.Data[PINB], Is.EqualTo(0x4));
+            Assert.That(Cpu.Mmio.Data[PINB], Is.EqualTo(0x4));
             Assert.That(calledCorrectly, Is.True);
         });
     }
@@ -117,7 +117,6 @@ public class Gpio
 	[Test (Description = "Should only affect one pin when writing to PIN using SBI (issue #103)")]
 	public void PinToggleSbi ()
 	{
-
 		var program = new AsmProgram (@$"
 			; register addresses
 		    _REPLACE DDRD, {DDRD - 0x20}
@@ -135,9 +134,8 @@ public class Gpio
 		    break
 ").Compile();
 
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
-		var portD = new AvrIoPort (cpu, AvrIoPort.PortDConfig);
-		var runner = new TestProgramRunner (cpu);
+		Cpu.LoadProgram(program.Program);
+		var runner = new TestProgramRunner (Cpu);
 
 		var calledCorrectly = false;
 
@@ -146,7 +144,7 @@ public class Gpio
 		});
 
 		runner.RunInstructions (3);
-		Assert.That (cpu.Mmio.Data[PORTD], Is.EqualTo (0x48));
+		Assert.That (Cpu.Mmio.Data[PORTD], Is.EqualTo (0x48));
 
 		var calledCorrectly2 = false;
 		portD.AddListener ((value, oldValue) => {
@@ -156,7 +154,7 @@ public class Gpio
 		runner.RunInstructions (1);
         Assert.Multiple(() =>
         {
-            Assert.That(cpu.Mmio.Data[PORTD], Is.EqualTo(0x8));
+            Assert.That(Cpu.Mmio.Data[PORTD], Is.EqualTo(0x8));
             Assert.That(calledCorrectly, Is.True);
             Assert.That(calledCorrectly2, Is.True);
         });
@@ -165,341 +163,327 @@ public class Gpio
 	[Test (Description = "Should update the PIN register on output compare (OCR) match (issue #102)")]
 	public void PinToggleOcrMatch ()
 	{
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-		var port = new AvrIoPort (cpu, AvrIoPort.PortBConfig);
+		Cpu.WriteData (DDRB, 1 << 1);
 
-		cpu.WriteData (DDRB, 1 << 1);
-
-		port.TimerOverridePin (1, PinOverrideMode.Set);
+		portB.TimerOverridePin (1, PinOverrideMode.Set);
 		Assert.Multiple (() => {
-			Assert.That (port.GetPinState (1), Is.EqualTo (AVR8Sharp.Core.Peripherals.PinState.High));
-			Assert.That (cpu.Mmio.Data[PINB], Is.EqualTo (1 << 1));
+			Assert.That (portB.GetPinState (1), Is.EqualTo (AVR8Sharp.Core.Peripherals.PinState.High));
+			Assert.That (Cpu.Mmio.Data[PINB], Is.EqualTo (1 << 1));
 		});
 
-		port.TimerOverridePin (1, PinOverrideMode.Clear);
+		portB.TimerOverridePin (1, PinOverrideMode.Clear);
 		Assert.Multiple (() => {
-			Assert.That (port.GetPinState (1), Is.EqualTo (AVR8Sharp.Core.Peripherals.PinState.Low));
-			Assert.That (cpu.Mmio.Data[PINB], Is.EqualTo (0));
+			Assert.That (portB.GetPinState (1), Is.EqualTo (AVR8Sharp.Core.Peripherals.PinState.Low));
+			Assert.That (Cpu.Mmio.Data[PINB], Is.EqualTo (0));
 		});
 	}
 
 	[Test (Description = "Should remove the given listener")]
 	public void RemoveListener ()
 	{
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-		var port = new AvrIoPort (cpu, AvrIoPort.PortBConfig);
-
 		var counter = 0;
 
-		var listener = new System.Action<byte, byte> ((_, _) => {
+		var listener = new Action<byte, byte> ((_, _) => {
 			counter++;
 		});
 
-		port.AddListener (listener);
+		portB.AddListener (listener);
 
-		cpu.WriteData (DDRB, 0x0f);
+		Cpu.WriteData (DDRB, 0x0f);
 
-		port.RemoveListener (listener);
+		portB.RemoveListener (listener);
 
-		cpu.WriteData (PORTB, 0x99);
+		Cpu.WriteData (PORTB, 0x99);
 
 		Assert.That (counter, Is.EqualTo (1));
 	}
 
 	[TestFixture]
-	public class PinState
+	public class PinState : AvrTestBase
 	{
+		private AvrIoPort portB;
+
+		protected override void SetupPeripherals()
+		{
+			portB = new AvrIoPort (Cpu, AvrIoPort.PortBConfig);
+		}
+
 		[Test (Description = "Should return PinState.High when the pin set to output and HIGH")]
 		public void PinStateHigh ()
 		{
-			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-			var port = new AvrIoPort (cpu, AvrIoPort.PortBConfig);
+			Cpu.WriteData (DDRB, 0x1);
+			Cpu.WriteData (PORTB, 0x1);
 
-			cpu.WriteData (DDRB, 0x1);
-			cpu.WriteData (PORTB, 0x1);
-
-			Assert.That (port.GetPinState (PB0), Is.EqualTo (AVR8Sharp.Core.Peripherals.PinState.High));
+			Assert.That (portB.GetPinState (PB0), Is.EqualTo (AVR8Sharp.Core.Peripherals.PinState.High));
 		}
 
 		[Test (Description = "Should return PinState.Low when the pin set to output and LOW")]
 		public void PinStateLow ()
 		{
-			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-			var port = new AvrIoPort (cpu, AvrIoPort.PortBConfig);
+			Cpu.WriteData (DDRB, 0x8);
+			Cpu.WriteData (PORTB, 0xf7);
 
-			cpu.WriteData (DDRB, 0x8);
-			cpu.WriteData (PORTB, 0xf7);
-
-			Assert.That (port.GetPinState (PB3), Is.EqualTo (AVR8Sharp.Core.Peripherals.PinState.Low));
+			Assert.That (portB.GetPinState (PB3), Is.EqualTo (AVR8Sharp.Core.Peripherals.PinState.Low));
 		}
 
 		[Test (Description = "Should return PinState.Input by default (reset state)")]
 		public void PinStateInput ()
 		{
-			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-			var port = new AvrIoPort (cpu, AvrIoPort.PortBConfig);
-
-			Assert.That (port.GetPinState (PB1), Is.EqualTo (AVR8Sharp.Core.Peripherals.PinState.Input));
+			Assert.That (portB.GetPinState (PB1), Is.EqualTo (AVR8Sharp.Core.Peripherals.PinState.Input));
 		}
 
 		[Test (Description = "Should return PinState.InputPullUp when the pin is set to input with pullup")]
 		public void PinStateInputPullUp ()
 		{
-			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-			var port = new AvrIoPort (cpu, AvrIoPort.PortBConfig);
+			Cpu.WriteData (DDRB, 0);
+			Cpu.WriteData (PORTB, 0x2);
 
-			cpu.WriteData (DDRB, 0);
-			cpu.WriteData (PORTB, 0x2);
-
-			Assert.That (port.GetPinState (PB1), Is.EqualTo (AVR8Sharp.Core.Peripherals.PinState.InputPullup));
+			Assert.That (portB.GetPinState (PB1), Is.EqualTo (AVR8Sharp.Core.Peripherals.PinState.InputPullup));
 		}
 
 		[Test (Description = "Should reflect the current port state when called inside a listener")]
 		public void GetPinStateInListener ()
 		{
-			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-			var port = new AvrIoPort (cpu, AvrIoPort.PortBConfig);
-
 			var listener = new System.Action<byte, byte> ((value, oldValue) => {
-				Assert.That (port.GetPinState (PB0), Is.EqualTo (AVR8Sharp.Core.Peripherals.PinState.High));
+				Assert.That (portB.GetPinState (PB0), Is.EqualTo (AVR8Sharp.Core.Peripherals.PinState.High));
 			});
 
-			Assert.That (port.GetPinState (PB0), Is.EqualTo (AVR8Sharp.Core.Peripherals.PinState.Input));
-			cpu.WriteData (DDRB, 0x01);
-			port.AddListener (listener);
-			cpu.WriteData (PORTB, 0x01);
+			Assert.That (portB.GetPinState (PB0), Is.EqualTo (AVR8Sharp.Core.Peripherals.PinState.Input));
+			Cpu.WriteData (DDRB, 0x01);
+			portB.AddListener (listener);
+			Cpu.WriteData (PORTB, 0x01);
 		}
 
 		[Test (Description = "Should reflect the current port state when called inside a listener after DDR change")]
 		public void GetPinStateInListenerAfterDdrChange ()
 		{
-			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-			var port = new AvrIoPort (cpu, AvrIoPort.PortBConfig);
-
 			var listener = new System.Action<byte, byte> ((_, _) => {
-				Assert.That (port.GetPinState (PB0), Is.EqualTo (AVR8Sharp.Core.Peripherals.PinState.Low));
+				Assert.That (portB.GetPinState (PB0), Is.EqualTo (AVR8Sharp.Core.Peripherals.PinState.Low));
 			});
 
-			Assert.That (port.GetPinState (PB0), Is.EqualTo (AVR8Sharp.Core.Peripherals.PinState.Input));
-			port.AddListener (listener);
-			cpu.WriteData (DDRB, 0x01);
+			Assert.That (portB.GetPinState (PB0), Is.EqualTo (AVR8Sharp.Core.Peripherals.PinState.Input));
+			portB.AddListener (listener);
+			Cpu.WriteData (DDRB, 0x01);
 		}
 	}
 
 	[TestFixture]
-	public class SetPin
+	public class SetPin : AvrTestBase
 	{
+		private AvrIoPort portB;
+
+		protected override void SetupPeripherals()
+		{
+			portB = new AvrIoPort (Cpu, AvrIoPort.PortBConfig);
+		}
+
 		[Test (Description = "Should set the value of the given pin")]
 		public void SetPinValue ()
 		{
-			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-			var port = new AvrIoPort (cpu, AvrIoPort.PortBConfig);
+			Cpu.WriteData(DDRB, 0);
+			portB.SetPinValue (PB4, true);
+			Assert.That (Cpu.Mmio.Data[0x23], Is.EqualTo (0x10));
 
-			cpu.WriteData(DDRB, 0);
-			port.SetPinValue (PB4, true);
-			Assert.That (cpu.Mmio.Data[0x23], Is.EqualTo (0x10));
-
-			port.SetPinValue (PB4, false);
-			Assert.That (cpu.Mmio.Data[0x23], Is.EqualTo (0));
+			portB.SetPinValue (PB4, false);
+			Assert.That (Cpu.Mmio.Data[0x23], Is.EqualTo (0));
 		}
 
 		[Test (Description = "Should only update PIN register when pin in Input mode")]
 		public void SetPinValueInput ()
 		{
-			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-			var port = new AvrIoPort (cpu, AvrIoPort.PortBConfig);
+			Cpu.WriteData (DDRB, 0x10);
+			Cpu.WriteData (PORTB, 0x0);
 
-			cpu.WriteData (DDRB, 0x10);
-			cpu.WriteData (PORTB, 0x0);
+			portB.SetPinValue (PB4, true);
 
-			port.SetPinValue (PB4, true);
+			Assert.That (Cpu.Mmio.Data[PINB], Is.EqualTo (0x0));
 
-			Assert.That (cpu.Mmio.Data[PINB], Is.EqualTo (0x0));
+			Cpu.WriteData (DDRB, 0x0);
 
-			cpu.WriteData (DDRB, 0x0);
-
-			Assert.That (cpu.Mmio.Data[PINB], Is.EqualTo (0x10));
+			Assert.That (Cpu.Mmio.Data[PINB], Is.EqualTo (0x10));
 		}
 	}
 
 	[TestFixture]
-	public class ExternalInterrupts
+	public class ExternalInterrupts : AvrTestBase
 	{
+		private AvrIoPort portD;
+
+		protected override void SetupPeripherals()
+		{
+			portD = new AvrIoPort (Cpu, AvrIoPort.PortDConfig);
+		}
+
 		[Test (Description = "Should generate INT0 interrupt on rising edge")]
 		public void Int0RisingEdge ()
 		{
-			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-			var port = new AvrIoPort (cpu, AvrIoPort.PortDConfig);
+			Cpu.WriteData (EIMSK, 1 << INT0);
+			Cpu.WriteData (EICRA, (1 << ISC01) | (1 << ISC00));
 			
-			cpu.WriteData (EIMSK, 1 << INT0);
-			cpu.WriteData (EICRA, (1 << ISC01) | (1 << ISC00));
+			Assert.That (Cpu.Mmio.Data[EIFR], Is.EqualTo (0));
+			portD.SetPinValue (PD2, true);
+			Assert.That (Cpu.Mmio.Data[EIFR], Is.EqualTo (1 << INT0));
 			
-			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (0));
-			port.SetPinValue (PD2, true);
-			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (1 << INT0));
-			
-			cpu.Mmio.Data[SREG] = 0x80; // SREG: I------- (enable interrupts)
-			cpu.Tick ();
+			Cpu.Mmio.Data[SREG] = 0x80; // SREG: I------- (enable interrupts)
+			Cpu.Tick ();
 			
 			Assert.Multiple (() => {
-				Assert.That (cpu.Pc, Is.EqualTo (PC_INT_INT0));
-				Assert.That (cpu.Cycles, Is.EqualTo (3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
-				Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (0));
+				Assert.That (Cpu.Pc, Is.EqualTo (PC_INT_INT0));
+				Assert.That (Cpu.Cycles, Is.EqualTo (3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
+				Assert.That (Cpu.Mmio.Data[EIFR], Is.EqualTo (0));
 			});
 			
-			port.SetPinValue (PD2, false);
-			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (0));
+			portD.SetPinValue (PD2, false);
+			Assert.That (Cpu.Mmio.Data[EIFR], Is.EqualTo (0));
 		}
 
 		[Test (Description = "Should generate INT0 interrupt on falling edge")]
 		public void Int0FallingEdge ()
 		{
-			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-			var port = new AvrIoPort (cpu, AvrIoPort.PortDConfig);
-
-			cpu.WriteData (EIMSK, 1 << INT0);
-			cpu.WriteData (EICRA, 1 << ISC01);
+			Cpu.WriteData (EIMSK, 1 << INT0);
+			Cpu.WriteData (EICRA, 1 << ISC01);
 			
-			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (0));
-			port.SetPinValue (PD2, true);
-			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (0));
-			port.SetPinValue (PD2, false);
-			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (1 << INT0));
+			Assert.That (Cpu.Mmio.Data[EIFR], Is.EqualTo (0));
+			portD.SetPinValue (PD2, true);
+			Assert.That (Cpu.Mmio.Data[EIFR], Is.EqualTo (0));
+			portD.SetPinValue (PD2, false);
+			Assert.That (Cpu.Mmio.Data[EIFR], Is.EqualTo (1 << INT0));
 			
-			cpu.Mmio.Data[SREG] = 0x80; // SREG: I------- (enable interrupts)
-			cpu.Tick ();
+			Cpu.Mmio.Data[SREG] = 0x80; // SREG: I------- (enable interrupts)
+			Cpu.Tick ();
 			
 			Assert.Multiple (() => {
-				Assert.That (cpu.Pc, Is.EqualTo (PC_INT_INT0));
-				Assert.That (cpu.Cycles, Is.EqualTo (3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
-				Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (0));
+				Assert.That (Cpu.Pc, Is.EqualTo (PC_INT_INT0));
+				Assert.That (Cpu.Cycles, Is.EqualTo (3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
+				Assert.That (Cpu.Mmio.Data[EIFR], Is.EqualTo (0));
 			});
 		}
 		
 		[Test (Description = "Should generate INT0 interrupt on level change")]
 		public void Int0LevelChange ()
 		{
-			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-			var port = new AvrIoPort (cpu, AvrIoPort.PortDConfig);
-
-			cpu.WriteData (EIMSK, 1 << INT0);
-			cpu.WriteData (EICRA, 1 << ISC00);
+			Cpu.WriteData (EIMSK, 1 << INT0);
+			Cpu.WriteData (EICRA, 1 << ISC00);
 			
-			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (0));
-			port.SetPinValue (PD2, true);
-			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (1 << INT0));
-			cpu.WriteData (EIFR, 1 << INT0);
-			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (0));
-			port.SetPinValue (PD2, false);
-			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (1 << INT0));
+			Assert.That (Cpu.Mmio.Data[EIFR], Is.EqualTo (0));
+			portD.SetPinValue (PD2, true);
+			Assert.That (Cpu.Mmio.Data[EIFR], Is.EqualTo (1 << INT0));
+			Cpu.WriteData (EIFR, 1 << INT0);
+			Assert.That (Cpu.Mmio.Data[EIFR], Is.EqualTo (0));
+			portD.SetPinValue (PD2, false);
+			Assert.That (Cpu.Mmio.Data[EIFR], Is.EqualTo (1 << INT0));
 		}
 		
 		[Test (Description = "Should a sticky INT0 interrupt while the pin level is low")]
 		public void Int0StickyLow ()
 		{
-			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-			var port = new AvrIoPort (cpu, AvrIoPort.PortDConfig);
+			Cpu.WriteData (EIMSK, 1 << INT0);
+			Cpu.WriteData (EICRA, 0);
 			
-			cpu.WriteData (EIMSK, 1 << INT0);
-			cpu.WriteData (EICRA, 0);
+			Assert.That (Cpu.Mmio.Data[EIFR], Is.EqualTo (0));
 			
-			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (0));
+			portD.SetPinValue (PD2, true);
+			Assert.That (Cpu.Mmio.Data[EIFR], Is.EqualTo (0));
 			
-			port.SetPinValue (PD2, true);
-			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (0));
-			
-			port.SetPinValue (PD2, false);
-			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (1 << INT0));
+			portD.SetPinValue (PD2, false);
+			Assert.That (Cpu.Mmio.Data[EIFR], Is.EqualTo (1 << INT0));
 			
 			// This is a sticky interrupt, verify we can't clear the flag:
-			cpu.WriteData (EIFR, 1 << INT0);
-			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (1 << INT0));
+			Cpu.WriteData (EIFR, 1 << INT0);
+			Assert.That (Cpu.Mmio.Data[EIFR], Is.EqualTo (1 << INT0));
 			
-			cpu.Mmio.Data[SREG] = 0x80; // SREG: I------- (enable interrupts)
-			cpu.Tick ();
+			Cpu.Mmio.Data[SREG] = 0x80; // SREG: I------- (enable interrupts)
+			Cpu.Tick ();
 			Assert.Multiple (() => {
-				Assert.That (cpu.Pc, Is.EqualTo (PC_INT_INT0));
-				Assert.That (cpu.Cycles, Is.EqualTo (3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
+				Assert.That (Cpu.Pc, Is.EqualTo (PC_INT_INT0));
+				Assert.That (Cpu.Cycles, Is.EqualTo (3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
 			});
 			
 			// Flag shouldn't be cleared, as the interrupt is sticky
-			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (1 << INT0));
+			Assert.That (Cpu.Mmio.Data[EIFR], Is.EqualTo (1 << INT0));
 			
 			// But it will be cleared as soon as the pin goes high.
-			port.SetPinValue (PD2, true);
-			Assert.That (cpu.Mmio.Data[EIFR], Is.EqualTo (0));
+			portD.SetPinValue (PD2, true);
+			Assert.That (Cpu.Mmio.Data[EIFR], Is.EqualTo (0));
 		}
 	}
 
 	[TestFixture]
-	public class PinChangeInterrupts
+	public class PinChangeInterrupts : AvrTestBase
 	{
+		private AvrIoPort portB;
+
+		protected override void SetupPeripherals()
+		{
+			portB = new AvrIoPort (Cpu, AvrIoPort.PortBConfig);
+		}
+
 		[Test (Description = "Should generate a pin change interrupt when PB3 (PCINT3) goes high")]
 		public void PinChangeHigh ()
 		{
-			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-			var port = new AvrIoPort (cpu, AvrIoPort.PortBConfig);
+			Cpu.WriteData (PCICR, 1 << PCIE0);
+			Cpu.WriteData (PCMSK0, 1 << PCINT3);
 			
-			cpu.WriteData (PCICR, 1 << PCIE0);
-			cpu.WriteData (PCMSK0, 1 << PCINT3);
+			portB.SetPinValue (PB3, true);
+			Assert.That (Cpu.Mmio.Data[PCIFR], Is.EqualTo (1 << PCIE0));
 			
-			port.SetPinValue (PB3, true);
-			Assert.That (cpu.Mmio.Data[PCIFR], Is.EqualTo (1 << PCIE0));
-			
-			cpu.Mmio.Data[SREG] = 0x80; // SREG: I------- (enable interrupts)
-			cpu.Tick ();
+			Cpu.Mmio.Data[SREG] = 0x80; // SREG: I------- (enable interrupts)
+			Cpu.Tick ();
 			
 			Assert.Multiple (() => {
-				Assert.That (cpu.Pc, Is.EqualTo (PC_INT_PCINT0));
-				Assert.That (cpu.Cycles, Is.EqualTo(3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
-				Assert.That (cpu.Mmio.Data[PCIFR], Is.EqualTo (0));
+				Assert.That (Cpu.Pc, Is.EqualTo (PC_INT_PCINT0));
+				Assert.That (Cpu.Cycles, Is.EqualTo(3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
+				Assert.That (Cpu.Mmio.Data[PCIFR], Is.EqualTo (0));
 			});
 		}
 		
 		[Test (Description = "Should generate a pin change interrupt when PB3 (PCINT3) goes low")]
 		public void PinChangeLow ()
 		{
-			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-			var port = new AvrIoPort (cpu, AvrIoPort.PortBConfig);
+			portB.SetPinValue (PB3, true);
+			Cpu.WriteData (PCICR, 1 << PCIE0);
+			Cpu.WriteData (PCMSK0, 1 << PCINT3);
+			Assert.That (Cpu.Mmio.Data[PCIFR], Is.EqualTo (0));
 			
-			port.SetPinValue (PB3, true);
-			cpu.WriteData (PCICR, 1 << PCIE0);
-			cpu.WriteData (PCMSK0, 1 << PCINT3);
-			Assert.That (cpu.Mmio.Data[PCIFR], Is.EqualTo (0));
+			portB.SetPinValue (PB3, false);
+			Assert.That (Cpu.Mmio.Data[PCIFR], Is.EqualTo (1 << PCIE0));
 			
-			port.SetPinValue (PB3, false);
-			Assert.That (cpu.Mmio.Data[PCIFR], Is.EqualTo (1 << PCIE0));
-			
-			cpu.Mmio.Data[SREG] = 0x80; // SREG: I------- (enable interrupts)
-			cpu.Tick ();
+			Cpu.Mmio.Data[SREG] = 0x80; // SREG: I------- (enable interrupts)
+			Cpu.Tick ();
 			
 			Assert.Multiple (() => {
-				Assert.That (cpu.Pc, Is.EqualTo (PC_INT_PCINT0));
-				Assert.That (cpu.Cycles, Is.EqualTo(3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
-				Assert.That (cpu.Mmio.Data[PCIFR], Is.EqualTo (0));
+				Assert.That (Cpu.Pc, Is.EqualTo (PC_INT_PCINT0));
+				Assert.That (Cpu.Cycles, Is.EqualTo(3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
+				Assert.That (Cpu.Mmio.Data[PCIFR], Is.EqualTo (0));
 			});
 		}
 		
 		[Test (Description = "Should clear the interrupt flag when writing to PCIFR")]
 		public void ClearFlag ()
 		{
-			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-			var port = new AvrIoPort (cpu, AvrIoPort.PortBConfig);
+			Cpu.WriteData (PCICR, 1 << PCIE0);
+			Cpu.WriteData (PCMSK0, 1 << PCINT3);
 
-			cpu.WriteData (PCICR, 1 << PCIE0);
-			cpu.WriteData (PCMSK0, 1 << PCINT3);
+			portB.SetPinValue (PB3, true);
+			Assert.That (Cpu.Mmio.Data[PCIFR], Is.EqualTo (1 << PCIE0));
 
-			port.SetPinValue (PB3, true);
-			Assert.That (cpu.Mmio.Data[PCIFR], Is.EqualTo (1 << PCIE0));
-
-			cpu.WriteData (PCIFR, 1 << PCIE0);
-			Assert.That (cpu.Mmio.Data[PCIFR], Is.EqualTo (0));
+			Cpu.WriteData (PCIFR, 1 << PCIE0);
+			Assert.That (Cpu.Mmio.Data[PCIFR], Is.EqualTo (0));
 		}
 	}
 
 	[TestFixture]
-	public class PcmskIsolation
+	public class PcmskIsolation : AvrTestBase
 	{
+		private AvrIoPort portB;
+		private AvrIoPort portC;
+
+		protected override void SetupPeripherals()
+		{
+			portB = new AvrIoPort (Cpu, AvrIoPort.PortBConfig);
+			portC = new AvrIoPort (Cpu, AvrIoPort.PortCConfig);
+		}
+
 		// PCMSK addresses
 		const int PCMSK0 = 0x6b; // Port B  (PCINT0 group)
 		const int PCMSK1 = 0x6c; // Port C  (PCINT1 group)
@@ -512,45 +496,38 @@ public class Gpio
 			// Regression for bug: PCMSK write previously called UpdateInterruptEnable on ALL
 			// GPIO ports using the PCMSK VALUE (not PCICR), which could erroneously clear
 			// or queue other port groups' interrupts.
-			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-			var portB = new AvrIoPort (cpu, AvrIoPort.PortBConfig);
-			var portC = new AvrIoPort (cpu, AvrIoPort.PortCConfig);
 
 			// Enable both PCINT groups in PCICR
-			cpu.WriteData (PCICR, 0x03); // PCIE0 | PCIE1
+			Cpu.WriteData (PCICR, 0x03); // PCIE0 | PCIE1
 
 			// Manually raise the PCINT1 (Port C) flag in PCIFR so the interrupt is pending
-			cpu.Mmio.Data[PCIFR] = 0x02; // PCINT1 flag bit
+			Cpu.Mmio.Data[PCIFR] = 0x02; // PCINT1 flag bit
 
 			// Now write PCMSK0 — old code passed this VALUE (0x08) to UpdateInterruptEnable for
 			// ALL ports; since 0x08 & PCIE1_mask=2 = 0, it would ClearInterrupt(portC_pcint).
-			cpu.WriteData (PCMSK0, 1 << 3); // PCINT3
+			Cpu.WriteData (PCMSK0, 1 << 3); // PCINT3
 
 			// PCIFR bit for PCINT1 must still be set — writing PCMSK0 must not touch PCINT1
-			Assert.That (cpu.Mmio.Data[PCIFR] & 0x02, Is.EqualTo(0x02),
+			Assert.That (Cpu.Mmio.Data[PCIFR] & 0x02, Is.EqualTo(0x02),
 				"Writing PCMSK0 must not clear the PCINT1 flag in PCIFR");
 		}
 
 		[Test (Description = "Writing PCMSK0 only re-evaluates Port B interrupt — Port C PCINT1 state unchanged")]
 		public void WritePcmsk0_PortB_InterruptStaysArmed ()
 		{
-			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-			var portB = new AvrIoPort (cpu, AvrIoPort.PortBConfig);
-			var portC = new AvrIoPort (cpu, AvrIoPort.PortCConfig);
-
 			// Enable PCINT1 group
-			cpu.WriteData (PCICR, 0x02); // PCIE1
+			Cpu.WriteData (PCICR, 0x02); // PCIE1
 
 			// Trigger a Port C pin change to arm the PCINT1 interrupt
-			cpu.WriteData (PCMSK1, 0x01); // PCINT8
+			Cpu.WriteData (PCMSK1, 0x01); // PCINT8
 			portC.SetPinValue (0, true);
-			Assert.That (cpu.Mmio.Data[PCIFR] & 0x02, Is.EqualTo(0x02), "PCINT1 should be pending");
+			Assert.That (Cpu.Mmio.Data[PCIFR] & 0x02, Is.EqualTo(0x02), "PCINT1 should be pending");
 
 			// Write PCMSK0 (Port B mask) — must not affect PCINT1
-			cpu.WriteData (PCMSK0, 0xFF);
+			Cpu.WriteData (PCMSK0, 0xFF);
 
 			// PCINT1 must still be pending
-			Assert.That (cpu.Mmio.Data[PCIFR] & 0x02, Is.EqualTo(0x02),
+			Assert.That (Cpu.Mmio.Data[PCIFR] & 0x02, Is.EqualTo(0x02),
 				"PCINT1 must remain armed after unrelated PCMSK0 write");
 		}
 	}

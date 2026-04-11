@@ -4,13 +4,9 @@ using Avr8Sharp.Tests.Utils;
 namespace Avr8Sharp.Tests;
 
 [TestFixture]
-public class Spi
+public class Spi : AvrTestBase
 {
 	const int FREQ_16MHZ = 16_000_000;
-
-	// CPU registers
-	const int R17 = 17;
-	const int SREG = 95;
 
 	// SPI Registers
 	const int SPCR = 0x4c;
@@ -29,110 +25,99 @@ public class Spi
 	const int WCOL = 0x40;
 	const int SPIF = 0x80;
 	const int SPI2X = 1;
-	
+
+	private AvrSpi _spi;
+
+	protected override void SetupPeripherals()
+	{
+		_spi = new AvrSpi (Cpu, AvrSpi.SpiConfig, FREQ_16MHZ);
+	}
+
 	[Test (Description = "Should correctly calculate the frequency based on SPCR/SPST values")]
 	public void Frequency ()
 	{
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-		var spi = new AvrSpi (cpu, AvrSpi.SpiConfig, FREQ_16MHZ);
-		
 		// Standard SPI speed:
-		cpu.WriteData(SPSR, 0);
-		cpu.WriteData(SPCR, 0);
-		Assert.That (spi.SpiFrequency, Is.EqualTo(FREQ_16MHZ / 4));
+		Cpu.WriteData(SPSR, 0);
+		Cpu.WriteData(SPCR, 0);
+		Assert.That (_spi.SpiFrequency, Is.EqualTo(FREQ_16MHZ / 4));
 		
-		cpu.WriteData(SPCR, SPR0);
-		Assert.That (spi.SpiFrequency, Is.EqualTo(FREQ_16MHZ / 16));
+		Cpu.WriteData(SPCR, SPR0);
+		Assert.That (_spi.SpiFrequency, Is.EqualTo(FREQ_16MHZ / 16));
 		
-		cpu.WriteData(SPCR, SPR1);
-		Assert.That (spi.SpiFrequency, Is.EqualTo(FREQ_16MHZ / 64));
+		Cpu.WriteData(SPCR, SPR1);
+		Assert.That (_spi.SpiFrequency, Is.EqualTo(FREQ_16MHZ / 64));
 		
-		cpu.WriteData(SPCR, SPR1 | SPR0);
-		Assert.That (spi.SpiFrequency, Is.EqualTo(FREQ_16MHZ / 128));
+		Cpu.WriteData(SPCR, SPR1 | SPR0);
+		Assert.That (_spi.SpiFrequency, Is.EqualTo(FREQ_16MHZ / 128));
 		
 		// Double SPI speed:
-		cpu.WriteData(SPSR, SPI2X);
-		cpu.WriteData(SPCR, 0);
-		Assert.That (spi.SpiFrequency, Is.EqualTo(FREQ_16MHZ / 2));
+		Cpu.WriteData(SPSR, SPI2X);
+		Cpu.WriteData(SPCR, 0);
+		Assert.That (_spi.SpiFrequency, Is.EqualTo(FREQ_16MHZ / 2));
 		
-		cpu.WriteData(SPCR, SPR0);
-		Assert.That (spi.SpiFrequency, Is.EqualTo(FREQ_16MHZ / 8));
+		Cpu.WriteData(SPCR, SPR0);
+		Assert.That (_spi.SpiFrequency, Is.EqualTo(FREQ_16MHZ / 8));
 		
-		cpu.WriteData(SPCR, SPR1);
-		Assert.That (spi.SpiFrequency, Is.EqualTo(FREQ_16MHZ / 32));
+		Cpu.WriteData(SPCR, SPR1);
+		Assert.That (_spi.SpiFrequency, Is.EqualTo(FREQ_16MHZ / 32));
 		
-		cpu.WriteData(SPCR, SPR1 | SPR0);
-		Assert.That (spi.SpiFrequency, Is.EqualTo(FREQ_16MHZ / 64));
+		Cpu.WriteData(SPCR, SPR1 | SPR0);
+		Assert.That (_spi.SpiFrequency, Is.EqualTo(FREQ_16MHZ / 64));
 	}
 	
-	[Test (Description = "hould correctly report the data order (MSB/LSB first), based on SPCR value")]
+	[Test (Description = "Should correctly report the data order (MSB/LSB first), based on SPCR value")]
 	public void DataOrder ()
 	{
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-		var spi = new AvrSpi (cpu, AvrSpi.SpiConfig, FREQ_16MHZ);
+		Cpu.WriteData(SPCR, 0);
+		Assert.That (_spi.DataOrder, Is.EqualTo(SpiDataOrder.MsbFirst));
 		
-		cpu.WriteData(SPCR, 0);
-		Assert.That (spi.DataOrder, Is.EqualTo(SpiDataOrder.MsbFirst));
-		
-		cpu.WriteData(SPCR, DORD);
-		Assert.That (spi.DataOrder, Is.EqualTo(SpiDataOrder.LsbFirst));
+		Cpu.WriteData(SPCR, DORD);
+		Assert.That (_spi.DataOrder, Is.EqualTo(SpiDataOrder.LsbFirst));
 	}
 	
 	[Test (Description = "Should correctly report the SPI mode, based on SPCR value")]
 	public void Mode ()
 	{
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-		var spi = new AvrSpi (cpu, AvrSpi.SpiConfig, FREQ_16MHZ);
-		
 		// Values in this test are based on Table 2 in the datasheet, page 174.
-		cpu.WriteData(SPCR, 0);
-		Assert.That (spi.SpiMode, Is.EqualTo(0));
+		Cpu.WriteData(SPCR, 0);
+		Assert.That (_spi.SpiMode, Is.EqualTo(0));
 		
-		cpu.WriteData(SPCR, CPHA);
-		Assert.That (spi.SpiMode, Is.EqualTo(1));
+		Cpu.WriteData(SPCR, CPHA);
+		Assert.That (_spi.SpiMode, Is.EqualTo(1));
 		
-		cpu.WriteData(SPCR, CPOL);
-		Assert.That (spi.SpiMode, Is.EqualTo(2));
+		Cpu.WriteData(SPCR, CPOL);
+		Assert.That (_spi.SpiMode, Is.EqualTo(2));
 		
-		cpu.WriteData(SPCR, CPOL | CPHA);
-		Assert.That (spi.SpiMode, Is.EqualTo(3));
+		Cpu.WriteData(SPCR, CPOL | CPHA);
+		Assert.That (_spi.SpiMode, Is.EqualTo(3));
 	}
 	
 	[Test (Description = "Should indicate slave/master operation, based on SPCR value")]
 	public void MasterSlave ()
 	{
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-		var spi = new AvrSpi (cpu, AvrSpi.SpiConfig, FREQ_16MHZ);
+		Cpu.WriteData(SPCR, 0);
+		Assert.That (_spi.IsMaster, Is.False);
 		
-		cpu.WriteData(SPCR, 0);
-		Assert.That (spi.IsMaster, Is.False);
-		
-		cpu.WriteData(SPCR, MSTR);
-		Assert.That (spi.IsMaster, Is.True);
+		Cpu.WriteData(SPCR, MSTR);
+		Assert.That (_spi.IsMaster, Is.True);
 	}
 	
 	[Test (Description = "Should call the `onByteTransfer` callback when initiating an SPI trasfer by writing to SPDR")]
 	public void Transfer ()
 	{
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-		var spi = new AvrSpi (cpu, AvrSpi.SpiConfig, FREQ_16MHZ) {
-			OnByte = b => Assert.That(b, Is.EqualTo(0x8f))
-		};
+		_spi.OnByte = b => Assert.That(b, Is.EqualTo(0x8f));
 
-		cpu.WriteData(SPCR, SPE | MSTR);
-		cpu.WriteData(SPDR, 0x8f);
+		Cpu.WriteData(SPCR, SPE | MSTR);
+		Cpu.WriteData(SPDR, 0x8f);
 	}
 	
 	[Test (Description = "Should ignore SPDR writes when the SPE bit in SPCR is clear")]
 	public void NoTransfer ()
 	{
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-		var spi = new AvrSpi (cpu, AvrSpi.SpiConfig, FREQ_16MHZ) {
-			OnByte = b => Assert.Fail("Should not have been called")
-		};
+		_spi.OnByte = b => Assert.Fail("Should not have been called");
 
-		cpu.WriteData(SPCR, MSTR);
-		cpu.WriteData(SPDR, 0x8f);
+		Cpu.WriteData(SPCR, MSTR);
+		Cpu.WriteData(SPDR, 0x8f);
 	}
 
 	[Test (Description = "Should transmit a byte successfully (integration)")]
@@ -168,26 +153,25 @@ public class Spi
 		    BREAK
 ").Compile();
 		
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
-		var spi = new AvrSpi (cpu, AvrSpi.SpiConfig, FREQ_16MHZ);
+		Cpu.LoadProgram(program.Program);
 		
 		var byteReceivedFromAsmCode = 0;
 		
-		spi.OnByte = b => {
+		_spi.OnByte = b => {
 			byteReceivedFromAsmCode = b;
-			cpu.AddClockEvent(() => spi.CompleteTransfer(0x5b), spi.TransferCycles);
+			Cpu.AddClockEvent(() => _spi.CompleteTransfer(0x5b), _spi.TransferCycles);
 		};
 		
-		var runner = new TestProgramRunner(cpu, (_) => {});
+		var runner = new TestProgramRunner(Cpu, (_) => {});
 		runner.RunToBreak();
 		
         Assert.Multiple(() =>
         {
             // 16 cycles per clock * 8 bits = 128
-            Assert.That(cpu.Cycles, Is.GreaterThanOrEqualTo(128));
+            Assert.That(Cpu.Cycles, Is.GreaterThanOrEqualTo(128));
             
             Assert.That(byteReceivedFromAsmCode, Is.EqualTo(0xb8));
-            Assert.That(cpu.Mmio.Data[R17], Is.EqualTo(0x5b));
+            Assert.That(Cpu.Mmio.Data[R17], Is.EqualTo(0x5b));
         });
 
     }
@@ -195,72 +179,63 @@ public class Spi
 	[Test (Description = "Should set the WCOL bit in SPSR if writing to SPDR while SPI is already transmitting")]
 	public void WriteCollision ()
 	{
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-		var spi = new AvrSpi (cpu, AvrSpi.SpiConfig, FREQ_16MHZ);
+		Cpu.WriteData(SPCR, SPE | MSTR);
+		Cpu.WriteData(SPDR, 0x50);
+		Cpu.Tick();
+		Assert.That(Cpu.ReadData(SPSR) & WCOL, Is.Zero);
 		
-		cpu.WriteData(SPCR, SPE | MSTR);
-		cpu.WriteData(SPDR, 0x50);
-		cpu.Tick();
-		Assert.That(cpu.ReadData(SPSR) & WCOL, Is.Zero);
-		
-		cpu.WriteData(SPDR, 0x51);
-		Assert.That(cpu.ReadData(SPSR) & WCOL, Is.EqualTo(WCOL));
+		Cpu.WriteData(SPDR, 0x51);
+		Assert.That(Cpu.ReadData(SPSR) & WCOL, Is.EqualTo(WCOL));
 	}
 	
 	[Test (Description = "Should clear the SPIF bit and fire an interrupt when SPI transfer completes")]
 	public void TransferComplete ()
 	{
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-		var spi = new AvrSpi (cpu, AvrSpi.SpiConfig, FREQ_16MHZ);
-		
-		cpu.WriteData(SPCR, SPE | SPIE | MSTR);
-		cpu.WriteData(SPDR, 0x50);
-		cpu.Mmio.Data[SREG] = 0x80; // SREG: I-------
+		Cpu.WriteData(SPCR, SPE | SPIE | MSTR);
+		Cpu.WriteData(SPDR, 0x50);
+		Cpu.Mmio.Data[SREG] = 0x80; // SREG: I-------
 		
 		// At this point, write shouldn't be complete yet
-		cpu.Cycles += 10;
-		cpu.Tick();
-		Assert.That (cpu.Pc, Is.Zero);
+		Cpu.Cycles += 10;
+		Cpu.Tick();
+		Assert.That (Cpu.Pc, Is.Zero);
 		
 		// 100 cycles later, it should (8 bits * 8 cycles per bit = 64).
-		cpu.Cycles += 100;
-		cpu.Tick();
+		Cpu.Cycles += 100;
+		Cpu.Tick();
 		Assert.Multiple(() =>
 		{
-			Assert.That(cpu.ReadData(SPSR) & SPIF, Is.Zero);
-			Assert.That(cpu.Pc, Is.EqualTo(0x22)); // SPI Ready interrupt
+			Assert.That(Cpu.ReadData(SPSR) & SPIF, Is.Zero);
+			Assert.That(Cpu.Pc, Is.EqualTo(0x22)); // SPI Ready interrupt
 		});
 	}
 	
 	[Test (Description = "Should fire a pending SPI interrupt when SPIE flag is set")]
 	public void PendingInterrupt ()
 	{
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-		var spi = new AvrSpi (cpu, AvrSpi.SpiConfig, FREQ_16MHZ);
-		
-		cpu.WriteData(SPCR, SPE | MSTR);
-		cpu.WriteData(SPDR, 0x50);
-		cpu.Mmio.Data[SREG] = 0x80; // SREG: I-------
+		Cpu.WriteData(SPCR, SPE | MSTR);
+		Cpu.WriteData(SPDR, 0x50);
+		Cpu.Mmio.Data[SREG] = 0x80; // SREG: I-------
 		
 		// Wait for transfer to complete (8 bits * 8 cycles per bit = 64).
-		cpu.Cycles += 64;
-		cpu.Tick();
+		Cpu.Cycles += 64;
+		Cpu.Tick();
 		
 		Assert.Multiple(() =>
 		{
-			Assert.That(cpu.ReadData(SPSR) & SPIF, Is.EqualTo(SPIF));
-			Assert.That(cpu.Pc, Is.Zero); // Interrupt not taken (yet)
+			Assert.That(Cpu.ReadData(SPSR) & SPIF, Is.EqualTo(SPIF));
+			Assert.That(Cpu.Pc, Is.Zero); // Interrupt not taken (yet)
 			
 			// Enable the interrupt (SPIE)
-			cpu.WriteData(SPCR, SPE | MSTR | SPIE);
-			cpu.Tick();
-			Assert.That(cpu.Pc, Is.EqualTo(0x22)); // SPI Ready interrupt
-			Assert.That(cpu.ReadData(SPSR) & SPIF, Is.Zero);
+			Cpu.WriteData(SPCR, SPE | MSTR | SPIE);
+			Cpu.Tick();
+			Assert.That(Cpu.Pc, Is.EqualTo(0x22)); // SPI Ready interrupt
+			Assert.That(Cpu.ReadData(SPSR) & SPIF, Is.Zero);
 		});
 	}
 	
 	[TestFixture (Description = "SPI slave-mode tests")]
-	public class SpiSlave
+	public class SpiSlave : AvrTestBase
 	{
 		const int FREQ_16MHZ = 16_000_000;
 		const int SPCR = 0x4c;
@@ -271,35 +246,36 @@ public class Spi
 		const int SPIE = 0x80;
 		const int SPIF = 0x80;
 
+		private AvrSpi _spi;
+
+		protected override void SetupPeripherals()
+		{
+			_spi = new AvrSpi (Cpu, AvrSpi.SpiConfig, FREQ_16MHZ);
+		}
+
 		[Test (Description = "Slave mode: SimulateIncomingMasterByte stores byte in SPDR and sets SPIF")]
 		public void SlaveMode_ReceivesByte ()
 		{
-			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-			var spi = new AvrSpi (cpu, AvrSpi.SpiConfig, FREQ_16MHZ);
-
 			// Slave mode: MSTR=0, SPE=1
-			cpu.WriteData (SPCR, SPE);
+			Cpu.WriteData (SPCR, SPE);
 
-			spi.SimulateIncomingMasterByte (0xAB);
+			_spi.SimulateIncomingMasterByte (0xAB);
 
 			Assert.Multiple (() => {
-				Assert.That (cpu.ReadData (SPDR), Is.EqualTo (0xAB), "SPDR must hold the received byte");
-				Assert.That (cpu.ReadData (SPSR) & SPIF, Is.EqualTo (SPIF), "SPIF must be set after receive");
+				Assert.That (Cpu.ReadData (SPDR), Is.EqualTo (0xAB), "SPDR must hold the received byte");
+				Assert.That (Cpu.ReadData (SPSR) & SPIF, Is.EqualTo (SPIF), "SPIF must be set after receive");
 			});
 		}
 
 		[Test (Description = "Slave mode: OnSlaveTransfer callback is invoked with the received byte")]
 		public void SlaveMode_TransmitsByte ()
 		{
-			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-			var spi = new AvrSpi (cpu, AvrSpi.SpiConfig, FREQ_16MHZ);
-
-			cpu.WriteData (SPCR, SPE);
+			Cpu.WriteData (SPCR, SPE);
 
 			byte? captured = null;
-			spi.OnSlaveTransfer = b => captured = b;
+			_spi.OnSlaveTransfer = b => captured = b;
 
-			spi.SimulateIncomingMasterByte (0xCD);
+			_spi.SimulateIncomingMasterByte (0xCD);
 
 			Assert.That (captured, Is.EqualTo (0xCD), "OnSlaveTransfer must be invoked with received byte");
 		}
@@ -307,50 +283,41 @@ public class Spi
 		[Test (Description = "Slave mode: SPI interrupt fires when SPIE=1 and a byte is received")]
 		public void SlaveMode_Interrupt_Fires ()
 		{
-			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-			var spi = new AvrSpi (cpu, AvrSpi.SpiConfig, FREQ_16MHZ);
+			Cpu.WriteData (SPCR, SPE | SPIE);
+			Cpu.Mmio.Data[SREG] = 0x80; // global interrupt enable
 
-			cpu.WriteData (SPCR, SPE | SPIE);
-			cpu.Mmio.Data[SREG] = 0x80; // global interrupt enable
+			_spi.SimulateIncomingMasterByte (0x77);
+			Cpu.Tick ();
 
-			spi.SimulateIncomingMasterByte (0x77);
-			cpu.Tick ();
-
-			Assert.That (cpu.Pc, Is.EqualTo (0x22), "CPU must jump to SPI interrupt vector");
+			Assert.That (Cpu.Pc, Is.EqualTo (0x22), "CPU must jump to SPI interrupt vector");
 		}
 
 		[Test (Description = "Guard: SimulateIncomingMasterByte does nothing if SPE is 0 (SPI disabled)")]
 		public void SlaveMode_IgnoresByte_WhenSpiDisabled ()
 		{
-			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-			var spi = new AvrSpi (cpu, AvrSpi.SpiConfig, FREQ_16MHZ);
+			Cpu.Mmio.Data[SPDR] = 0x11;
 
-			cpu.Mmio.Data[SPDR] = 0x11;
-
-			spi.SimulateIncomingMasterByte (0xAB);
+			_spi.SimulateIncomingMasterByte (0xAB);
 
 			Assert.Multiple (() => {
-				Assert.That (cpu.ReadData (SPDR), Is.EqualTo (0x11), "SPDR must not change when SPI is disabled");
-				Assert.That (cpu.ReadData (SPSR) & SPIF, Is.Zero, "SPIF must not be set when SPI is disabled");
+				Assert.That (Cpu.ReadData (SPDR), Is.EqualTo (0x11), "SPDR must not change when SPI is disabled");
+				Assert.That (Cpu.ReadData (SPSR) & SPIF, Is.Zero, "SPIF must not be set when SPI is disabled");
 			});
 		}
 
 		[Test (Description = "Guard: SimulateIncomingMasterByte does nothing if MSTR is 1 (Master mode)")]
 		public void SlaveMode_IgnoresByte_WhenConfiguredAsMaster ()
 		{
-			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-			var spi = new AvrSpi (cpu, AvrSpi.SpiConfig, FREQ_16MHZ);
-
 			const int SPCR_MSTR = 0x10;
-			cpu.WriteData (SPCR, SPE | SPCR_MSTR);
+			Cpu.WriteData (SPCR, SPE | SPCR_MSTR);
 
-			cpu.Mmio.Data[SPDR] = 0x22;
+			Cpu.Mmio.Data[SPDR] = 0x22;
 
-			spi.SimulateIncomingMasterByte (0xCD);
+			_spi.SimulateIncomingMasterByte (0xCD);
 
 			Assert.Multiple (() => {
-				Assert.That (cpu.ReadData (SPDR), Is.EqualTo (0x22), "SPDR must not change in Master mode");
-				Assert.That (cpu.ReadData (SPSR) & SPIF, Is.Zero, "SPIF must not be set from external input in Master mode");
+				Assert.That (Cpu.ReadData (SPDR), Is.EqualTo (0x22), "SPDR must not change in Master mode");
+				Assert.That (Cpu.ReadData (SPSR) & SPIF, Is.Zero, "SPIF must not be set from external input in Master mode");
 			});
 		}
 	}
@@ -358,46 +325,40 @@ public class Spi
 	[Test (Description = "Shift register: byte is moved to SPDR only when transfer completes")]
 	public void ShiftRegister_ByteMovedToSpdr ()
 	{
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-		var spi = new AvrSpi (cpu, AvrSpi.SpiConfig, FREQ_16MHZ);
-
-		spi.OnByte = b => {
-			cpu.AddClockEvent (() => spi.CompleteTransfer (0xA5), spi.TransferCycles);
+		_spi.OnByte = b => {
+			Cpu.AddClockEvent (() => _spi.CompleteTransfer (0xA5), _spi.TransferCycles);
 		};
 
-		cpu.WriteData (SPCR, SPE | MSTR);
-		cpu.WriteData (SPDR, 0x00); // initiate transfer
+		Cpu.WriteData (SPCR, SPE | MSTR);
+		Cpu.WriteData (SPDR, 0x00); // initiate transfer
 
 		// SPDR must still hold the old value during transfer
-		Assert.That (cpu.ReadData (SPDR), Is.Zero, "SPDR must not update while transfer is in progress");
+		Assert.That (Cpu.ReadData (SPDR), Is.Zero, "SPDR must not update while transfer is in progress");
 
 		// Advance past transfer (8 bits * 4 cycles/bit = 32)
-		cpu.Cycles += 32;
-		cpu.Tick ();
+		Cpu.Cycles += 32;
+		Cpu.Tick ();
 
-		Assert.That (cpu.ReadData (SPDR), Is.EqualTo (0xA5),
+		Assert.That (Cpu.ReadData (SPDR), Is.EqualTo (0xA5),
 			"Byte must be moved from shift register to SPDR on transfer completion");
 	}
 
 	[Test (Description = "Should should only update SPDR when tranfer finishes (double buffering)")]
 	public void DoubleBuffering ()
 	{
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
-		var spi = new AvrSpi (cpu, AvrSpi.SpiConfig, FREQ_16MHZ);
-		
-		spi.OnByte = (b) => {
-			cpu.AddClockEvent(() => spi.CompleteTransfer(0x88), spi.TransferCycles);
+		_spi.OnByte = (b) => {
+			Cpu.AddClockEvent(() => _spi.CompleteTransfer(0x88), _spi.TransferCycles);
 		};
 		
-		cpu.WriteData(SPCR, SPE | MSTR);
-		cpu.WriteData(SPDR, 0x8f);
+		Cpu.WriteData(SPCR, SPE | MSTR);
+		Cpu.WriteData(SPDR, 0x8f);
 		
-		cpu.Cycles += 10;
-		cpu.Tick();
-		Assert.That(cpu.ReadData(SPDR), Is.Zero);
+		Cpu.Cycles += 10;
+		Cpu.Tick();
+		Assert.That(Cpu.ReadData(SPDR), Is.Zero);
 		
-		cpu.Cycles += 32; // 4 cycles per bit * 8 bits = 32
-		cpu.Tick();
-		Assert.That(cpu.ReadData(SPDR), Is.EqualTo(0x88));
+		Cpu.Cycles += 32; // 4 cycles per bit * 8 bits = 32
+		Cpu.Tick();
+		Assert.That(Cpu.ReadData(SPDR), Is.EqualTo(0x88));
 	}
 }

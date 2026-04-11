@@ -1,55 +1,59 @@
 using AVR8Sharp.Core.Cpu;
+using Avr8Sharp.Tests.Utils;
+
 namespace Avr8Sharp.Tests;
 
 [TestFixture]
-public class Interrupt
+public class Interrupt : AvrTestBase
 {
+	protected override int FlashByteCount => 0x80000;
+
 	[Test(Description = "The interrupt handler should be executed")]
 	public void Interrupt_Handler ()
 	{
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x8000]);
+		Cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x8000])
+		{
+			Pc = 0x520
+		};
 
-		cpu.Pc = 0x520;
-		cpu.Mmio.Data[94] = 0;
-		cpu.Mmio.Data[93] = 0x80; // SP <- 0x80
-		cpu.Mmio.Data[95] = 0b10000001; // SREG <- I------C
+		Cpu.Mmio.Data[94] = 0;
+		Cpu.Mmio.Data[93] = 0x80; // SP <- 0x80
+		Cpu.Mmio.Data[95] = 0b10000001; // SREG <- I------C
 
-		AvrInterrupt.DoAvrInterrupt (cpu, 5);
+		AvrInterrupt.DoAvrInterrupt (Cpu, 5);
 
 		Assert.Multiple(() =>
 		{
-			Assert.That(cpu.Cycles, Is.EqualTo(3)); // 2 for PC push + 1 for vector fetch (AVR spec: 4 cycles total)
-			Assert.That(cpu.Pc, Is.EqualTo(5));
-			Assert.That(cpu.Mmio.Data[93], Is.EqualTo(0x7E)); // SP <- 0x7E
-			Assert.That(cpu.Mmio.Data[0x80], Is.EqualTo(0x20)); // Return address low byte
-			Assert.That(cpu.Mmio.Data[0x7F], Is.EqualTo(0x5)); // Return address high byte
-			Assert.That(cpu.Mmio.Data[95], Is.EqualTo(0b00000001)); // SREG <- -------C
+			Assert.That(Cpu.Cycles, Is.EqualTo(3)); // 2 for PC push + 1 for vector fetch (AVR spec: 4 cycles total)
+			Assert.That(Cpu.Pc, Is.EqualTo(5));
+			Assert.That(Cpu.Mmio.Data[93], Is.EqualTo(0x7E)); // SP <- 0x7E
+			Assert.That(Cpu.Mmio.Data[0x80], Is.EqualTo(0x20)); // Return address low byte
+			Assert.That(Cpu.Mmio.Data[0x7F], Is.EqualTo(0x5)); // Return address high byte
+			Assert.That(Cpu.Mmio.Data[95], Is.EqualTo(0b00000001)); // SREG <- -------C
 		});
 	}
 
 	[Test(Description = "Push a 3-byte return address when running in 22-bit PC mode (issue #58)")]
 	public void AVRJS_Issue_58 ()
 	{
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x80000]);
+		Assert.That(Cpu.Pc22Bits, Is.True);
 
-		Assert.That(cpu.Pc22Bits, Is.True);
+		Cpu.Pc = 0x10520;
+		Cpu.Mmio.Data[94] = 0;
+		Cpu.Mmio.Data[93] = 0x80; // SP <- 0x80
+		Cpu.Mmio.Data[95] = 0b10000001; // SREG <- I------C
 
-		cpu.Pc = 0x10520;
-		cpu.Mmio.Data[94] = 0;
-		cpu.Mmio.Data[93] = 0x80; // SP <- 0x80
-		cpu.Mmio.Data[95] = 0b10000001; // SREG <- I------C
-
-		AvrInterrupt.DoAvrInterrupt (cpu, 5);
+		AvrInterrupt.DoAvrInterrupt (Cpu, 5);
 
 		Assert.Multiple(() =>
 		{
-			Assert.That(cpu.Cycles, Is.EqualTo(3)); // 2 for PC push + 1 for vector fetch (AVR spec: 4 cycles total)
-			Assert.That(cpu.Pc, Is.EqualTo(5));
-			Assert.That(cpu.Mmio.Data[93], Is.EqualTo(0x7D)); // SP <- 0x7D
-			Assert.That(cpu.Mmio.Data[0x80], Is.EqualTo(0x20)); // Return address low byte
-			Assert.That(cpu.Mmio.Data[0x7F], Is.EqualTo(0x5)); // Return address high byte
-			Assert.That(cpu.Mmio.Data[0x7E], Is.EqualTo(0x1)); // Return address high byte
-			Assert.That(cpu.Mmio.Data[95], Is.EqualTo(0b00000001)); // SREG <- -------C
+			Assert.That(Cpu.Cycles, Is.EqualTo(3)); // 2 for PC push + 1 for vector fetch (AVR spec: 4 cycles total)
+			Assert.That(Cpu.Pc, Is.EqualTo(5));
+			Assert.That(Cpu.Mmio.Data[93], Is.EqualTo(0x7D)); // SP <- 0x7D
+			Assert.That(Cpu.Mmio.Data[0x80], Is.EqualTo(0x20)); // Return address low byte
+			Assert.That(Cpu.Mmio.Data[0x7F], Is.EqualTo(0x5)); // Return address high byte
+			Assert.That(Cpu.Mmio.Data[0x7E], Is.EqualTo(0x1)); // Return address high byte
+			Assert.That(Cpu.Mmio.Data[95], Is.EqualTo(0b00000001)); // SREG <- -------C
 		});
 	}
 
@@ -60,23 +64,21 @@ public class Interrupt
 		// finishes (1 cycle), then the PC is pushed onto the stack (2 cycles),
 		// then the vector address is fetched (1 cycle) = 4 cycles total.
 		// DoAvrInterrupt is called *after* the instruction cycle, so it must add exactly 3.
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x8000]);
-		cpu.Mmio.Data[93] = 0x80;
-		cpu.Mmio.Data[95] = 0b10000001; // I flag + C flag
+		Cpu.Mmio.Data[93] = 0x80;
+		Cpu.Mmio.Data[95] = 0b10000001; // I flag + C flag
 
-		var cyclesBefore = cpu.Cycles;
-		AvrInterrupt.DoAvrInterrupt(cpu, 10);
-		Assert.That(cpu.Cycles - cyclesBefore, Is.EqualTo(3));
+		var cyclesBefore = Cpu.Cycles;
+		AvrInterrupt.DoAvrInterrupt(Cpu, 10);
+		Assert.That(Cpu.Cycles - cyclesBefore, Is.EqualTo(3));
 	}
 
 	[Test(Description = "SREG is cleared to zero on CPU Reset")]
 	public void SregClearedOnReset ()
 	{
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x1000]);
 		// Dirty SREG with all bits set
-		cpu.Mmio.Data[95] = 0xFF;
-		cpu.Reset();
-		Assert.That(cpu.Mmio.Data[95], Is.EqualTo(0),
+		Cpu.Mmio.Data[95] = 0xFF;
+		Cpu.Reset();
+		Assert.That(Cpu.Mmio.Data[95], Is.EqualTo(0),
 			"SREG must be 0 after Reset (AVR spec: all I/O registers return to reset state)");
 	}
 
@@ -85,14 +87,14 @@ public class Interrupt
 	{
 		// 0x9598 = BREAK opcode
 		var program = new ushort[] { 0x9598 };
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu(program);
+		Cpu.LoadProgram(program);
 
 		uint? capturedPc = null;
 		AvrInterrupt.OnBreakpoint = pc => capturedPc = pc;
 		try
 		{
 			var decoder = new AVR8Sharp.Core.Cpu.Decoders.SwitchDecoder();
-			decoder.Decode(cpu);
+			decoder.Decode(Cpu);
 			Assert.That(capturedPc, Is.Not.Null, "OnBreakpoint must be called by BREAK instruction");
 		}
 		finally
@@ -105,14 +107,14 @@ public class Interrupt
 	public void BreakInstruction_LutDecoder ()
 	{
 		var program = new ushort[] { 0x9598 };
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu(program);
+		Cpu.LoadProgram(program);
 
 		uint? capturedPc = null;
 		AvrInterrupt.OnBreakpoint = pc => capturedPc = pc;
 		try
 		{
 			var decoder = new AVR8Sharp.Core.Cpu.Decoders.LutDecoder();
-			decoder.Decode(cpu);
+			decoder.Decode(Cpu);
 			Assert.That(capturedPc, Is.Not.Null);
 		}
 		finally
@@ -125,14 +127,14 @@ public class Interrupt
 	public void BreakInstruction_NativeLutDecoder ()
 	{
 		var program = new ushort[] { 0x9598 };
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu(program);
+		Cpu.LoadProgram(program);
 
 		uint? capturedPc = null;
 		AvrInterrupt.OnBreakpoint = pc => capturedPc = pc;
 		try
 		{
 			var decoder = new AVR8Sharp.Core.Cpu.Decoders.NativeLutDecoder();
-			decoder.Decode(cpu);
+			decoder.Decode(Cpu);
 			Assert.That(capturedPc, Is.Not.Null);
 		}
 		finally
@@ -145,13 +147,13 @@ public class Interrupt
 	public void BreakInstruction_NoCallback ()
 	{
 		var program = new ushort[] { 0x9598 };
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu(program);
+		Cpu.LoadProgram(program);
 		AvrInterrupt.OnBreakpoint = null;
 
 		Assert.DoesNotThrow(() =>
 		{
 			var decoder = new AVR8Sharp.Core.Cpu.Decoders.SwitchDecoder();
-			decoder.Decode(cpu);
+			decoder.Decode(Cpu);
 		});
 	}
 
@@ -159,17 +161,17 @@ public class Interrupt
 	public void SleepInstruction_SwitchDecoder_InvokesCallback ()
 	{
 		var program = new ushort[] { 0x9588 };
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu(program);
+		Cpu.LoadProgram(program);
 
 		// Set SM1:SM0 bits in SMCR (0x53): SM bits are bits 3:1, value 0b0000_0010 → SM0=1 (idle)
-		cpu.Mmio.Data[0x53] = 0b0000_0010; // SM0=1, SM1=0 → sleep mode bits = 0b001 = 1
+		Cpu.Mmio.Data[0x53] = 0b0000_0010; // SM0=1, SM1=0 → sleep mode bits = 0b001 = 1
 
 		byte? capturedMode = null;
 		AvrInterrupt.OnSleep = mode => capturedMode = mode;
 		try
 		{
 			var decoder = new AVR8Sharp.Core.Cpu.Decoders.SwitchDecoder();
-			decoder.Decode(cpu);
+			decoder.Decode(Cpu);
 			Assert.That(capturedMode, Is.Not.Null, "OnSleep must be called by SLEEP instruction");
 			Assert.That(capturedMode, Is.EqualTo(1), "Sleep mode bits SM2:SM1:SM0 must match SMCR");
 		}
@@ -183,15 +185,15 @@ public class Interrupt
 	public void SleepInstruction_LutDecoder_InvokesCallback ()
 	{
 		var program = new ushort[] { 0x9588 };
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu(program);
-		cpu.Mmio.Data[0x53] = 0b0000_0100; // SM1=1, SM0=0 → sleep mode bits = 0b010 = 2
+		Cpu.LoadProgram(program);
+		Cpu.Mmio.Data[0x53] = 0b0000_0100; // SM1=1, SM0=0 → sleep mode bits = 0b010 = 2
 
 		byte? capturedMode = null;
 		AvrInterrupt.OnSleep = mode => capturedMode = mode;
 		try
 		{
 			var decoder = new AVR8Sharp.Core.Cpu.Decoders.LutDecoder();
-			decoder.Decode(cpu);
+			decoder.Decode(Cpu);
 			Assert.That(capturedMode, Is.Not.Null, "OnSleep must be called by SLEEP instruction in LutDecoder");
 			Assert.That(capturedMode, Is.EqualTo(2));
 		}
@@ -205,15 +207,15 @@ public class Interrupt
 	public void SleepInstruction_NativeLutDecoder_InvokesCallback ()
 	{
 		var program = new ushort[] { 0x9588 };
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu(program);
-		cpu.Mmio.Data[0x53] = 0b0000_0110; // SM1=1, SM0=1 → sleep mode bits = 0b011 = 3
+		Cpu.LoadProgram(program);
+		Cpu.Mmio.Data[0x53] = 0b0000_0110; // SM1=1, SM0=1 → sleep mode bits = 0b011 = 3
 
 		byte? capturedMode = null;
 		AvrInterrupt.OnSleep = mode => capturedMode = mode;
 		try
 		{
 			var decoder = new AVR8Sharp.Core.Cpu.Decoders.NativeLutDecoder();
-			decoder.Decode(cpu);
+			decoder.Decode(Cpu);
 			Assert.That(capturedMode, Is.Not.Null, "OnSleep must be called by SLEEP instruction in NativeLutDecoder");
 			Assert.That(capturedMode, Is.EqualTo(3));
 		}
@@ -227,13 +229,13 @@ public class Interrupt
 	public void SleepInstruction_NoCallback_DoesNotCrash ()
 	{
 		var program = new ushort[] { 0x9588 };
-		var cpu = new AVR8Sharp.Core.Cpu.Cpu(program);
+		Cpu.LoadProgram(program);
 		AvrInterrupt.OnSleep = null;
 
 		Assert.DoesNotThrow(() =>
 		{
 			var decoder = new AVR8Sharp.Core.Cpu.Decoders.SwitchDecoder();
-			decoder.Decode(cpu);
+			decoder.Decode(Cpu);
 		});
 	}
 }
