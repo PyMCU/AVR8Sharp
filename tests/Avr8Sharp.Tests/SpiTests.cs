@@ -318,6 +318,41 @@ public class Spi
 
 			Assert.That (cpu.Pc, Is.EqualTo (0x22), "CPU must jump to SPI interrupt vector");
 		}
+
+		[Test (Description = "Guard: SimulateIncomingMasterByte does nothing if SPE is 0 (SPI disabled)")]
+		public void SlaveMode_IgnoresByte_WhenSpiDisabled ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
+			var spi = new AvrSpi (cpu, AvrSpi.SpiConfig, FREQ_16MHZ);
+
+			cpu.Mmio.Data[SPDR] = 0x11;
+
+			spi.SimulateIncomingMasterByte (0xAB);
+
+			Assert.Multiple (() => {
+				Assert.That (cpu.ReadData (SPDR), Is.EqualTo (0x11), "SPDR must not change when SPI is disabled");
+				Assert.That (cpu.ReadData (SPSR) & SPIF, Is.Zero, "SPIF must not be set when SPI is disabled");
+			});
+		}
+
+		[Test (Description = "Guard: SimulateIncomingMasterByte does nothing if MSTR is 1 (Master mode)")]
+		public void SlaveMode_IgnoresByte_WhenConfiguredAsMaster ()
+		{
+			var cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
+			var spi = new AvrSpi (cpu, AvrSpi.SpiConfig, FREQ_16MHZ);
+
+			const int SPCR_MSTR = 0x10;
+			cpu.WriteData (SPCR, SPE | SPCR_MSTR);
+
+			cpu.Mmio.Data[SPDR] = 0x22;
+
+			spi.SimulateIncomingMasterByte (0xCD);
+
+			Assert.Multiple (() => {
+				Assert.That (cpu.ReadData (SPDR), Is.EqualTo (0x22), "SPDR must not change in Master mode");
+				Assert.That (cpu.ReadData (SPSR) & SPIF, Is.Zero, "SPIF must not be set from external input in Master mode");
+			});
+		}
 	}
 
 	[Test (Description = "Shift register: byte is moved to SPDR only when transfer completes")]

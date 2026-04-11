@@ -19,7 +19,7 @@ graph LR
 ## Installation
 
 ```bash
-dotnet add package AVR8Sharp
+dotnet add package Avr8Sharp
 ```
 
 ## Usage

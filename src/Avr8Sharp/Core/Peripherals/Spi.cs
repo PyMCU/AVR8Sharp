@@ -157,6 +157,10 @@ public class AvrSpi
 	/// </summary>
 	public void SimulateIncomingMasterByte (byte masterByte)
 	{
+		if ((_cpu.Mmio.Data[_config.SPCR] & SPCR_SPE) == 0 || IsMaster) {
+			return;
+		}
+
 		_shiftRegister = masterByte;
 		_cpu.Mmio.Data[_config.SPDR] = _shiftRegister;
 		OnSlaveTransfer?.Invoke (masterByte);
