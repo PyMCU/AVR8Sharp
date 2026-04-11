@@ -102,8 +102,8 @@ Three instruction decoders are available. The default (`NativeLut`) is the faste
 
 ```csharp
 AvrBuilder.Create()
-    .UseNativeDecoder()   // unsafe function-pointer LUT — fastest (default)
-    // .UseLutDecoder()   // delegate LUT — portable
+    .UseNativeLutDecoder() // unsafe function-pointer LUT — fastest (default)
+    // .UseLutDecoder()    // delegate LUT — portable
     // .UseSwitchDecoder() // switch/case — simplest
     ...
 ```
