@@ -809,5 +809,36 @@ public class Twi : AvrTestBase
                 Assert.That (Cpu.Mmio.Data[TWCR] & TWINT, Is.EqualTo (TWINT), "TWINT must be set");
             });
         }
+
+        [Test(Description = "Interrupt: Jumps to TWI vector only when TWIE and Global Interrupts are enabled")]
+        public void SlaveAddressMatch_JumpsToInterruptOnlyWhenEnabled()
+        {
+            const int INT_TWI = 0x30;
+
+            Cpu.Mmio.Data[SREG] = 0x80;
+            Cpu.Mmio.Data[TWAR] = 0x48 << 1;
+
+            // Enable TWI and clear TWINT, but do NOT set TWIE
+            Cpu.WriteData(TWCR, TWEN | TWINT);
+
+            _twi.SimulateIncomingAddress(0x48, isWrite: true);
+            Cpu.Tick(); // Allow CPU to process pending interrupts
+
+            Assert.Multiple(() => {
+                Assert.That(Cpu.Mmio.Data[TWCR] & TWINT, Is.EqualTo(TWINT), "TWINT flag should be set");
+                Assert.That(Cpu.Pc, Is.EqualTo(0), "CPU should NOT jump to interrupt vector because TWIE is 0");
+            });
+
+            // Reset TWINT, keep TWI enabled, AND enable TWIE
+            Cpu.WriteData(TWCR, TWEN | TWINT | TWIE);
+
+            _twi.SimulateIncomingAddress(0x48, isWrite: true);
+            Cpu.Tick();
+
+            Assert.Multiple(() => {
+                Assert.That(Cpu.Mmio.Data[TWCR] & TWINT, Is.EqualTo(0), "TWINT flag is cleared automatically by hardware when ISR executes");
+                Assert.That(Cpu.Pc, Is.EqualTo(INT_TWI), "CPU should jump to TWI interrupt vector because TWIE is 1");
+            });
+        }
     }
 }
