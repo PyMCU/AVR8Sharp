@@ -1,0 +1,232 @@
+﻿using System.Diagnostics;
+using System.Text;
+using AVR8Sharp.Core;
+using AVR8Sharp.Core.Decoders;
+using AVR8Sharp.Core.Peripherals;
+using Newtonsoft.Json;
+namespace Avr8Sharp.Demo;
+
+public static class Program
+{
+	const string HexiUrl = "https://hexi.wokwi.com";
+	const string BlinkCode = @"
+// Green LED connected to LED_BUILTIN,
+// Red LED connected to pin 12. Enjoy!
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(LED_BUILTIN, OUTPUT);
+}
+
+void loop() {
+  Serial.println(""AVR8Sharp is awesome!"");
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(500);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(500);
+}
+";
+
+	private const string BlinkHex = """
+	                                :100000000C945D000C9485000C9485000C94850084
+	                                :100010000C9485000C9485000C9485000C9485004C
+	                                :100020000C9485000C9485000C9485000C9485003C
+	                                :100030000C9485000C9485000C9485000C9485002C
+	                                :100040000C948F020C9485000C945D020C94370282
+	                                :100050000C9485000C9485000C9485000C9485000C
+	                                :100060000C9485000C9485000000000024002700FB
+	                                :100070002A0000000000250028002B0004040404CE
+	                                :100080000404040402020202020203030303030342
+	                                :10009000010204081020408001020408102001021F
+	                                :1000A00004081020000000080002010000030407FB
+	                                :1000B0000000000000000000910311241FBECFEFDC
+	                                :1000C000D8E0DEBFCDBF11E0A0E0B1E0ECE8F7E0A2
+	                                :1000D00002C005900D92AC32B107D9F721E0ACE235
+	                                :1000E000B1E001C01D92A23DB207E1F710E0CDE5FD
+	                                :1000F000D0E004C02197FE010E94BE03CC35D10799
+	                                :10010000C9F70E94D9020C94C4030C940000E1EBDF
+	                                :10011000F0E02491EDE9F0E09491E9E8F0E0E49179
+	                                :10012000EE23C9F0222339F0233001F1A8F4213065
+	                                :1001300019F1223029F1F0E0EE0FFF1FEE58FF4FCA
+	                                :10014000A591B4912FB7F894EC91811126C09095A8
+	                                :100150009E239C932FBF08952730A9F02830C9F023
+	                                :10016000243049F7209180002F7D03C0209180002A
+	                                :100170002F7720938000DFCF24B52F7724BDDBCFEE
+	                                :1001800024B52F7DFBCF2091B0002F772093B000B6
+	                                :10019000D2CF2091B0002F7DF9CF9E2BDACFAF9236
+	                                :1001A000BF92CF92DF92EF92FF920F931F93CF9364
+	                                :1001B000DF936C017B018B01040F151FEB015E01C6
+	                                :1001C000AE18BF08C017D10759F06991D601ED915B
+	                                :1001D000FC910190F081E02DC6010995892B79F7FA
+	                                :1001E000C501DF91CF911F910F91FF90EF90DF90AC
+	                                :1001F000CF90BF90AF900895FC01538D448D252F73
+	                                :1002000030E0842F90E0821B930B541710F0CF96B0
+	                                :10021000089501970895FC01918D828D981761F0E2
+	                                :10022000A28DAE0FBF2FB11D5D968C91928D9F5FF9
+	                                :100230009F73928F90E008958FEF9FEF0895FC01D8
+	                                :10024000918D828D981731F0828DE80FF11D858D8B
+	                                :1002500090E008958FEF9FEF0895FC01918D228D1E
+	                                :10026000892F90E0805C9F4F821B91098F739927A3
+	                                :10027000089585E391E00E942D0121E0892B09F486
+	                                :1002800020E0822F089580E090E0892B29F00E94E1
+	                                :10029000390181110C9400000895FC01A48DA80F70
+	                                :1002A000B92FB11DA35ABF4F2C91848D90E00196B8
+	                                :1002B0008F739927848FA689B7892C93A089B189D8
+	                                :1002C0008C91837080648C93938D848D981306C079
+	                                :1002D0000288F389E02D80818F7D80830895EF92DD
+	                                :1002E000FF920F931F93CF93DF93EC0181E0888FF0
+	                                :1002F0009B8D8C8D98131AC0E889F989808185FFC0
+	                                :1003000015C09FB7F894EE89FF896083E889F98961
+	                                :1003100080818370806480839FBF81E090E0DF9163
+	                                :10032000CF911F910F91FF90EF900895F62E0B8DB6
+	                                :1003300010E00F5F1F4F0F731127E02E8C8D8E1171
+	                                :100340000CC00FB607FCFACFE889F989808185FFD8
+	                                :10035000F5CFCE010E944D01F1CFEB8DEC0FFD2FBB
+	                                :10036000F11DE35AFF4FF0829FB7F8940B8FEA8993
+	                                :10037000FB8980818062CFCFCF93DF93EC01888DA2
+	                                :100380008823B9F0AA89BB89E889F9898C9185FD10
+	                                :1003900003C0808186FD0DC00FB607FCF7CF8C919E
+	                                :1003A00085FFF2CF808185FFEDCFCE010E944D0108
+	                                :1003B000E9CFDF91CF9108953FB7F8948091310153
+	                                :1003C00090913201A0913301B091340126B5A89BE0
+	                                :1003D00005C02F3F19F00196A11DB11D3FBFBA2FD7
+	                                :1003E000A92F982F8827BC01CD01620F711D811D97
+	                                :1003F000911D42E0660F771F881F991F4A95D1F71C
+	                                :1004000008958F929F92AF92BF92CF92DF92EF9218
+	                                :10041000FF920E94DC014B015C0184EFC82EDD24B9
+	                                :10042000D394E12CF12C0E94DC01681979098A0926
+	                                :100430009B09683E734081059105A8F321E0C21A2B
+	                                :10044000D108E108F10888EE880E83E0981EA11C0F
+	                                :10045000B11CC114D104E104F10429F7FF90EF901D
+	                                :10046000DF90CF90BF90AF909F908F9008951F9294
+	                                :100470000F920FB60F9211242F933F934F935F93D8
+	                                :100480006F937F938F939F93AF93BF93EF93FF935C
+	                                :1004900085E391E00E944D01FF91EF91BF91AF91F3
+	                                :1004A0009F918F917F916F915F914F913F912F918C
+	                                :1004B0000F900FBE0F901F9018951F920F920FB6BE
+	                                :1004C0000F9211242F938F939F93EF93FF93E091BB
+	                                :1004D0004501F09146018081E0914B01F0914C0182
+	                                :1004E00082FD1BC0908180914E018F5F8F732091A0
+	                                :1004F0004F01821741F0E0914E01F0E0EB5CFE4FBE
+	                                :10050000958F80934E01FF91EF919F918F912F9145
+	                                :100510000F900FBE0F901F9018958081F4CF1F92FF
+	                                :100520000F920FB60F9211242F933F938F939F93A7
+	                                :10053000AF93BF9380912D0190912E01A0912F0137
+	                                :10054000B091300130912C0123E0230F2D3758F565
+	                                :100550000196A11DB11D20932C0180932D01909334
+	                                :100560002E01A0932F01B093300180913101909121
+	                                :100570003201A0913301B09134010196A11DB11D4A
+	                                :100580008093310190933201A0933301B0933401F1
+	                                :10059000BF91AF919F918F913F912F910F900FBE7F
+	                                :1005A0000F901F90189526E8230F0296A11DB11DEC
+	                                :1005B000D2CF789484B5826084BD84B5816084BDD7
+	                                :1005C00085B5826085BD85B5816085BD80916E00F1
+	                                :1005D000816080936E001092810080918100826022
+	                                :1005E000809381008091810081608093810080915F
+	                                :1005F00080008160809380008091B100846080934E
+	                                :10060000B1008091B00081608093B00080917A0049
+	                                :10061000846080937A0080917A00826080937A006F
+	                                :1006200080917A00816080937A0080917A0080685E
+	                                :1006300080937A001092C100E0914501F09146014B
+	                                :1006400082E08083E0914101F09142011082E091CB
+	                                :100650004301F091440180E1808310924D01E091CB
+	                                :100660004901F0914A0186E08083E0914701F091D1
+	                                :100670004801808180618083E0914701F0914801C9
+	                                :10068000808188608083E0914701F09148018081FA
+	                                :1006900080688083E0914701F091480180818F7DDF
+	                                :1006A0008083EDE9F0E02491E9E8F0E0849188238B
+	                                :1006B00099F090E0880F991FFC01E859FF4FA59130
+	                                :1006C000B491FC01EE58FF4F859194918FB7F89447
+	                                :1006D000EC91E22BEC938FBFC0E0D0E045E150E01D
+	                                :1006E00062E171E085E391E00E94CF0042E050E0DA
+	                                :1006F00068E271E085E391E00E94CF0081E00E9412
+	                                :1007000087000E94010280E00E9487000E9401028F
+	                                :10071000209721F30E943901882301F30E940000F1
+	                                :10072000DDCFE5E3F1E01382128288EE93E0A0E0F2
+	                                :10073000B0E084839583A683B78384E091E09183BE
+	                                :10074000808385EC90E09587848784EC90E09787A0
+	                                :10075000868780EC90E0918B808B81EC90E0938B8E
+	                                :10076000828B82EC90E0958B848B86EC90E0978B6B
+	                                :10077000868B118E128E138E148E0895EE0FFF1F2E
+	                                :0C0780000590F491E02D0994F894FFCF4F
+	                                :10078C00000000006F01CF00FC00BC012D010B012B
+	                                :10079C001F01415652385368617270206973206191
+	                                :0C07AC007765736F6D6521000D0A000079
+	                                :00000001FF
+
+	                                """;
+	public static readonly HttpClient Client = new HttpClient ();
+
+	public static void Main ()
+	{
+		// Compile the code using the Hexi API
+		// var result = Compile (BlinkCode);
+		// var hex = result.Hex;
+		var watch = new Stopwatch ();
+		// Create the AVR runner
+		var runner = AvrBuilder.Create ()
+			.SetSpeed (16_000_000)
+			.SetWorkUnitCycles (1_000)
+			.SetHex (BlinkHex)
+			.AddGpioPort (AvrIoPort.PortBConfig, out var portB)
+			.AddGpioPort (AvrIoPort.PortCConfig, out _)
+			.AddGpioPort (AvrIoPort.PortDConfig, out _)
+			.AddUsart (AvrUsart.Usart0Config, out var usart)
+			.AddTimer (AvrTimer.Timer0Config, out _)
+			.AddTimer (AvrTimer.Timer1Config, out _)
+			.AddTimer (AvrTimer.Timer2Config, out _)
+			.Build ();
+		// Add a listener to the port B to print the state of pins 4 and 5
+		portB.AddListener ((newVal, prevVal) => {
+			if (prevVal == newVal)
+				return;
+
+			Console.WriteLine ($"Pin 4: {portB.GetPinState (4)}");
+			Console.WriteLine ($"Pin 5: {portB.GetPinState (5)}");
+
+			var millis = runner.Cpu.Cycles / 16_000_000.0 * 1000;
+			Console.WriteLine ($"CPU Time: {millis} ms");
+			Console.WriteLine ($"Time: {watch.Elapsed.TotalMilliseconds} ms");
+			Console.WriteLine ();
+		});
+		// Add a listener when a byte is transmitted
+		var builder = new StringBuilder ();
+		usart.OnByteTransmit = b => {
+			var c = (char)b;
+			builder.Append (c);
+			if (c != '\n') return;
+			Console.WriteLine ($"Serial Output: {builder.ToString ().Trim ()}");
+			builder.Clear ();
+			var millis = (runner.Cpu.Cycles / 16_000_000.0) * 1000;
+			Console.WriteLine ($"CPU Time: {millis} ms");
+			Console.WriteLine ($"Time: {watch.Elapsed.TotalMilliseconds} ms");
+			Console.WriteLine ();
+		};
+		Console.WriteLine ("Running...");
+		const int fiveSecs = (int)(5.5 * 16_000_000);
+		// Run the program for 5.5 seconds
+		while (runner.Cpu.Cycles < fiveSecs) {
+			runner.Execute ();
+		}
+		watch.Stop ();
+		Console.WriteLine (builder.ToString ());
+		Console.WriteLine ($"Execution time: {watch.ElapsedMilliseconds} ms");
+	}
+
+	public static HexiResult Compile (string source)
+	{
+		var content = new StringContent (JsonConvert.SerializeObject (new {
+			sketch = source,
+		}), Encoding.UTF8, "application/json");
+		var response = Client.PostAsync ($"{HexiUrl}/build", content).Result;
+		var result = response.Content.ReadAsStringAsync ().Result;
+		return JsonConvert.DeserializeObject<HexiResult> (result) ?? new HexiResult ();
+	}
+
+	public class HexiResult
+	{
+		public string Stdout { get; set; }
+		public string Stderr { get; set; }
+		public string Hex { get; set; }
+	}
+}

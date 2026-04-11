@@ -1,0 +1,107 @@
+name: Publish NuGet
+
+on:
+  push:
+    tags:
+      - "v*"
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      version_suffix:
+        description: "Version suffix (e.g. beta.1). Leave blank for a stable build."
+        required: false
+        default: ""
+      push_public:
+        description: "Push to nuget.org as well?"
+        required: false
+        default: "false"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── Checkout ────────────────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── .NET setup ──────────────────────────────────────────────────────────
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      # ── Resolve version suffix ───────────────────────────────────────────────
+      - name: Resolve version suffix
+        id: versioning
+        run: |
+          TAG="${{ github.ref }}"
+          if [[ "$TAG" == refs/tags/v* ]]; then
+            TAG_VERSION="${TAG#refs/tags/v}"
+          
+            if [[ "$TAG_VERSION" == *-* ]]; then
+              echo "suffix=${TAG_VERSION#*-}" >> "$GITHUB_OUTPUT"
+            else
+              echo "suffix=" >> "$GITHUB_OUTPUT"
+            fi
+          elif [[ -n "${{ github.event.inputs.version_suffix }}" ]]; then
+            echo "suffix=${{ github.event.inputs.version_suffix }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "suffix=preview.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── Restore ─────────────────────────────────────────────────────────────
+      - name: Restore
+        run: dotnet restore AVR8Sharp.sln
+
+      # ── Build ────────────────────────────────────────────────────────────────
+      - name: Build
+        run: dotnet build AVR8Sharp.sln -c Release --no-restore /p:ContinuousIntegrationBuild=true
+
+      # ── Test ─────────────────────────────────────────────────────────────────
+      - name: Test
+        run: >
+          dotnet test tests/Avr8Sharp.Tests/Avr8Sharp.Tests.csproj
+          -c Release
+          --no-build
+          --logger "console;verbosity=normal"
+
+      # ── Pack ─────────────────────────────────────────────────────────────────
+      - name: Pack Avr8Sharp
+        run: >
+          dotnet pack src/Avr8Sharp/Avr8Sharp.csproj
+          -c Release
+          --no-build
+          --output ./nupkgs
+          ${{ steps.versioning.outputs.full_version != '' && format('/p:Version={0}', steps.versioning.outputs.full_version) || (steps.versioning.outputs.suffix != '' && format('--version-suffix {0}', steps.versioning.outputs.suffix) || '') }}
+      - name: Pack Avr8Sharp.TestKit
+        run: >
+          dotnet pack src/Avr8Sharp.TestKit/Avr8Sharp.TestKit.csproj
+          -c Release
+          --no-build
+          --output ./nupkgs
+          ${{ steps.versioning.outputs.full_version != '' && format('/p:Version={0}', steps.versioning.outputs.full_version) || (steps.versioning.outputs.suffix != '' && format('--version-suffix {0}', steps.versioning.outputs.suffix) || '') }}
+
+      # ── Push to nuget.org (optional) ─────────────────────────────────────────
+      - name: Push to nuget.org
+        env:
+          API_KEY: ${{ secrets.NUGET_API_KEY }}
+        if: >
+          ${{ github.server_url == 'https://github.com' &&
+              env.API_KEY != '' &&
+              (startsWith(github.ref, 'refs/tags/v') ||
+              github.event.inputs.push_public == 'true') }}
+        run: >
+          dotnet nuget push "./nupkgs/*.nupkg"
+          --source https://api.nuget.org/v3/index.json
+          --api-key "${{ secrets.NUGET_API_KEY }}"
+          --skip-duplicate
+
+      - name: Upload NuGet Packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkgs-${{ steps.versioning.outputs.full_version || steps.versioning.outputs.suffix }}
+          path: ./nupkgs/*.nupkg
+          retention-days: 14
+          if-no-files-found: error
