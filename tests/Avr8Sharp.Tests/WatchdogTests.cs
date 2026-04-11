@@ -1,3 +1,5 @@
+using Avr8Sharp.Tests.Utils;
+
 namespace Avr8Sharp.Tests;
 
 [TestFixture]
@@ -62,7 +64,7 @@ public class Watchdog
 	[Test(Description = "Should reset the CPU when the timer expires")]
 	public void ResetOnTimeout()
 	{
-		var program = Utils.AsmProgram (@$"
+		var program = new AsmProgram (@$"
     ; register addresses
     _REPLACE WDTCSR, {WDTCSR}
 
@@ -75,7 +77,7 @@ public class Watchdog
     nop
 
     break
-");
+").Compile();
 		
 		var cpu = new AVR8Sharp.Core.Cpu.Cpu(program.Program);
 		var clock = new AVR8Sharp.Core.Peripherals.AvrClock(cpu, 16_000_000, AVR8Sharp.Core.Peripherals.AvrClock.ClockConfig);
@@ -103,7 +105,7 @@ public class Watchdog
 	[Test (Description = "Should extend the watchdog timeout when executing a WDR instruction")]
 	public void ExtendTimeout ()
 	{
-		var program = Utils.AsmProgram (@$"
+		var program = new AsmProgram (@$"
     ; register addresses
     _REPLACE WDTCSR, {WDTCSR}
 
@@ -116,7 +118,7 @@ public class Watchdog
     wdr
     nop
 
-    break");
+    break").Compile();
 		
 		var cpu = new AVR8Sharp.Core.Cpu.Cpu(program.Program);
 		var clock = new AVR8Sharp.Core.Peripherals.AvrClock(cpu, 16_000_000, AVR8Sharp.Core.Peripherals.AvrClock.ClockConfig);
@@ -146,7 +148,7 @@ public class Watchdog
 	[Test (Description = "Should fire an interrupt when the watchdog expires and WDIE is set")]
 	public void InterruptOnTimeout ()
 	{
-		var program = Utils.AsmProgram (@$"
+		var program = new AsmProgram (@$"
     ; register addresses
     _REPLACE WDTCSR, {WDTCSR}
 
@@ -160,7 +162,7 @@ public class Watchdog
     sei
 
     break
-");
+").Compile();
 		
 		var cpu = new AVR8Sharp.Core.Cpu.Cpu(program.Program);
 		var clock = new AVR8Sharp.Core.Peripherals.AvrClock(cpu, 16_000_000, AVR8Sharp.Core.Peripherals.AvrClock.ClockConfig);
@@ -186,7 +188,7 @@ public class Watchdog
 	[Test (Description = "Should not reset the CPU if the watchdog has been disabled")]
 	public void NoResetIfDisabled ()
 	{
-		var program = Utils.AsmProgram (@$"
+		var program = new AsmProgram (@$"
     ; register addresses
     _REPLACE WDTCSR, {WDTCSR}
 
@@ -205,7 +207,7 @@ public class Watchdog
     ldi r20, 55
 
     break
-");
+").Compile();
 		
 		var cpu = new AVR8Sharp.Core.Cpu.Cpu(program.Program);
 		var clock = new AVR8Sharp.Core.Peripherals.AvrClock(cpu, 16_000_000, AVR8Sharp.Core.Peripherals.AvrClock.ClockConfig);

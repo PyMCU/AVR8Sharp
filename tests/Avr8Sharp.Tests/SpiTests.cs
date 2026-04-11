@@ -1,4 +1,6 @@
 using AVR8Sharp.Core.Peripherals;
+using Avr8Sharp.Tests.Utils;
+
 namespace Avr8Sharp.Tests;
 
 [TestFixture]
@@ -136,7 +138,7 @@ public class Spi
 	[Test (Description = "Should transmit a byte successfully (integration)")]
 	public void Transmit ()
 	{
-		var program = Utils.AsmProgram (@$"
+		var program = new AsmProgram (@$"
 		; register addresses
 		_REPLACE SPCR, {SPCR - 0x20}
 		_REPLACE SPDR, {SPDR - 0x20}
@@ -164,7 +166,7 @@ public class Spi
 		   ; Now read the result into r17
 	        IN r17, SPDR
 		    BREAK
-");
+").Compile();
 		
 		var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 		var spi = new AvrSpi (cpu, AvrSpi.SpiConfig, FREQ_16MHZ);

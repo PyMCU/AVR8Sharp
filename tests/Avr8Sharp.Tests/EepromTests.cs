@@ -1,4 +1,6 @@
 using AVR8Sharp.Core.Peripherals;
+using Avr8Sharp.Tests.Utils;
+
 namespace Avr8Sharp.Tests;
 
 [TestFixture]
@@ -86,7 +88,7 @@ public class Eeprom
 		[Test (Description = "Should not erase the memory when writing if EEPM1 is high")]
 		public void NoErase ()
 		{
-			var program = Utils.AsmProgram ($@"
+			var program = new AsmProgram ($@"
 				  ; register addresses
 		          _REPLACE TWSR, {EECR - 0x20}
         		  _REPLACE EEARL, {EEARL - 0x20}
@@ -100,7 +102,7 @@ public class Eeprom
         		  SBI EECR, 5     ; EECR |= EEPM1
         		  SBI EECR, 2     ; EECR |= EEMPE
  		          SBI EECR, 1     ; EECR |= EEPE
-			");
+			").Compile();
 			
 			var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 			var backend = new EepromMemoryBackend (1024);
@@ -312,7 +314,7 @@ public class Eeprom
 	[Test(Description = "Should only erase the memory when EEPM0 is high")]
 	public void Erase()
 	{
-		var program = Utils.AsmProgram ($@"
+		var program = new AsmProgram ($@"
 				  ; register addresses
 		          _REPLACE EEARL, {EEARL - 0x20}
 				  _REPLACE EEDR, {EEDR - 0x20}
@@ -325,7 +327,7 @@ public class Eeprom
 				  SBI EECR, 4     ; EECR |= EEPM0
 				  SBI EECR, 2     ; EECR |= EEMPE
 			      SBI EECR, 1     ; EECR |= EEPE
-			");
+			").Compile();
 		
 		var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 		var backend = new EepromMemoryBackend (1024);

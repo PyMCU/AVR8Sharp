@@ -1,4 +1,6 @@
 using AVR8Sharp.Core.Peripherals;
+using Avr8Sharp.Tests.Utils;
+
 namespace Avr8Sharp.Tests;
 
 [TestFixture]
@@ -116,7 +118,7 @@ public class Gpio
 	public void PinToggleSbi ()
 	{
 
-		var program = Utils.AsmProgram (@$"
+		var program = new AsmProgram (@$"
 			; register addresses
 		    _REPLACE DDRD, {DDRD - 0x20}
 			_REPLACE PIND, {PIND - 0x20}
@@ -131,7 +133,7 @@ public class Gpio
 		    sbi PIND, 6
 
 		    break
-");
+").Compile();
 
 		var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 		var portD = new AvrIoPort (cpu, AvrIoPort.PortDConfig);

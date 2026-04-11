@@ -1,4 +1,6 @@
 using AVR8Sharp.Core.Peripherals;
+using Avr8Sharp.Tests.Utils;
+
 namespace Avr8Sharp.Tests;
 
 [TestFixture]
@@ -576,14 +578,14 @@ public class Timer
 	[Test (Description = "Should not increment TCNT on the same cycle of TCNT write (issue #36)")]
 	public void Timer0WriteTcnt ()
 	{
-		var program = Utils.AsmProgram (@"
+		var program = new AsmProgram (@"
 		LDI r16, 0x1    ; TCCR0B = 1 << CS00;
         OUT 0x25, r16
 		LDI r16, 0x30   ; TCNT0 <- 0x30
 		OUT 0x26, r16
 		NOP
 		IN r17, 0x26    ; r17 <- TCNT
-");
+").Compile();
 		var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 		var timer = new AvrTimer (cpu, AvrTimer.Timer0Config);
 		var runner = new TestProgramRunner (cpu);
@@ -615,14 +617,14 @@ public class Timer
 	[Test (Description = "Should update TCNT as it is being read by a 2-cycle instruction (issue #40)")]
 	public void Timer0ReadTcnt ()
 	{
-		var program = Utils.AsmProgram (@"
+		var program = new AsmProgram (@"
 		LDI r16, 0x1      ; TCCR0B = 1 << CS00
 		OUT 0x25, r16
 		LDI r16, 0x0      ; TCNT0 <- 0
 		OUT 0x26, r16
 		NOP
 		LDS r1, 0x46      ; r1 <- TCNT0 (2 cycles)
-");
+").Compile();
 		var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 		var timer = new AvrTimer (cpu, AvrTimer.Timer0Config);
 		var runner = new TestProgramRunner (cpu);
@@ -635,7 +637,7 @@ public class Timer
 	[Test (Description = "Should not start counting before the prescaler is first set (issue #41)")]
 	public void Timer0Prescaler0 ()
 	{
-		var program = Utils.AsmProgram (@"
+		var program = new AsmProgram (@"
 		NOP
 		NOP
 	    NOP
@@ -644,7 +646,7 @@ public class Timer
 		STS 0xb1, r16   ; Should start counting after this line
 		NOP
 		LDS r17, 0xb2   ; TCNT should equal 2 at this point
-");
+").Compile();
 		var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 		var timer = new AvrTimer (cpu, AvrTimer.Timer2Config);
 		var runner = new TestProgramRunner (cpu);
@@ -657,14 +659,14 @@ public class Timer
 	[Test (Description = "Should not keep counting for one more instruction when the timer is disabled (issue #72)")]
 	public void Timer0Disabled2 ()
 	{
-		var program = Utils.AsmProgram (@"
+		var program = new AsmProgram (@"
 		EOR r1, r1      ; r1 = 0;
 		LDI r16, 0x1    ; TCCR2B = 1 << CS20;
 		STS 0xb1, r16   ; Should start counting after this instruction,
 		STS 0xb1, r1    ; and stop counting *after* this one.
 		NOP
 		LDS r17, 0xb2   ; TCNT2 should equal 2 at this point (not counting the NOP)
-	");
+	").Compile();
 		var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 		var timer = new AvrTimer (cpu, AvrTimer.Timer2Config);
 		var runner = new TestProgramRunner (cpu);
@@ -699,7 +701,7 @@ public class Timer
 		[Test (Description = "Should set OC0A on Compare Match, clear on Bottom (issue #78)")]
 		public void Timer0FastPwmMode1 ()
 		{
-			var program = Utils.AsmProgram (@"
+			var program = new AsmProgram (@"
         LDI r16, 0xfc   ; TCNT0 = 0xfc;
         OUT 0x26, r16
         LDI r16, 0xfe   ; OCR0A = 0xfe;
@@ -719,7 +721,7 @@ public class Timer
         NOP             ; TCNT is now 0x00 (BOTTOM)
       afterBottom:
         NOP
-");
+").Compile();
 			
 			var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 			var timer = new AvrTimer (cpu, AvrTimer.Timer0Config);
@@ -773,7 +775,7 @@ public class Timer
 		[Test (Description = "Should toggle OC0A on Compare Match when COM0An = 1 (issue #78)")]
 		public void Timer0FastPwmMode2 ()
 		{
-			var program = Utils.AsmProgram (@"
+			var program = new AsmProgram (@"
         LDI r16, 0xfc   ; TCNT0 = 0xfc;
         OUT 0x26, r16
         LDI r16, 0xfe   ; OCR0A = 0xfe;
@@ -791,7 +793,7 @@ public class Timer
         NOP             ; TCNT is now 0
       afterOverflow:
         NOP
-");
+").Compile();
 			
 			var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 			var timer = new AvrTimer (cpu, AvrTimer.Timer0Config);
@@ -834,7 +836,7 @@ public class Timer
 		[Test (Description = "Should leave OC0A disconnected when COM0An = 1 and WGM02 = 0 (issue #78)")]
 		public void Timer0FastPwmMode3 ()
 		{
-			var program = Utils.AsmProgram (@"
+			var program = new AsmProgram (@"
         LDI r16, 0xfc   ; TCNT0 = 0xfc;
         OUT 0x26, r16
         LDI r16, 0xfe   ; OCR0A = 0xfe;
@@ -851,7 +853,7 @@ public class Timer
 
       afterClearWGM02:
         NOP
-");
+").Compile();
 			
 			var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 			var timer = new AvrTimer (cpu, AvrTimer.Timer0Config);
@@ -890,7 +892,7 @@ public class Timer
 		[Test (Description = "Should count up to TOP, down to 0, and then set TOV flag")]
 		public void Timer0PhaseCorrectPwm ()
 		{
-			var program = Utils.AsmProgram (@"
+			var program = new AsmProgram (@"
         LDI r16, 0x3   ; OCR0A = 0x3;   // <- TOP value
         OUT 0x27, r16  
         ; Set waveform generation mode (WGM) to PWM, Phase Correct, top OCR0A
@@ -907,7 +909,7 @@ public class Timer
         IN r20, 0x26   ; TCNT0 will be 1
         IN r21, 0x26   ; TCNT0 will be 0
         IN r22, 0x26   ; TCNT0 will be 1 (end of test)
-");
+").Compile();
 			var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 			var timer = new AvrTimer (cpu, AvrTimer.Timer0Config);
 			
@@ -927,7 +929,7 @@ public class Timer
 		[Test (Description = "Should clear OC0A when TCNT0=OCR0A and counting up")]
 		public void Timer0PhaseCorrectPwm2 ()
 		{
-			var program = Utils.AsmProgram (@"
+			var program = new AsmProgram (@"
         LDI r16, 0xfe   ; OCR0A = 0xfe;   // <- TOP value
         OUT 0x27, r16  
         ; Set waveform generation mode (WGM) to PWM, Phase Correct
@@ -941,7 +943,7 @@ public class Timer
         NOP   ; TCNT0 will be 0xfe
         NOP   ; TCNT0 will be 0xff
         NOP   ; TCNT0 will be 0xfe again (end of test)
-");
+").Compile();
 			
 			var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 			var timer = new AvrTimer (cpu, AvrTimer.Timer0Config);
@@ -998,7 +1000,7 @@ public class Timer
 		[Test (Description = "Should toggle OC0A when TCNT0=OCR0A and COM0An=1 (issue #78)")]
 		public void Timer0PhaseCorrectPwm3 ()
 		{
-			var program = Utils.AsmProgram (@"
+			var program = new AsmProgram (@"
         LDI r16, 0xfe   ; OCR0A = 0xfe;   // <- TOP value
         OUT 0x27, r16  
         ; Set waveform generation mode (WGM) to PWM, Phase Correct (mode 5)
@@ -1013,7 +1015,7 @@ public class Timer
         NOP             ; TCNT0 will be 0xfe
       afterMatch:
         NOP
-");
+").Compile();
 			var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 			var timer = new AvrTimer (cpu, AvrTimer.Timer0Config);
 			
@@ -1050,7 +1052,7 @@ public class Timer
 		[Test (Description = "Should leave OC0A disconnected TCNT0=OCR0A and COM0An=1 in WGM mode 1 (issue #78)")]
 		public void Timer0PhaseCorrectPwm4 ()
 		{
-			var program = Utils.AsmProgram (@"
+			var program = new AsmProgram (@"
         LDI r16, 0xfe   ; OCR0A = 0xfe;   // <- TOP value
         OUT 0x27, r16  
         ; Set waveform generation mode (WGM) to PWM, Phase Correct (mode 1)
@@ -1060,7 +1062,7 @@ public class Timer
         OUT 0x25, r16  
         LDI r16, 0xfd   ; TCNT0 = 0xfd;
         OUT 0x26, r16  
-");
+").Compile();
 			
 			var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 			var timer = new AvrTimer (cpu, AvrTimer.Timer0Config);
@@ -1080,7 +1082,7 @@ public class Timer
 		[Test (Description = "Should not miss Compare Match when executing multi-cycle instruction (issue #79)")]
 		public void Timer0PhaseCorrectPwm5 ()
 		{
-			var program = Utils.AsmProgram (@"
+			var program = new AsmProgram (@"
         LDI r16, 0x10   ; OCR0A = 0x10;   // <- TOP value
         OUT 0x27, r16  
         ; Set waveform generation mode (WGM) to normal, enable OC0A (Set on match)
@@ -1091,7 +1093,7 @@ public class Timer
         LDI r16, 0xf    ; TCNT0 = 0xf;
         OUT 0x26, r16  
         RJMP 1          ; TCNT0 will be 0x11 (RJMP takes 2 cycles)
-");
+").Compile();
 			
 			var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 			var timer = new AvrTimer (cpu, AvrTimer.Timer0Config);
@@ -1125,7 +1127,7 @@ public class Timer
 		[Test (Description = "Should only update OCR0A when TCNT0=TOP in PWM Phase Correct mode (issue #76)")]
 		public void Timer0PhaseCorrectPwm6 ()
 		{
-			var program = Utils.AsmProgram (@"
+			var program = new AsmProgram (@"
         LDI r16, 0x4   ; OCR0A = 0x4;
         OUT 0x27, r16  
         ; Set waveform generation mode (WGM) to PWM, Phase Correct
@@ -1148,7 +1150,7 @@ public class Timer
         NOP             ; // TCNT0 should read 0x1
         NOP             ; // TCNT0 should read 0x2
         IN r18, 0x26    ; R18 = TCNT; // TCNT0 should read 0x1
-");
+").Compile();
 			
 			var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 			var timer = new AvrTimer (cpu, AvrTimer.Timer0Config);
@@ -1164,7 +1166,7 @@ public class Timer
 		[Test (Description = "Should update OCR0A when TCNT0=TOP and TOP=0 in PWM Phase Correct mode (issue #119)")]
 		public void Timer0PhaseCorrectPwm7 ()
 		{
-			var program = Utils.AsmProgram (@"
+			var program = new AsmProgram (@"
         ; Set waveform generation mode (WGM) to PWM, Phase Correct
         LDI r16, 0x01   ; TCCR0A = (1 << WGM00);
         OUT 0x24, r16
@@ -1179,7 +1181,7 @@ public class Timer
         OUT 0x27, r16   ; // TCNT0 should read 0x1
         NOP             ; // TCNT0 should read 0x2
         IN r19, 0x26    ; R19 = TCNT; // TCNT0 should read 0x1
-");
+").Compile();
 			
 			var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 			var timer = new AvrTimer (cpu, AvrTimer.Timer0Config);
@@ -1196,7 +1198,7 @@ public class Timer
 		[Test (Description = "Should not overrun when TOP < current value in Phase Correct mode (issue #119)")]
 		public void Timer0PhaseCorrectPwm8 ()
 		{
-			var program = Utils.AsmProgram (@"
+			var program = new AsmProgram (@"
         ; Set waveform generation mode (WGM) to PWM, Phase Correct
         LDI r16, 0x01   ; TCCR0A = (1 << WGM00);
         OUT 0x24, r16
@@ -1206,7 +1208,7 @@ public class Timer
         OUT 0x26, r16
 
         IN r17, 0x26    ; R17 = TCNT; // TCNT0 should read 255
-");
+").Compile();
 			
 			var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 			var timer = new AvrTimer (cpu, AvrTimer.Timer0Config);
@@ -1406,7 +1408,7 @@ public class Timer
 		[Test (Description = "Should toggle OC1B on Compare Match")]
 		public void Timer1ToggleOnCompareMatchB ()
 		{
-			var program = Utils.AsmProgram (@"
+			var program = new AsmProgram (@"
         ; Set waveform generation mode (WGM) to Normal, top 0xFFFF
         LDI r16, 0x10   ; TCCR1A = (1 << COM1B0);
         STS 0x80, r16  
@@ -1423,7 +1425,7 @@ public class Timer
 
         NOP   ; TCNT1 will be 0x49
         NOP   ; TCNT1 will be 0x4a
-");
+").Compile();
 			
 			var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 			var timer = new AvrTimer (cpu, AvrTimer.Timer1Config);
@@ -1462,7 +1464,7 @@ public class Timer
 		[Test (Description = "Should toggle OC1C on Compare Match")]
 		public void Timer1ToggleOnCompareMatchC ()
 		{
-			var program = Utils.AsmProgram (@$"
+			var program = new AsmProgram (@$"
         ; Set waveform generation mode (WGM) to Normal, top 0xFFFF
         LDI r16, 0x04   ; TCCR1A = (1 << COM1C0);
         STS {TCCR1A}, r16  
@@ -1479,7 +1481,7 @@ public class Timer
 
         NOP   ; TCNT1 will be 0x49
         NOP   ; TCNT1 will be 0x4a
-");
+").Compile();
 			
 			var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 			var timer = new AvrTimer (cpu, AvrTimer.Timer1Config.CreateNew (
@@ -1574,7 +1576,7 @@ public class Timer
 		[Test (Description = "Should only update OCR1A when TCNT1=BOTTOM in PWM Phase/Frequency Correct mode (issue #76)")]
 		public void Timer1PhaseCorrectPwm1 ()
 		{
-			var program = Utils.AsmProgram (@"
+			var program = new AsmProgram (@"
         LDI r16, 0x0    ; OCR1AH = 0x0;
         STS 0x89, r16  
         LDI r16, 0x4   ; OCR1AL = 0x4;
@@ -1602,7 +1604,7 @@ public class Timer
         LDS r19, 0x84  ; // TCNT1 should read 0x6 (going up)
         NOP            ; // TCNT1 should read 0x8 (going up)
         LDS r20, 0x84  ; // TCNT1 should read 0x7 (going up)
-");
+").Compile();
 			
 			var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 			var timer = new AvrTimer (cpu, AvrTimer.Timer1Config);
@@ -1622,7 +1624,7 @@ public class Timer
 		[Test (Description = "Should update OCR1A when setting TCNT to 0 (issue #111)")]
 		public void Timer1PhaseCorrectPwm2 ()
 		{
-			var program = Utils.AsmProgram (@"
+			var program = new AsmProgram (@"
         CLR r1          ; r1 is our zero register
         LDI r16, 0x0    ; OCR1AH = 0x0;
         STS 0x89, r1    
@@ -1643,7 +1645,7 @@ public class Timer
         LDS r18, 0x84  ; // TCNT1 should read 0x3 (going up)
         LDS r19, 0x84  ; // TCNT1 should read 0x5 (going down)
         LDS r20, 0x84  ; // TCNT1 should read 0x3 (going down)
-");
+").Compile();
 			
 			var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 			var timer = new AvrTimer (cpu, AvrTimer.Timer1Config);

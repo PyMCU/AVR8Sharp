@@ -1,4 +1,6 @@
 using AVR8Sharp.Core.Peripherals;
+using Avr8Sharp.Tests.Utils;
+
 namespace Avr8Sharp.Tests;
 
 [TestFixture]
@@ -25,7 +27,7 @@ public class Adc
 	[Test(Description = "Should successfully perform an ADC conversion")]
 	public void Conversion ()
 	{
-		var program = Utils.AsmProgram (@$"
+		var program = new AsmProgram (@$"
 		; register addresses
 	    _REPLACE ADMUX, {ADMUX}
 		_REPLACE ADCSRA, {ADCSRA}
@@ -51,7 +53,7 @@ public class Adc
 	    lds r17, {ADCH}
 
 		break
-");
+").Compile();
 		var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 		var adc = new AvrAdc (cpu, AvrAdc.AdcConfig);
 		var runner = new TestProgramRunner (cpu);
@@ -77,7 +79,7 @@ public class Adc
 	[Test(Description = "Should read 0 when the ADC peripheral is not enabled")]
 	public void Disabled ()
 	{
-		var program = Utils.AsmProgram (@$"
+		var program = new AsmProgram (@$"
 		; register addresses
 	    _REPLACE ADMUX, {ADMUX}
 		_REPLACE ADCSRA, {ADCSRA}
@@ -107,7 +109,7 @@ public class Adc
 	    lds r17, {ADCH}
 
 		break
-");
+").Compile();
 		var cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
 		var adc = new AvrAdc (cpu, AvrAdc.AdcConfig);
 		var runner = new TestProgramRunner (cpu, (cpu) => {
