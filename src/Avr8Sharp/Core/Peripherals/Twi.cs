@@ -106,7 +106,7 @@ public class AvrTwi
             enableMask: TWCR_TWIE
         );
 
-        this.UpdateStatus(STATUS_TWI_IDLE);
+        UpdateStatus(STATUS_TWI_IDLE);
 
         cpu.Mmio.RegisterWrite(_config.TWCR, (value, _, _, _) =>
         {
@@ -156,33 +156,33 @@ public class AvrTwi
     public void CompleteStart()
     {
         _busy = false;
-        this.UpdateStatus(Status == STATUS_TWI_IDLE ? STATUS_START : STATUS_REPEATED_START);
+        UpdateStatus(Status == STATUS_TWI_IDLE ? STATUS_START : STATUS_REPEATED_START);
     }
 
     public void CompleteStop()
     {
         _busy = false;
         _cpu.Mmio.Data[_config.TWCR] &= ~TWCR_TWSTO & 0xff;
-        this.UpdateStatus(STATUS_TWI_IDLE);
+        UpdateStatus(STATUS_TWI_IDLE);
     }
 
-    public void CompleteConnect(byte address, bool read)
+    public void CompleteConnect(bool ack)
     {
         _busy = false;
         if ((_cpu.Mmio.Data[_config.TWDR] & 0x1) != 0)
         {
-            this.UpdateStatus(read ? STATUS_SLAR_ACK : STATUS_SLAR_NACK);
+            UpdateStatus(ack ? STATUS_SLAR_ACK : STATUS_SLAR_NACK);
         }
         else
         {
-            this.UpdateStatus(read ? STATUS_SLAW_ACK : STATUS_SLAW_NACK);
+            UpdateStatus(ack ? STATUS_SLAW_ACK : STATUS_SLAW_NACK);
         }
     }
 
-    public void CompleteWrite(byte data)
+    public void CompleteWrite(bool ack)
     {
         _busy = false;
-        this.UpdateStatus((data & 0x1) != 0 ? STATUS_DATA_SENT_ACK : STATUS_DATA_SENT_NACK);
+        UpdateStatus(ack ? STATUS_DATA_SENT_ACK : STATUS_DATA_SENT_NACK);
     }
 
     public void CompleteRead(byte data)
@@ -190,7 +190,7 @@ public class AvrTwi
         _busy = false;
         var ack = (_cpu.Mmio.Data[_config.TWCR] & TWCR_TWEA) != 0;
         _cpu.Mmio.Data[_config.TWDR] = data;
-        this.UpdateStatus(ack ? STATUS_DATA_RECEIVED_ACK : STATUS_DATA_RECEIVED_NACK);
+        UpdateStatus(ack ? STATUS_DATA_RECEIVED_ACK : STATUS_DATA_RECEIVED_NACK);
     }
 
     /// <summary>
