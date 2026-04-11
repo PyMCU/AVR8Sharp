@@ -75,22 +75,25 @@ public class AvrUsi
 
     private void DelegatePortListener(byte value, byte oldValue)
     {
-        var twoWire = (_cpu.Mmio.Data[USICR] & USIWM1) == USIWM1;
-        if (twoWire)
+        var control = _cpu.Mmio.Data[USICR];
+        var twoWire = (control & USIWM1) != 0;
+
+        if (!twoWire) return;
+        var sclHigh = (value & (1 << _clockPin)) != 0;
+        var sdaOld = (oldValue & (1 << _dataPin)) != 0;
+        var sdaNew = (value & (1 << _dataPin)) != 0;
+
+        if (!sclHigh) return;
+        switch (sdaOld)
         {
-            if ((value & (1 << _clockPin)) != 0 && (value & (1 << _dataPin)) == 0)
-            {
-                // Start condition detected: SCL high, SDA low
+            case true when !sdaNew:
                 _cpu.SetInterruptFlag(_start);
                 OnStartCondition?.Invoke();
-            }
-
-            if ((value & (1 << _clockPin)) != 0 && (value & (1 << _dataPin)) != 0)
-            {
-                // Stop condition detected: SCL high, SDA high
+                break;
+            case false when sdaNew:
                 _cpu.Mmio.Data[USISR] |= USIPF;
                 OnStopCondition?.Invoke();
-            }
+                break;
         }
     }
 

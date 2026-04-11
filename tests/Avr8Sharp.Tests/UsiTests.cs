@@ -115,4 +115,32 @@ public class Usi
 				"OnStopCondition callback must be invoked");
 		});
 	}
+
+	[Test (Description = "Two-wire mode: Start condition must be edge-triggered and not fire repeatedly")]
+	public void TwoWire_StartCondition_FiresOnlyOnEdge ()
+	{
+		var cpu  = new AVR8Sharp.Core.Cpu.Cpu (new ushort[1024]);
+		var port = new AvrIoPort (cpu, AvrIoPort.PortBConfig);
+		var usi  = new AvrUsi (cpu, port, (int)AvrIoPort.PortBConfig.PIN,
+			dataPin: DATA_PIN, clockPin: CLOCK_PIN);
+
+		cpu.WriteData ((ushort)USICR, (byte)USIWM1);
+		cpu.WriteData ((ushort)DDRB, (byte)((1 << CLOCK_PIN) | (1 << DATA_PIN)));
+
+		cpu.WriteData ((ushort)PORTB, (byte)((1 << CLOCK_PIN) | (1 << DATA_PIN)));
+
+		int startCount = 0;
+		usi.OnStartCondition = () => startCount++;
+
+		cpu.WriteData ((ushort)PORTB, (byte)(1 << CLOCK_PIN));
+
+		cpu.WriteData ((ushort)PORTB, (byte)((1 << CLOCK_PIN) | 0b10000));
+
+		Assert.Multiple (() => {
+			Assert.That (startCount, Is.EqualTo (1),
+				"OnStartCondition debe dispararse exactamente UNA vez en el flanco");
+			Assert.That (cpu.Mmio.Data[USISR] & USISIF, Is.EqualTo (USISIF),
+				"El flag USISIF debe estar activo");
+		});
+	}
 }
