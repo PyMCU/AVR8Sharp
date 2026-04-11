@@ -829,18 +829,16 @@ public partial class AvrAssembler
 	/// </summary>
 	private static int ConstValue (string value, int min = 0, int max = 255)
 	{
-		int d;
-		if (value.Length > 1 && value[0] == '0' && value[1] == 'x') {
-			d = int.Parse (value.Substring (2), System.Globalization.NumberStyles.HexNumber);
-		}
-		else if (value.Length > 1 && value[0] == '0' && value[1] == 'b') {
-			d = Convert.ToInt32(value.Substring(2), 2);
-		}
-		else
-			d = int.Parse(value);
-		
+		var d = value.Length switch
+		{
+			> 1 when value[0] == '0' && value[1] == 'x' => (int)uint.Parse(value[2..],
+				System.Globalization.NumberStyles.HexNumber),
+			> 1 when value[0] == '0' && value[1] == 'b' => (int)Convert.ToUInt32(value[2..], 2),
+			_ => int.Parse(value)
+		};
+
 		if (d < min || d > max) {
-			throw new Exception($"[Ks] out of range: {min}<{value}<{max}");
+			throw new Exception($"[Ks] out of range: {min} < {value} < {max}");
 		}
 		return d;
 	}
@@ -878,28 +876,22 @@ public partial class AvrAssembler
 	}
 
 	/// <summary>
-	/// Determin if input is an address or label and lookup if required.
-	/// If label that doesn't exist, return NaN. If offset is not 0,
-	/// convert from absolute address to relative.
+	/// Determine if input is an address or label and lookup if required.
 	/// </summary>
-	private static int ConstOrLabel (object value, Dictionary<string, int> labels, int offset = 0)
+	private static int ConstOrLabel (object value, LabelTable labels, int offset = 0)
 	{
-		if (value is string c) {
-			if (labels.ContainsKey(c)) {
-				return labels[c] - offset;
-			}
-			if (c.Length > 1 && c[0] == '0' && c[1] == 'x') {
-				return int.Parse (c.Substring (2), System.Globalization.NumberStyles.HexNumber);
-			}
-			if (c.Length > 1 && c[0] == '0' && c[1] == 'b') {
-				return Convert.ToInt32(c.Substring(2), 2);
-			}
-			if (int.TryParse(c, out var d)) {
-				return d;
-			}
-			return int.MinValue;
+		if (value is not string c) return (int)value;
+		if (labels.TryGetValue(c, out var label)) {
+			return label - offset;
 		}
-		return (int)value;
+
+		return c.Length switch
+		{
+			> 1 when c[0] == '0' && c[1] == 'x' => (int)uint.Parse(c[2..],
+				System.Globalization.NumberStyles.HexNumber),
+			> 1 when c[0] == '0' && c[1] == 'b' => (int)Convert.ToUInt32(c[2..], 2),
+			_ => int.TryParse(c, out var d) ? d : int.MinValue
+		};
 	}
 
 	/// <summary>
