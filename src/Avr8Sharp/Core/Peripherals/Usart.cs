@@ -60,7 +60,7 @@ public class AvrUsart
     private readonly uint _freqHz;
 
     private bool _rxBusyValue = false;
-    private byte _rxByte = 0;
+    private ushort _rxBuffer = 0;
     private readonly StringBuilder _lineBuffer = new StringBuilder();
 
     private readonly AvrInterruptConfig _rxc;
@@ -72,7 +72,7 @@ public class AvrUsart
 
     private readonly Action _txCompleteAction;
     private readonly Action _rxCompleteAction;
-    private byte _incomingRxByte;
+    private ushort _incomingRxBuffer;
 
     public Action<byte>? OnByteTransmit { get; set; } = null;
     public Action<string>? OnLineTransmit { get; set; } = null;
@@ -196,7 +196,7 @@ public class AvrUsart
         _rxCompleteAction = () =>
         {
             _rxBusyValue = false;
-            WriteByte(_incomingRxByte, true);
+            WriteByte(_incomingRxBuffer, true);
         };
         
         Reset();
@@ -230,6 +230,8 @@ public class AvrUsart
                 _cpu.SetInterruptFlag(_udre);
             }
 
+            value = (byte)((value & ~UCSRB_RXB8) | (oldValue & UCSRB_RXB8));
+
             _cpu.Mmio.Data[_config.UCSRB] = value;
             UpdateCalculatedValues();
             if ((value & UCSRB_CFG_MASK) != (oldValue & UCSRB_CFG_MASK))
@@ -250,8 +252,8 @@ public class AvrUsart
 
         _cpu.Mmio.RegisterRead(_config.UDR, _ =>
         {
-            var result = _rxByte & _cachedRxMask;
-            _rxByte = 0;
+            var result = _rxBuffer & _cachedRxMask & 0xFF;
+            _rxBuffer = 0;
             _cpu.ClearInterrupt(_rxc);
             return (byte)result;
         });
@@ -310,29 +312,40 @@ public class AvrUsart
         _cpu.Mmio.Data[_config.UCSRB] = 0;
         _cpu.Mmio.Data[_config.UCSRC] = UCSRC_UCSZ1 | UCSRC_UCSZ0; // default: 8 bits per byte
         _rxBusyValue = false;
-        _rxByte = 0;
+        _rxBuffer = 0;
         _lineBuffer.Clear();
     }
 
-    public bool WriteByte(byte value, bool immediate = false)
+    public bool WriteByte(ushort value, bool immediate = false)
     {
         if (_rxBusyValue || !RxEnable) return false;
 
         if (immediate)
         {
-            _rxByte = value;
+            _rxBuffer = value;
+
+            var ucsrb = _cpu.Mmio.Data[_config.UCSRB];
+            if ((value & 0x100) != 0)
+            {
+                ucsrb |= UCSRB_RXB8;
+            }
+            else
+            {
+                ucsrb &= ~UCSRB_RXB8 & 0xFF;
+            }
+            _cpu.Mmio.Data[_config.UCSRB] = ucsrb;
+
             _cpu.SetInterruptFlag(_rxc);
             OnRxComplete?.Invoke();
         }
         else
         {
             _rxBusyValue = true;
-            _incomingRxByte = value;
-            _cpu.AddClockEvent(_rxCompleteAction, _cachedCyclesPerChar); 
-            return true;
+            _incomingRxBuffer = value;
+            _cpu.AddClockEvent(_rxCompleteAction, _cachedCyclesPerChar);
         }
 
-        return false;
+        return true;
     }
 }
 
