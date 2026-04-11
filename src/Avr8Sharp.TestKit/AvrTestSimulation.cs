@@ -50,7 +50,7 @@ public class AvrTestSimulation
     }
 
     /// <summary>Creates a new blank simulation with the given flash and SRAM sizes.</summary>
-    public static AvrTestSimulation Create(int flashSize = AvrRunner.FLASH, int sramBytes = 8192)
+    public static AvrTestSimulation Create(int flashSize = 0x8000, int sramBytes = 8192)
         => new(flashSize, sramBytes);
 
     // ── Program loading ──────────────────────────────────────────────────────

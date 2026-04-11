@@ -7,8 +7,6 @@ public enum DecoderType { Switch, Lut, NativeLut }
 
 public class AvrRunner(byte[] program, int sramBytes)
 {
-	public const int FLASH = 0x8000;
-
 	public readonly Cpu.Cpu Cpu = new(program, sramBytes);
 	private int _workUnitCycles = 500000;
 	
@@ -46,13 +44,18 @@ public class AvrRunner(byte[] program, int sramBytes)
 	
 	public void LoadHex (string source)
 	{
-		var target = new byte[FLASH];
+		var flashSize = Cpu.ProgBytes.Length;
+		var target = new byte[flashSize];
 		foreach (var line in source.Split ('\n')) {
-			if (!string.IsNullOrEmpty (line) && line[0] == ':' && line.Substring (7, 2) == "00") {
-				var bytes = Convert.ToInt32 (line.Substring (1, 2), 16);
-				var addr = Convert.ToInt32 (line.Substring (3, 4), 16);
-				for (var i = 0; i < bytes; i++) {
-					target[addr + i] = Convert.ToByte (line.Substring (9 + i * 2, 2), 16);
+			var trimmedLine = line.Trim();
+			if (string.IsNullOrEmpty(trimmedLine) || trimmedLine[0] != ':' ||
+			    trimmedLine.Substring(7, 2) != "00") continue;
+			var bytes = Convert.ToInt32 (trimmedLine.Substring (1, 2), 16);
+			var addr = Convert.ToInt32 (trimmedLine.Substring (3, 4), 16);
+
+			for (var i = 0; i < bytes; i++) {
+				if (addr + i < target.Length) {
+					target[addr + i] = Convert.ToByte (trimmedLine.Substring (9 + i * 2, 2), 16);
 				}
 			}
 		}

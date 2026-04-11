@@ -3,10 +3,10 @@ using AVR8Sharp.Core.Utils;
 
 namespace AVR8Sharp.Core;
 
-public class AvrBuilder (AvrRunner @base, int flashSize = AvrRunner.FLASH)
+public class AvrBuilder (AvrRunner @base, int flashSize = 0x8000)
 {
 	readonly AvrRunner @base = @base;
-	public static AvrBuilder Create (int flashSize = AvrRunner.FLASH, int ramSize = 8192)
+	public static AvrBuilder Create (int flashSize = 0x8000, int ramSize = 8192)
 	{
 		return new AvrBuilder (new AvrRunner (new byte[flashSize], ramSize), flashSize);
 	}
