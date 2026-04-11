@@ -57,7 +57,7 @@ jobs:
 
       # ── Build ────────────────────────────────────────────────────────────────
       - name: Build
-        run: dotnet build AVR8Sharp.sln -c Release --no-restore
+        run: dotnet build AVR8Sharp.sln -c Release --no-restore /p:ContinuousIntegrationBuild=true
 
       # ── Test ─────────────────────────────────────────────────────────────────
       - name: Test
@@ -74,15 +74,14 @@ jobs:
           -c Release
           --no-build
           --output ./nupkgs
-          ${{ steps.versioning.outputs.suffix != '' && format('--version-suffix {0}', steps.versioning.outputs.suffix) || '' }}
-
+          ${{ steps.versioning.outputs.full_version != '' && format('/p:Version={0}', steps.versioning.outputs.full_version) || (steps.versioning.outputs.suffix != '' && format('--version-suffix {0}', steps.versioning.outputs.suffix) || '') }}
       - name: Pack Avr8Sharp.TestKit
         run: >
           dotnet pack src/Avr8Sharp.TestKit/Avr8Sharp.TestKit.csproj
           -c Release
           --no-build
           --output ./nupkgs
-          ${{ steps.versioning.outputs.suffix != '' && format('--version-suffix {0}', steps.versioning.outputs.suffix) || '' }}
+          ${{ steps.versioning.outputs.full_version != '' && format('/p:Version={0}', steps.versioning.outputs.full_version) || (steps.versioning.outputs.suffix != '' && format('--version-suffix {0}', steps.versioning.outputs.suffix) || '') }}
 
       # ── Push to nuget.org (optional) ─────────────────────────────────────────
       - name: Push to nuget.org
@@ -98,3 +97,11 @@ jobs:
           --source https://api.nuget.org/v3/index.json
           --api-key "${{ secrets.NUGET_API_KEY }}"
           --skip-duplicate
+
+      - name: Upload NuGet Packages
+          uses: actions/upload-artifact@v4
+          with:
+            name: nupkgs-${{ steps.versioning.outputs.full_version || steps.versioning.outputs.suffix }}
+            path: ./nupkgs/*.nupkg
+            retention-days: 14
+            if-no-files-found: error
