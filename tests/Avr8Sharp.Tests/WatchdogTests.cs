@@ -269,10 +269,11 @@ public class Watchdog : AvrTestBase
 	[Test(Description = "Should reschedule and fire earlier if the prescaler is shortened while already running")]
 	public void RescheduleOnPrescalerShortened()
 	{
-		// Configure the watchdog to run at 128ms (WDP2 | WDP1)
+		// Configure the watchdog to run at 128ms (WDP1 | WDP0)
 		// 128ms * 16,000 cycles/ms = 2,048,000 cycles
+		Cpu.Pc = 0x10;
 		Cpu.WriteData(WDTCSR, WDCE | WDE);
-		Cpu.WriteData(WDTCSR, WDE | WDP2 | WDP1);
+		Cpu.WriteData(WDTCSR, WDE | WDP1 | WDP0);
 
 		Assert.Multiple(() => {
 			Assert.That(_watchdog.Enabled, Is.True);
