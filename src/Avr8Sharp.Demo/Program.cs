@@ -27,7 +27,7 @@ void loop() {
 }
 ";
 
-	private const string BlinkHex = """
+	private const string PrecompiledBlinkHex = """
 	                                :100000000C945D000C9485000C9485000C94850084
 	                                :100010000C9485000C9485000C9485000C9485004C
 	                                :100020000C9485000C9485000C9485000C9485003C
@@ -160,14 +160,14 @@ void loop() {
 	public static void Main ()
 	{
 		// Compile the code using the Hexi API
-		// var result = Compile (BlinkCode);
-		// var hex = result.Hex;
+		var result = Compile (BlinkCode);
+		var hex = result.Hex;
 		var watch = new Stopwatch ();
 		// Create the AVR runner
 		var runner = AvrBuilder.Create ()
 			.SetSpeed (16_000_000)
 			.SetWorkUnitCycles (1_000)
-			.SetHex (BlinkHex)
+			.SetHex (hex)
 			.AddGpioPort (AvrIoPort.PortBConfig, out var portB)
 			.AddGpioPort (AvrIoPort.PortCConfig, out _)
 			.AddGpioPort (AvrIoPort.PortDConfig, out _)
