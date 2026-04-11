@@ -231,7 +231,8 @@ public class AvrTestSimulation
     {
         for (var i = 0; i < maxInstructions; i++)
         {
-            if (Runner.Cpu.ProgramMemory[Runner.Cpu.Pc] == BreakOpcode)
+            var pc = Runner.Cpu.Pc;
+            if (Runner.Cpu.ProgramMemory[(int)pc] == BreakOpcode)
                 return this;
             Decoder.Decode(Runner.Cpu);
             Runner.Cpu.Tick();
