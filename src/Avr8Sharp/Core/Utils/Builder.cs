@@ -89,7 +89,7 @@ public class AvrBuilder (AvrRunner @base, int flashSize = 0x8000)
 		return this;
 	}
 
-	public AvrBuilder UseNativeDecoder()
+	public AvrBuilder UseNativeLutDecoder()
 	{
 		@base.SetDecoder(DecoderType.NativeLut);
 		return this;

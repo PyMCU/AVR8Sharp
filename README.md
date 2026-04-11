@@ -2,7 +2,7 @@
 
 ![Build Status](https://github.com/begeistert/AVR8Sharp/actions/workflows/ci.yml/badge.svg)
 [![NuGet](https://img.shields.io/nuget/v/Avr8Sharp.svg)](https://www.nuget.org/packages/Avr8Sharp)
-[![License](https://img.shields.io/github/license/begeistert/AVR8Sharp)](https://github.com/begeistert/avr8sharp/blob/master/LICENSE)
+[![License](https://img.shields.io/github/license/begeistert/AVR8Sharp)](https://github.com/begeistert/AVR8Sharp/blob/main/LICENSE)
 
 **AVR8Sharp** is a .NET library that emulates the AVR 8-bit microcontroller family. It is a port of the [avr8js](https://github.com/wokwi/avr8js) library originally written in TypeScript, with additional accuracy fixes and C#-specific optimizations.
 

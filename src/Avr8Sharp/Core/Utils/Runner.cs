@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using AVR8Sharp.Core;
 using AVR8Sharp.Core.Decoders;
@@ -47,19 +48,30 @@ public class AvrRunner(byte[] program, int sramBytes)
 	{
 		var flashSize = Cpu.ProgBytes.Length;
 		var target = new byte[flashSize];
-		foreach (var line in source.Split ('\n')) {
-			var trimmedLine = line.Trim();
-			if (string.IsNullOrEmpty(trimmedLine) || trimmedLine[0] != ':' ||
-			    trimmedLine.Substring(7, 2) != "00") continue;
-			var bytes = Convert.ToInt32 (trimmedLine.Substring (1, 2), 16);
-			var addr = Convert.ToInt32 (trimmedLine.Substring (3, 4), 16);
 
-			for (var i = 0; i < bytes; i++) {
-				if (addr + i < target.Length) {
-					target[addr + i] = Convert.ToByte (trimmedLine.Substring (9 + i * 2, 2), 16);
+		foreach (var line in source.AsSpan().EnumerateLines())
+		{
+			var trimmedLine = line.Trim();
+
+			if (trimmedLine.Length < 11 || trimmedLine[0] != ':') continue;
+
+			if (trimmedLine.Slice(7, 2) is not "00") continue;
+
+			var bytes = int.Parse(trimmedLine.Slice(1, 2), NumberStyles.HexNumber);
+
+			if (trimmedLine.Length < 11 + (bytes * 2)) continue;
+
+			var addr = int.Parse(trimmedLine.Slice(3, 4), NumberStyles.HexNumber);
+
+			for (var i = 0; i < bytes; i++)
+			{
+				if (addr + i < target.Length)
+				{
+					target[addr + i] = byte.Parse(trimmedLine.Slice(9 + i * 2, 2), NumberStyles.HexNumber);
 				}
 			}
 		}
+
 		Cpu.LoadProgram (target);
 	}
 
