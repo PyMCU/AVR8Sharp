@@ -1,4 +1,4 @@
-using AVR8Sharp.Core.Cpu;
+using AVR8Sharp.Core;
 
 namespace AVR8Sharp.Core.Peripherals;
 
@@ -219,7 +219,7 @@ public class AvrTimer
             tovUpdateMode: TovUpdateMode.Top, flags: OC_TOGGLE),
     ];
 
-    private readonly Cpu.Cpu _cpu;
+    private readonly Cpu _cpu;
     private readonly AvrTimerConfig _config;
 
     private readonly int _max;
@@ -326,7 +326,7 @@ public class AvrTimer
         get { return _tcnt; }
     }
 
-    public AvrTimer(Cpu.Cpu cpu, AvrTimerConfig config)
+    public AvrTimer(Cpu cpu, AvrTimerConfig config)
     {
         _cpu = cpu;
         _config = config;

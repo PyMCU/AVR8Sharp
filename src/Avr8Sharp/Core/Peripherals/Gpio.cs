@@ -1,4 +1,4 @@
-using AVR8Sharp.Core.Cpu;
+using AVR8Sharp.Core;
 
 namespace AVR8Sharp.Core.Peripherals;
 
@@ -141,7 +141,7 @@ public class AvrIoPort
 	private readonly List<AvrInterruptConfig?> _externalInts = [];
 	public event Action<byte, byte>? OnGpioChange;
 	private readonly AvrInterruptConfig? _pcint;
-	private readonly Cpu.Cpu _cpu;
+	private readonly Cpu _cpu;
 	private readonly AvrPortConfig _portConfig;
 	private int _pinValue;
 	private byte _overrideMask = 0xff;
@@ -156,7 +156,7 @@ public class AvrIoPort
 	
 	public Action<byte, PinOverrideMode> TimerOverridePin { get; set; }
 
-	public AvrIoPort (Cpu.Cpu cpu, AvrPortConfig portConfig)
+	public AvrIoPort (Cpu cpu, AvrPortConfig portConfig)
 	{
 		_cpu = cpu;
 		_portConfig = portConfig;

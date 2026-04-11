@@ -1,10 +1,9 @@
 using AVR8Sharp.Core;
-using AVR8Sharp.Core.Cpu;
-using AVR8Sharp.Core.Cpu.Decoders;
+using AVR8Sharp.Core.Decoders;
 using AVR8Sharp.Core.Peripherals;
 using AVR8Sharp.Core.Utils;
 using Avr8Sharp.TestKit.Probes;
-using AvrCpu = AVR8Sharp.Core.Cpu.Cpu;
+using AvrCpu = AVR8Sharp.Core.Cpu;
 
 namespace Avr8Sharp.TestKit;
 

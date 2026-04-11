@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace AVR8Sharp.Core.Cpu;
+namespace AVR8Sharp.Core;
 
 public static class Opcodes
 {

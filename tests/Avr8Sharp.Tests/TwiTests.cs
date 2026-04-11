@@ -1,6 +1,5 @@
 using AVR8Sharp.Core.Peripherals;
 using Avr8Sharp.Tests.Utils;
-using AVR8Sharp.Tests.Utils;
 using Moq;
 
 namespace Avr8Sharp.Tests;

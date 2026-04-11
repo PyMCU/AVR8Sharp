@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
-using AVR8Sharp.Core.Cpu.Decoders;
+using AVR8Sharp.Core;
+using AVR8Sharp.Core.Decoders;
 
 namespace AVR8Sharp.Core.Utils;
 
@@ -7,7 +8,7 @@ public enum DecoderType { Switch, Lut, NativeLut }
 
 public class AvrRunner(byte[] program, int sramBytes)
 {
-	public readonly Cpu.Cpu Cpu = new(program, sramBytes);
+	public readonly Cpu Cpu = new(program, sramBytes);
 	private int _workUnitCycles = 500000;
 	
 	public uint Speed { get; private set; } = 16_000_000U;
@@ -62,7 +63,7 @@ public class AvrRunner(byte[] program, int sramBytes)
 		Cpu.LoadProgram (target);
 	}
 
-	public void Execute<TDecoder> (ref TDecoder decoder, Action<Cpu.Cpu> callback) where TDecoder : struct, IInstructionDecoder
+	public void Execute<TDecoder> (ref TDecoder decoder, Action<Cpu> callback) where TDecoder : struct, IInstructionDecoder
 	{
 		var cyclesToRun = Cpu.Cycles + _workUnitCycles;
 		while (Cpu.Cycles < cyclesToRun) {

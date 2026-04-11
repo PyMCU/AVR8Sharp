@@ -215,7 +215,7 @@ public class Timer : AvrTestBase
 	public void Timer0Override ()
 	{
 		// The following values correspond ATtiny85 config:
-		Cpu = new AVR8Sharp.Core.Cpu.Cpu (new ushort[0x1000]);
+		Cpu = new AVR8Sharp.Core.Cpu (new ushort[0x1000]);
 		var newConfiguration = AvrTimer.Timer0Config.CreateNew (tov: 2, ocfa: 2, ocfb: 8, toie: 2, ociea: 16, ocieb: 8);
 		var timer = new AvrTimer (Cpu, newConfiguration);
 		
@@ -887,7 +887,7 @@ public class Timer : AvrTestBase
         NOP   ; TCNT0 will be 0xff
         NOP   ; TCNT0 will be 0xfe again (end of test)
 ").Compile();
-			Cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
+			Cpu = new AVR8Sharp.Core.Cpu (program.Program);
 			var timer = new AvrTimer (Cpu, AvrTimer.Timer0Config);
 			
 			// Listen to Port D's internal callback
@@ -1355,7 +1355,7 @@ public class Timer : AvrTestBase
         NOP   ; TCNT1 will be 0x4a
 ").Compile();
 			
-			Cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
+			Cpu = new AVR8Sharp.Core.Cpu (program.Program);
 			var timer = new AvrTimer (Cpu, AvrTimer.Timer1Config);
 			
 			// Listen to Port D's internal callback
@@ -1411,7 +1411,7 @@ public class Timer : AvrTestBase
         NOP   ; TCNT1 will be 0x4a
 ").Compile();
 			
-			Cpu = new AVR8Sharp.Core.Cpu.Cpu (program.Program);
+			Cpu = new AVR8Sharp.Core.Cpu (program.Program);
 			var timer = new AvrTimer (Cpu, AvrTimer.Timer1Config.CreateNew (
 				ocrc: OCR1C,
 				ocfc: OCF1C,

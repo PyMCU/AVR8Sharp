@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Text;
 using AVR8Sharp.Core;
-using AVR8Sharp.Core.Cpu.Decoders;
+using AVR8Sharp.Core.Decoders;
 using AVR8Sharp.Core.Peripherals;
 using Newtonsoft.Json;
 namespace Avr8Sharp.Demo;

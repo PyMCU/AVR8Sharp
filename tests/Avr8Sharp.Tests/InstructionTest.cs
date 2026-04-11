@@ -7,11 +7,11 @@ public class Instruction : AvrTestBase
 {
 	protected override int FlashByteCount => 0x8000;
 
-	private AVR8Sharp.Core.Cpu.Decoders.SwitchDecoder decoder;
+	private AVR8Sharp.Core.Decoders.SwitchDecoder decoder;
 
 	protected override void SetupPeripherals()
 	{
-		decoder = new AVR8Sharp.Core.Cpu.Decoders.SwitchDecoder();
+		decoder = new AVR8Sharp.Core.Decoders.SwitchDecoder();
 	}
 	
 	[Test(Description = "Should execute ADC r0, r1 instruction when carry is on")]
@@ -239,7 +239,7 @@ public class Instruction : AvrTestBase
 	[Test (Description = "Should push 3-byte return address when executing CALL instruction on device with >128k flash")]
 	public void CALL_3Byte ()
 	{
-		Cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
+		Cpu = new AVR8Sharp.Core.Cpu(new ushort[0x20000]);
 		LoadProgram ([
 			"call 0xb8",
 		]);
@@ -394,7 +394,7 @@ public class Instruction : AvrTestBase
 	[Test (Description = "Should execute EIJMP instruction")]
 	public void EIJMP ()
 	{
-		Cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
+		Cpu = new AVR8Sharp.Core.Cpu(new ushort[0x20000]);
 		LoadProgram ([
 			"eijmp",
 		]);
@@ -411,7 +411,7 @@ public class Instruction : AvrTestBase
 	[Test (Description = "Should execute ELPM instruction")]
 	public void ELPM ()
 	{
-		Cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
+		Cpu = new AVR8Sharp.Core.Cpu(new ushort[0x20000]);
 		LoadProgram ([
 			"elpm",
 		]);
@@ -430,7 +430,7 @@ public class Instruction : AvrTestBase
 	[Test (Description = "Should execute ELPM r5, Z instruction")]
 	public void ELPM_Register ()
 	{
-		Cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
+		Cpu = new AVR8Sharp.Core.Cpu(new ushort[0x20000]);
 		LoadProgram ([
 			"elpm r5, Z",
 		]);
@@ -449,7 +449,7 @@ public class Instruction : AvrTestBase
 	[Test (Description = "Should execute ELPM r6, Z+ instruction")]
 	public void ELPM_Register_PostIncrement ()
 	{
-		Cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
+		Cpu = new AVR8Sharp.Core.Cpu(new ushort[0x20000]);
 		LoadProgram ([
 			"elpm r6, Z+",
 		]);
@@ -470,7 +470,7 @@ public class Instruction : AvrTestBase
 	[Test (Description = "Should clamp RAMPZ when executing ELPM r6, Z+ instruction")]
 	public void ELPM_Register_PostIncrement_RAMPZ ()
 	{
-		Cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
+		Cpu = new AVR8Sharp.Core.Cpu(new ushort[0x20000]);
 		LoadProgram ([
 			"elpm r6, Z+",
 		]);
@@ -506,7 +506,7 @@ public class Instruction : AvrTestBase
 	[Test (Description = "Should push 3-byte return address when executing ICALL instruction on device with >128k flash")]
 	public void ICALL_3Byte ()
 	{
-		Cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
+		Cpu = new AVR8Sharp.Core.Cpu(new ushort[0x20000]);
 		LoadProgram ([
 			"icall",
 		]);
@@ -894,7 +894,7 @@ public class Instruction : AvrTestBase
 	[Test (Description = "Should execute LPM instruction")]
 	public void LPM ()
 	{
-		Cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
+		Cpu = new AVR8Sharp.Core.Cpu(new ushort[0x20000]);
 		LoadProgram ([
 			"lpm",
 		]);
@@ -1213,7 +1213,7 @@ public class Instruction : AvrTestBase
 	[Test (Description = "Should push 3-byte return address when executing RCALL instruction on device with >128k flash")]
 	public void RCALL_3Byte ()
 	{
-		Cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
+		Cpu = new AVR8Sharp.Core.Cpu(new ushort[0x20000]);
 		LoadProgram ([
 			"rcall 6"
 		]);
@@ -1250,7 +1250,7 @@ public class Instruction : AvrTestBase
 	[Test (Description = "Should execute `RET` instruction on device with >128k flash")]
 	public void RET_3Byte ()
 	{
-		Cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
+		Cpu = new AVR8Sharp.Core.Cpu(new ushort[0x20000]);
 		LoadProgram ([
 			"ret",
 		]);
@@ -1289,7 +1289,7 @@ public class Instruction : AvrTestBase
 	[Test (Description = "Should execute `RETI` instruction on device with >128k flash")]
 	public void RETI_3Byte ()
 	{
-		Cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x20000]);
+		Cpu = new AVR8Sharp.Core.Cpu(new ushort[0x20000]);
 		LoadProgram ([
 			"reti",
 		]);

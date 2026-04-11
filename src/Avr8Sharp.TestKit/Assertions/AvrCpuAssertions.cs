@@ -1,7 +1,7 @@
 using FluentAssertions;
 using FluentAssertions.Execution;
 using FluentAssertions.Primitives;
-using AvrCpu = AVR8Sharp.Core.Cpu.Cpu;
+using AvrCpu = AVR8Sharp.Core.Cpu;
 
 namespace Avr8Sharp.TestKit.Assertions;
 

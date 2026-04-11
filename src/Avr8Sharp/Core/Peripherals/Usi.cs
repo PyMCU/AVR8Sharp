@@ -1,4 +1,4 @@
-using AVR8Sharp.Core.Cpu;
+using AVR8Sharp.Core;
 
 namespace AVR8Sharp.Core.Peripherals;
 
@@ -42,7 +42,7 @@ public class AvrUsi
         enableMask: USIOIE
     );
 
-    private readonly Cpu.Cpu _cpu;
+    private readonly Cpu _cpu;
     private readonly AvrIoPort _port;
     private readonly int _dataPin;
     private readonly int _clockPin;
@@ -56,7 +56,7 @@ public class AvrUsi
     private readonly ushort _PIN;
     private readonly ushort _PORT;
 
-    public AvrUsi(Cpu.Cpu cpu, AvrIoPort port, int portPin, int dataPin, int clockPin)
+    public AvrUsi(Cpu cpu, AvrIoPort port, int portPin, int dataPin, int clockPin)
     {
         _cpu = cpu;
         _port = port;

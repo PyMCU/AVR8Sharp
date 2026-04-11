@@ -1,13 +1,13 @@
 namespace Avr8Sharp.Tests.Utils;
 
-public class TestProgramRunner(AVR8Sharp.Core.Cpu.Cpu cpu, Action<AVR8Sharp.Core.Cpu.Cpu>? onBreak = null)
+public class TestProgramRunner(AVR8Sharp.Core.Cpu cpu, Action<AVR8Sharp.Core.Cpu>? onBreak = null)
 {
 	private const int BREAK_OPCODE = 0x9598;
 	
-	private static readonly Action<AVR8Sharp.Core.Cpu.Cpu> DefaultOnBreak = (cpu) => throw new Exception("BREAK instruction encountered");
+	private static readonly Action<AVR8Sharp.Core.Cpu> DefaultOnBreak = (cpu) => throw new Exception("BREAK instruction encountered");
 
-	private readonly Action<AVR8Sharp.Core.Cpu.Cpu> _onBreak = onBreak ?? DefaultOnBreak;
-	private AVR8Sharp.Core.Cpu.Decoders.SwitchDecoder _decoder = new();
+	private readonly Action<AVR8Sharp.Core.Cpu> _onBreak = onBreak ?? DefaultOnBreak;
+	private AVR8Sharp.Core.Decoders.SwitchDecoder _decoder = new();
 
 	public void RunInstructions (int count)
 	{
@@ -22,7 +22,7 @@ public class TestProgramRunner(AVR8Sharp.Core.Cpu.Cpu cpu, Action<AVR8Sharp.Core
 		}
 	}
 
-	private void RunUntil (Func<AVR8Sharp.Core.Cpu.Cpu, bool> predicate, int maxInstructions = 5000)
+	private void RunUntil (Func<AVR8Sharp.Core.Cpu, bool> predicate, int maxInstructions = 5000)
 	{
 		for (var i = 0; i < maxInstructions; i++) {
 			if (cpu.ProgramMemory[cpu.Pc] == BREAK_OPCODE)

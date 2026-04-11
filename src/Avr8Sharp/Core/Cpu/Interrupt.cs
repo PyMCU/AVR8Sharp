@@ -1,4 +1,4 @@
-namespace AVR8Sharp.Core.Cpu;
+namespace AVR8Sharp.Core;
 
 public static class AvrInterrupt
 {

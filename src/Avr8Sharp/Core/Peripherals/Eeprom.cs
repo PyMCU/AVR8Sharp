@@ -1,4 +1,4 @@
-using AVR8Sharp.Core.Cpu;
+using AVR8Sharp.Core;
 
 namespace AVR8Sharp.Core.Peripherals;
 
@@ -28,7 +28,7 @@ public class AvrEeprom
     readonly AvrInterruptConfig _eer;
     readonly IEepromBackend _backend;
 
-    public AvrEeprom(Cpu.Cpu cpu, IEepromBackend backend, AvrEepromConfig? config = null)
+    public AvrEeprom(Cpu cpu, IEepromBackend backend, AvrEepromConfig? config = null)
     {
         _backend = backend;
         _config = config ?? EepromConfig;

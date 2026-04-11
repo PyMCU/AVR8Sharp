@@ -1,5 +1,5 @@
 using System.Text;
-using AVR8Sharp.Core.Cpu;
+using AVR8Sharp.Core;
 
 namespace AVR8Sharp.Core.Peripherals;
 
@@ -55,7 +55,7 @@ public class AvrUsart
         { 9, 0x1ff }, // 9-bit mode: preserve bit 8 (RXB8)
     };
 
-    private readonly Cpu.Cpu _cpu;
+    private readonly Cpu _cpu;
     private readonly AvrUsartConfig _config;
     private readonly uint _freqHz;
 
@@ -156,7 +156,7 @@ public class AvrUsart
         get { return (_cpu.Mmio.Data[_config.UCSRC] & UCSRC_UPM0) != 0; }
     }
 
-    public AvrUsart(Cpu.Cpu cpu, AvrUsartConfig config, uint freqHz)
+    public AvrUsart(Cpu cpu, AvrUsartConfig config, uint freqHz)
     {
         _cpu = cpu;
         _config = config;

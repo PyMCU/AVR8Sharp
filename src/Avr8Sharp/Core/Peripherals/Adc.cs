@@ -1,4 +1,4 @@
-using AVR8Sharp.Core.Cpu;
+using AVR8Sharp.Core;
 using ADCMuxConfiguration = System.Collections.Generic.Dictionary<int, AVR8Sharp.Core.Peripherals.AdcMuxInput>;
 
 namespace AVR8Sharp.Core.Peripherals;
@@ -57,7 +57,7 @@ public class AvrAdc
     public const int REFS_MASK = 0x3;
     public const int REFS_SHIFT = 6;
 
-    readonly Cpu.Cpu _cpu;
+    readonly Cpu _cpu;
     bool _converting = false;
     int _conversionCycles = 25;
     readonly AvrAdcConfig _config;
@@ -147,7 +147,7 @@ public class AvrAdc
     /// </summary>
     public double TemperatureVoltage { get; set; } = 0.378125;
 
-    public AvrAdc(Cpu.Cpu cpu, AvrAdcConfig config)
+    public AvrAdc(Cpu cpu, AvrAdcConfig config)
     {
         _cpu = cpu;
         _config = config;

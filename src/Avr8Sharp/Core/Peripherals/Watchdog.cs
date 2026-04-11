@@ -1,4 +1,4 @@
-using AVR8Sharp.Core.Cpu;
+using AVR8Sharp.Core;
 
 namespace AVR8Sharp.Core.Peripherals;
 
@@ -29,7 +29,7 @@ public class AvrWatchdog
 
     readonly long _clockFrequency = 128_000;
 
-    private readonly Cpu.Cpu _cpu;
+    private readonly Cpu _cpu;
     private readonly AvrWatchdogConfig _config;
     private readonly AvrClock _clock;
 
@@ -58,7 +58,7 @@ public class AvrWatchdog
         }
     }
 
-    public AvrWatchdog(Cpu.Cpu cpu, AvrWatchdogConfig config, AvrClock clock)
+    public AvrWatchdog(Cpu cpu, AvrWatchdogConfig config, AvrClock clock)
     {
         _cpu = cpu;
         _clock = clock;
@@ -72,7 +72,7 @@ public class AvrWatchdog
             enableMask: WDTCSR_WDIE
         );
 
-        _cpu.OnWatchdogReset = () => { ResetWatchdog(); };
+        _cpu.OnWatchdogReset = ResetWatchdog;
 
         _cpu.Mmio.RegisterWrite(config.WDTCSR, (value, oldValue, _, _) =>
         {
@@ -93,12 +93,16 @@ public class AvrWatchdog
             }
 
             if (Enabled)
+            {
                 ResetWatchdog();
 
-            if (Enabled && !_scheduled)
-            {
-                _cpu.AddClockEvent(CheckWatchdog, _watchdogTimeout - _cpu.Cycles);
+                _cpu.UpdateClockEvent(CheckWatchdog, _watchdogTimeout - _cpu.Cycles);
                 _scheduled = true;
+            }
+            else if (_scheduled)
+            {
+                _cpu.ClearClockEvent(CheckWatchdog);
+                _scheduled = false;
             }
 
             _cpu.ClearInterruptByFlag(_watchdog, value);

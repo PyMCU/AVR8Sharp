@@ -1,7 +1,8 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using AVR8Sharp.Core;
 
-namespace AVR8Sharp.Core.Cpu.Decoders;
+namespace AVR8Sharp.Core.Decoders;
 
 public unsafe struct NativeLutDecoder : IInstructionDecoder
 {

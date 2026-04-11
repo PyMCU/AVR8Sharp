@@ -1,7 +1,7 @@
 using AVR8Sharp.Core.Peripherals;
 using Avr8Sharp.TestKit.Assertions;
 using Avr8Sharp.TestKit.Probes;
-using AvrCpu = AVR8Sharp.Core.Cpu.Cpu;
+using AvrCpu = AVR8Sharp.Core.Cpu;
 
 namespace Avr8Sharp.TestKit;
 

@@ -1,4 +1,4 @@
-using AVR8Sharp.Core.Cpu;
+using AVR8Sharp.Core;
 using Avr8Sharp.Tests.Utils;
 
 namespace Avr8Sharp.Tests;
@@ -11,7 +11,7 @@ public class Interrupt : AvrTestBase
 	[Test(Description = "The interrupt handler should be executed")]
 	public void Interrupt_Handler ()
 	{
-		Cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[0x8000])
+		Cpu = new AVR8Sharp.Core.Cpu(new ushort[0x8000])
 		{
 			Pc = 0x520
 		};
@@ -93,7 +93,7 @@ public class Interrupt : AvrTestBase
 		AvrInterrupt.OnBreakpoint = pc => capturedPc = pc;
 		try
 		{
-			var decoder = new AVR8Sharp.Core.Cpu.Decoders.SwitchDecoder();
+			var decoder = new AVR8Sharp.Core.Decoders.SwitchDecoder();
 			decoder.Decode(Cpu);
 			Assert.That(capturedPc, Is.Not.Null, "OnBreakpoint must be called by BREAK instruction");
 		}
@@ -113,7 +113,7 @@ public class Interrupt : AvrTestBase
 		AvrInterrupt.OnBreakpoint = pc => capturedPc = pc;
 		try
 		{
-			var decoder = new AVR8Sharp.Core.Cpu.Decoders.LutDecoder();
+			var decoder = new AVR8Sharp.Core.Decoders.LutDecoder();
 			decoder.Decode(Cpu);
 			Assert.That(capturedPc, Is.Not.Null);
 		}
@@ -133,7 +133,7 @@ public class Interrupt : AvrTestBase
 		AvrInterrupt.OnBreakpoint = pc => capturedPc = pc;
 		try
 		{
-			var decoder = new AVR8Sharp.Core.Cpu.Decoders.NativeLutDecoder();
+			var decoder = new AVR8Sharp.Core.Decoders.NativeLutDecoder();
 			decoder.Decode(Cpu);
 			Assert.That(capturedPc, Is.Not.Null);
 		}
@@ -152,7 +152,7 @@ public class Interrupt : AvrTestBase
 
 		Assert.DoesNotThrow(() =>
 		{
-			var decoder = new AVR8Sharp.Core.Cpu.Decoders.SwitchDecoder();
+			var decoder = new AVR8Sharp.Core.Decoders.SwitchDecoder();
 			decoder.Decode(Cpu);
 		});
 	}
@@ -170,7 +170,7 @@ public class Interrupt : AvrTestBase
 		AvrInterrupt.OnSleep = mode => capturedMode = mode;
 		try
 		{
-			var decoder = new AVR8Sharp.Core.Cpu.Decoders.SwitchDecoder();
+			var decoder = new AVR8Sharp.Core.Decoders.SwitchDecoder();
 			decoder.Decode(Cpu);
 			Assert.That(capturedMode, Is.Not.Null, "OnSleep must be called by SLEEP instruction");
 			Assert.That(capturedMode, Is.EqualTo(1), "Sleep mode bits SM2:SM1:SM0 must match SMCR");
@@ -192,7 +192,7 @@ public class Interrupt : AvrTestBase
 		AvrInterrupt.OnSleep = mode => capturedMode = mode;
 		try
 		{
-			var decoder = new AVR8Sharp.Core.Cpu.Decoders.LutDecoder();
+			var decoder = new AVR8Sharp.Core.Decoders.LutDecoder();
 			decoder.Decode(Cpu);
 			Assert.That(capturedMode, Is.Not.Null, "OnSleep must be called by SLEEP instruction in LutDecoder");
 			Assert.That(capturedMode, Is.EqualTo(2));
@@ -214,7 +214,7 @@ public class Interrupt : AvrTestBase
 		AvrInterrupt.OnSleep = mode => capturedMode = mode;
 		try
 		{
-			var decoder = new AVR8Sharp.Core.Cpu.Decoders.NativeLutDecoder();
+			var decoder = new AVR8Sharp.Core.Decoders.NativeLutDecoder();
 			decoder.Decode(Cpu);
 			Assert.That(capturedMode, Is.Not.Null, "OnSleep must be called by SLEEP instruction in NativeLutDecoder");
 			Assert.That(capturedMode, Is.EqualTo(3));
@@ -234,7 +234,7 @@ public class Interrupt : AvrTestBase
 
 		Assert.DoesNotThrow(() =>
 		{
-			var decoder = new AVR8Sharp.Core.Cpu.Decoders.SwitchDecoder();
+			var decoder = new AVR8Sharp.Core.Decoders.SwitchDecoder();
 			decoder.Decode(Cpu);
 		});
 	}

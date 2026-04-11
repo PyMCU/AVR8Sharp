@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 using AVR8Sharp.Core.Memory;
 using AVR8Sharp.Core.Peripherals;
 
-namespace AVR8Sharp.Core.Cpu;
+namespace AVR8Sharp.Core;
 
 public class Cpu
 {

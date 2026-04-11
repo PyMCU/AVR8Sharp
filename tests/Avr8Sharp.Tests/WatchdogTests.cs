@@ -265,4 +265,41 @@ public class Watchdog : AvrTestBase
            Assert.That(Cpu.ReadData(MCUSR), Is.EqualTo(WDRF), "WDRF flag must be set on Watchdog reset");
        });
     }
+
+	[Test(Description = "Should reschedule and fire earlier if the prescaler is shortened while already running")]
+	public void RescheduleOnPrescalerShortened()
+	{
+		// Configure the watchdog to run at 128ms (WDP2 | WDP1)
+		// 128ms * 16,000 cycles/ms = 2,048,000 cycles
+		Cpu.WriteData(WDTCSR, WDCE | WDE);
+		Cpu.WriteData(WDTCSR, WDE | WDP2 | WDP1);
+
+		Assert.Multiple(() => {
+			Assert.That(_watchdog.Enabled, Is.True);
+			Assert.That(_watchdog.Prescaler, Is.EqualTo(16384), "Prescaler should be 128ms equivalent");
+		});
+
+		// Advance 32ms (512,000 cycles).
+		// The Watchdog should not trigger yet (still ~1.5 million cycles left)
+		Cpu.Cycles += 16000 * 32;
+		Cpu.Tick();
+		Assert.That(Cpu.Pc, Is.Not.EqualTo(0), "CPU should NOT reset at 32ms");
+
+		// Lower the prescaler to minimum (16ms)
+		// 16ms * 16,000 cycles/ms = 256,000 cycles
+		Cpu.WriteData(WDTCSR, WDCE | WDE);
+		Cpu.WriteData(WDTCSR, WDE); // WDP = 0 (16ms)
+
+		// Advance 20ms.
+		// With the previous bug: The event would still be scheduled for the original 128ms (fails the test).
+		// With the fix: The event is rescheduled to trigger at 16ms from the last write.
+		Cpu.Cycles += 16000 * 20;
+		Cpu.Tick();
+
+		Assert.Multiple(() =>
+		{
+			Assert.That(Cpu.Pc, Is.EqualTo(0), "CPU should have reset because 20ms > new 16ms timeout");
+			Assert.That(Cpu.ReadData(MCUSR), Is.EqualTo(WDRF), "WDRF flag must be set");
+		});
+	}
 }

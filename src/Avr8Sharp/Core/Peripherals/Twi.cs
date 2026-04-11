@@ -1,4 +1,4 @@
-using AVR8Sharp.Core.Cpu;
+using AVR8Sharp.Core;
 
 namespace AVR8Sharp.Core.Peripherals;
 
@@ -56,7 +56,7 @@ public class AvrTwi
         TWAMR = 0xbd
     };
 
-    private readonly Cpu.Cpu _cpu;
+    private readonly Cpu _cpu;
     private readonly AvrTwiConfig _config;
     private readonly uint _freqHz;
 
@@ -90,7 +90,7 @@ public class AvrTwi
 
     public int Status => _cpu.Mmio.Data[_config.TWSR] & TWSR_TWS_MASK;
 
-    public AvrTwi(Cpu.Cpu cpu, AvrTwiConfig config, uint freqHz)
+    public AvrTwi(Cpu cpu, AvrTwiConfig config, uint freqHz)
     {
         _cpu = cpu;
         _config = config;

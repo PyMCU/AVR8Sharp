@@ -1,3 +1,5 @@
+using AVR8Sharp.Core;
+
 namespace AVR8Sharp.Core.Peripherals;
 
 public class AvrClock
@@ -19,7 +21,7 @@ public class AvrClock
     int _prescalerValue = 1;
     int _cyclesDelta = 0;
     readonly uint _baseFreqHz = 0;
-    readonly Cpu.Cpu _cpu;
+    readonly Cpu _cpu;
 
     public uint Frequency
     {
@@ -46,7 +48,7 @@ public class AvrClock
         get { return (uint)((_cpu.Cycles + _cyclesDelta) / (double)Frequency * 1e3); }
     }
 
-    public AvrClock(Cpu.Cpu cpu, uint baseFreqHz, AvrClockConfig clockConfig)
+    public AvrClock(Cpu cpu, uint baseFreqHz, AvrClockConfig clockConfig)
     {
         _baseFreqHz = baseFreqHz;
         _cpu = cpu;

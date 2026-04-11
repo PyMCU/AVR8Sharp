@@ -1,4 +1,4 @@
-using AVR8Sharp.Core.Cpu;
+using AVR8Sharp.Core;
 
 namespace AVR8Sharp.Core.Peripherals;
 
@@ -28,7 +28,7 @@ public class AvrSpi
 		SPDR = 0x4e
 	};
 	
-	readonly Cpu.Cpu _cpu;
+	readonly Cpu _cpu;
 	readonly AvrSpiConfig _config;
 	readonly uint _freqHz;
 	
@@ -86,7 +86,7 @@ public class AvrSpi
 		}
 	}
 
-	public AvrSpi (Cpu.Cpu cpu, AvrSpiConfig config, uint freqHz)
+	public AvrSpi (Cpu cpu, AvrSpiConfig config, uint freqHz)
 	{
 		_cpu = cpu;
 		_config = config;

@@ -1,4 +1,4 @@
-using AVR8Sharp.Core.Cpu;
+using AVR8Sharp.Core;
 using AVR8Sharp.Core.Peripherals;
 using NUnit.Framework;
 
@@ -55,14 +55,14 @@ public abstract class AvrTestBase
     protected const int SREG_H = 0b00100000;
     protected const int SREG_I = 0b10000000;
 
-    protected AVR8Sharp.Core.Cpu.Cpu Cpu;
+    protected AVR8Sharp.Core.Cpu Cpu;
     protected AvrClock Clock;
     protected const int DefaultFreq = 16_000_000;
 
     [SetUp]
     public void Setup()
     {
-        Cpu = new AVR8Sharp.Core.Cpu.Cpu(new ushort[FlashByteCount], SramByteCount);
+        Cpu = new AVR8Sharp.Core.Cpu(new ushort[FlashByteCount], SramByteCount);
         Clock = new AvrClock(Cpu, DefaultFreq, AvrClock.ClockConfig);
 
         SetupPeripherals();
