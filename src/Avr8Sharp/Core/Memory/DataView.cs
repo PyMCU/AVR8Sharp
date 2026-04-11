@@ -2,16 +2,9 @@ using System.Buffers.Binary;
 
 namespace Avr8Sharp.Core.Memory;
 
-public class DataView
+public class DataView(byte[] data)
 {
-    private readonly byte[] _data;
-
-    // Nota: Quité el 'ref'. En C#, los arreglos (byte[]) ya son tipos por referencia.
-    // Al pasar el arreglo normal, DataView y la clase principal apuntan a los mismos datos en memoria.
-    public DataView(byte[] data)
-    {
-        _data = data ?? throw new ArgumentNullException(nameof(data));
-    }
+    private readonly byte[] _data = data ?? throw new ArgumentNullException(nameof(data));
 
     public sbyte GetInt8(int byteOffset) 
         => (sbyte)_data[byteOffset];
@@ -21,7 +14,6 @@ public class DataView
 
     public short GetInt16(int byteOffset, bool littleEndian = false)
     {
-        // Creamos un Span al vuelo apuntando desde el offset indicado
         ReadOnlySpan<byte> span = _data.AsSpan(byteOffset);
         return littleEndian 
             ? BinaryPrimitives.ReadInt16LittleEndian(span) 
@@ -30,7 +22,7 @@ public class DataView
 
     public void SetInt16(int byteOffset, short value, bool littleEndian = false)
     {
-        Span<byte> span = _data.AsSpan(byteOffset);
+        var span = _data.AsSpan(byteOffset);
         if (littleEndian)
             BinaryPrimitives.WriteInt16LittleEndian(span, value);
         else
@@ -47,7 +39,7 @@ public class DataView
 
     public void SetUint16(int byteOffset, ushort value, bool littleEndian = false)
     {
-        Span<byte> span = _data.AsSpan(byteOffset);
+        var span = _data.AsSpan(byteOffset);
         if (littleEndian)
             BinaryPrimitives.WriteUInt16LittleEndian(span, value);
         else
