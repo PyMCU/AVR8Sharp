@@ -155,9 +155,15 @@ public class AvrUsi
     private void UpdateOutput()
     {
         var oldValue = _cpu.Mmio.Data[_PORT];
-        var newValue = (_cpu.Mmio.Data[USIDR] & 0x80) != 0 ? oldValue | (1 << _dataPin) : oldValue & ~(1 << _dataPin);
+        var outgoingBitIsHigh = (_cpu.Mmio.Data[USIDR] & 0x80) != 0;
+        var pinMask = 1 << _dataPin;
+
+        var newValue = outgoingBitIsHigh ? oldValue | pinMask : oldValue & ~pinMask;
         _cpu.Mmio.WriteData(_PORT, (byte)newValue);
-        if ((newValue & 0x80) != 0 && (_cpu.Mmio.Data[_PIN] & 0x80) == 0)
+
+        var externalPinIsLow = (_cpu.Mmio.Data[_PIN] & pinMask) == 0;
+
+        if ((newValue & pinMask) != 0 && externalPinIsLow)
         {
             _cpu.Mmio.Data[USISR] |= USIDC;
         }
