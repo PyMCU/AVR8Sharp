@@ -44,7 +44,7 @@ public class AvrTwi
     // Slave transmit states
     const int STATUS_SLAVE_SLAR_ACK = 0xA8;      // SLA+R received, ACK returned
 
-    public static readonly AvrTwiConfig TwiConfig = new AvrTwiConfig
+    public static readonly AvrTwiConfig TwiConfig = new()
     {
         TwiInterrupt = 0x30,
 
@@ -86,15 +86,9 @@ public class AvrTwi
         }
     }
 
-    public long SclFrequency
-    {
-        get { return _freqHz / (16 + 2 * _cpu.Mmio.Data[_config.TWBR] * Prescaler); }
-    }
+    public long SclFrequency => _freqHz / (16 + 2 * _cpu.Mmio.Data[_config.TWBR] * Prescaler);
 
-    public int Status
-    {
-        get { return _cpu.Mmio.Data[_config.TWSR] & TWSR_TWS_MASK; }
-    }
+    public int Status => _cpu.Mmio.Data[_config.TWSR] & TWSR_TWS_MASK;
 
     public AvrTwi(Cpu.Cpu cpu, AvrTwiConfig config, uint freqHz)
     {
@@ -245,59 +239,52 @@ public class AvrTwi
     }
 }
 
-public class NoopTwiEventHandler : ITwiEventHandler
+public class NoopTwiEventHandler(AvrTwi twi) : ITwiEventHandler
 {
-    private readonly AvrTwi _twi;
-
-    public NoopTwiEventHandler(AvrTwi twi)
-    {
-        _twi = twi;
-    }
-
     public void Start(bool repeated)
     {
-        _twi.CompleteStart();
+        twi.CompleteStart();
     }
 
     public void Stop()
     {
-        _twi.CompleteStop();
+        twi.CompleteStop();
     }
 
-    public void ConnectToSlave(byte address, bool read)
+    public void ConnectToSlave(byte address, bool write)
     {
         // No device connected — always NACK
-        _twi.CompleteConnect(address, false);
+        twi.CompleteConnect(false);
     }
 
     public void WriteByte(byte data)
     {
-        _twi.CompleteWrite(data);
+        twi.CompleteWrite(false);
     }
 
     public void ReadByte(bool ack)
     {
-        _twi.CompleteRead(0xff);
+        twi.CompleteRead(0xff);
     }
 }
 
-public class AvrTwiConfig
+public struct AvrTwiConfig
 {
-    public byte TwiInterrupt { get; set; }
+    public byte TwiInterrupt { get; init; }
 
-    public byte TWBR { get; set; }
-    public byte TWCR { get; set; }
-    public byte TWSR { get; set; }
-    public byte TWDR { get; set; }
-    public byte TWAR { get; set; }
-    public byte TWAMR { get; set; }
+    public byte TWBR { get; init; }
+    public byte TWCR { get; init; }
+    public byte TWSR { get; init; }
+    public byte TWDR { get; init; }
+    public byte TWAR { get; init; }
+    public byte TWAMR { get; init; }
 }
 
 public interface ITwiEventHandler
 {
     void Start(bool repeated);
     void Stop();
-    void ConnectToSlave(byte address, bool read);
+    void ConnectToSlave(byte address, bool write);
     void WriteByte(byte data);
     void ReadByte(bool ack);
 }
