@@ -1,5 +1,7 @@
 #nullable enable
 using System.Runtime.CompilerServices;
+using Avr8Sharp.Core.Memory;
+
 namespace AVR8Sharp.Core.Memory;
 
 public class MmioController
