@@ -58,12 +58,13 @@ public class MmioController
     public void WriteData(ushort address, byte value, byte mask = 0xff)
     {
         var hook = _writeHooks[address];
+        var oldValue = Data[address];
         
-        if (hook != null && hook(value, Data[address], address, mask))
+        if (hook != null && hook(value, oldValue, address, mask))
         {
             return;
         }
 
-        Data[address] = value;
+        Data[address] = (byte)((oldValue & ~mask) | (value & mask));
     }
 }
