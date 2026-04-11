@@ -228,4 +228,51 @@ public class Watchdog
 		Assert.That(cpu.Pc, Is.Not.EqualTo(0));
 		Assert.That(cpu.ReadData(R20), Is.EqualTo(55)); // assert that `ldi r20, 55` ran
 	}
+
+	[Test(Description = "Should not schedule duplicate CheckWatchdog events on consecutive WDTCSR writes")]
+    public void NoDuplicateEventsOnConsecutiveWrites()
+    {
+       var program = new AsmProgram (@$"
+    _REPLACE WDTCSR, {WDTCSR}
+
+    ldi r16, {WDE | WDCE}
+    sts WDTCSR, r16
+    ldi r16, {WDE}
+    sts WDTCSR, r16
+    
+    ldi r16, {WDE | WDCE}
+    sts WDTCSR, r16
+    ldi r16, {WDE}
+    sts WDTCSR, r16
+    
+    ldi r16, {WDE | WDCE}
+    sts WDTCSR, r16
+    ldi r16, {WDE}
+    sts WDTCSR, r16
+
+    nop
+    break
+").Compile();
+
+       var cpu = new AVR8Sharp.Core.Cpu.Cpu(program.Program);
+       var clock = new AVR8Sharp.Core.Peripherals.AvrClock(cpu, 16_000_000, AVR8Sharp.Core.Peripherals.AvrClock.ClockConfig);
+       var watchdog = new AVR8Sharp.Core.Peripherals.AvrWatchdog(cpu, AVR8Sharp.Core.Peripherals.AvrWatchdog.WatchdogConfig, clock);
+       var runner = new TestProgramRunner(cpu);
+
+       runner.RunInstructions(12);
+       Assert.That(watchdog.Enabled, Is.True);
+
+       cpu.Cycles += 16000 * 8;
+       runner.RunInstructions(1);
+       Assert.That(cpu.Pc, Is.Not.EqualTo(0), "CPU should not reset early from duplicate old events");
+
+       cpu.Cycles += 16000 * 8;
+       cpu.Tick();
+
+       Assert.Multiple(() =>
+       {
+           Assert.That(cpu.Pc, Is.EqualTo(0), "CPU should reset on timeout");
+           Assert.That(cpu.ReadData(MCUSR), Is.EqualTo(WDRF), "WDRF flag must be set on Watchdog reset");
+       });
+    }
 }

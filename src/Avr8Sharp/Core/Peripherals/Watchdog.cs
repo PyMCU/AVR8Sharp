@@ -98,6 +98,7 @@ public class AvrWatchdog
             if (Enabled && !_scheduled)
             {
                 _cpu.AddClockEvent(CheckWatchdog, _watchdogTimeout - _cpu.Cycles);
+                _scheduled = true;
             }
 
             _cpu.ClearInterruptByFlag(_watchdog, value);
