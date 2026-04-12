@@ -166,6 +166,23 @@ public class AvrCpuAssertions : ReferenceTypeAssertions<AvrCpu, AvrCpuAssertions
     }
 
     /// <summary>
+    /// Asserts the SREG sign flag (S, bit 4). S = N ⊕ V.
+    /// Pass <c>false</c> to assert it is clear.
+    /// </summary>
+    public AndConstraint<AvrCpuAssertions> HaveSignFlag(
+        bool expected = true, string because = "", params object[] becauseArgs)
+    {
+        Execute.Assertion
+            .BecauseOf(because, becauseArgs)
+            .ForCondition(SregBit(4) == expected)
+            .FailWith(expected
+                ? "Expected SREG sign flag (S) to be set{reason}, but it was clear."
+                : "Expected SREG sign flag (S) to be clear{reason}, but it was set.");
+
+        return new AndConstraint<AvrCpuAssertions>(this);
+    }
+
+    /// <summary>
     /// Asserts the SREG half-carry flag (H, bit 5).
     /// Pass <c>false</c> to assert it is clear.
     /// </summary>
@@ -178,6 +195,23 @@ public class AvrCpuAssertions : ReferenceTypeAssertions<AvrCpu, AvrCpuAssertions
             .FailWith(expected
                 ? "Expected SREG half-carry flag (H) to be set{reason}, but it was clear."
                 : "Expected SREG half-carry flag (H) to be clear{reason}, but it was set.");
+
+        return new AndConstraint<AvrCpuAssertions>(this);
+    }
+
+    /// <summary>
+    /// Asserts the SREG bit-copy flag (T, bit 6).
+    /// Pass <c>false</c> to assert it is clear.
+    /// </summary>
+    public AndConstraint<AvrCpuAssertions> HaveTFlag(
+        bool expected = true, string because = "", params object[] becauseArgs)
+    {
+        Execute.Assertion
+            .BecauseOf(because, becauseArgs)
+            .ForCondition(SregBit(6) == expected)
+            .FailWith(expected
+                ? "Expected SREG T flag (bit 6) to be set{reason}, but it was clear."
+                : "Expected SREG T flag (bit 6) to be clear{reason}, but it was set.");
 
         return new AndConstraint<AvrCpuAssertions>(this);
     }
