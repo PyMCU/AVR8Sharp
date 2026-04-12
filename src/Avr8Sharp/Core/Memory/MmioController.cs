@@ -59,7 +59,7 @@ public class MmioController
     {
         var hook = _writeHooks[address];
         var oldValue = Data[address];
-        
+
         if (hook != null && hook(value, oldValue, address, mask))
         {
             return;
