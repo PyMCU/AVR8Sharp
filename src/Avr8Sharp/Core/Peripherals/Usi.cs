@@ -26,7 +26,7 @@ public class AvrUsi
     const int USIOIE = 1 << 6;
     const int USISIE = 1 << 7;
 
-    static AvrInterruptConfig _start = new AvrInterruptConfig(
+    private static readonly AvrInterruptConfig _start = new AvrInterruptConfig(
         address: 0xd,
         flagRegister: USISR,
         flagMask: USISIF,
@@ -34,7 +34,7 @@ public class AvrUsi
         enableMask: USISIE
     );
 
-    private static AvrInterruptConfig _overflow = new AvrInterruptConfig(
+    private static readonly AvrInterruptConfig _overflow = new AvrInterruptConfig(
         address: 0xe,
         flagRegister: USISR,
         flagMask: USIOIF,
