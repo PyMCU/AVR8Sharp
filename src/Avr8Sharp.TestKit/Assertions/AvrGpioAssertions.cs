@@ -110,7 +110,7 @@ public class AvrGpioAssertions : ReferenceTypeAssertions<AvrIoPort, AvrGpioAsser
             Execute.Assertion
                 .BecauseOf(because, becauseArgs)
                 .ForCondition(state == PinState.High)
-                .FailWith("Expected pin {0} to be High{reason}, but its state was {1}.", pin, state); // 2. Agregamos {reason}
+                .FailWith("Expected pin {0} to be High{reason}, but its state was {1}.", pin, state);
         }
 
         return new AndConstraint<AvrGpioAssertions>(this);

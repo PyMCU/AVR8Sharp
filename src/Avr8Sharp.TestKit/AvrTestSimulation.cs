@@ -40,11 +40,7 @@ public class AvrTestSimulation
 
     public AvrCpu Cpu => Runner.Cpu;
 
-    /// <summary>
-    /// The instruction decoder used by all <c>Run*</c> methods.
-    /// Replace to swap decoder implementations (e.g. <see cref="LutDecoder"/>).
-    /// </summary>
-    public IInstructionDecoder Decoder = new SwitchDecoder();
+    private NativeLutDecoder _decoder;
 
     public byte[] Data => Runner.Cpu.Mmio.Data;
     public AvrMemoryView Memory => new(Runner.Cpu.Mmio.Data);
@@ -190,7 +186,7 @@ public class AvrTestSimulation
     {
         try
         {
-            Decoder.Decode(Runner.Cpu);
+            _decoder.Decode(Runner.Cpu);
             Runner.Cpu.Tick();
         }
         catch (IndexOutOfRangeException)
