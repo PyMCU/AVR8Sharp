@@ -40,7 +40,7 @@ public class AvrTestSimulation
 
     public AvrCpu Cpu => Runner.Cpu;
 
-    private NativeLutDecoder _decoder;
+    private LutDecoder _decoder;
 
     public byte[] Data => Runner.Cpu.Mmio.Data;
     public AvrMemoryView Memory => new(Runner.Cpu.Mmio.Data);
@@ -48,6 +48,7 @@ public class AvrTestSimulation
     protected AvrTestSimulation(int flashSize, int sramBytes)
     {
         Runner = new AvrRunner(new byte[flashSize], sramBytes);
+        _decoder = new LutDecoder();
     }
 
     /// <summary>Creates a new blank simulation with the given flash and SRAM sizes.</summary>
