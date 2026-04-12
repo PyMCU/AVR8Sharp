@@ -26,7 +26,7 @@ public sealed class ArduinoMegaSimulation : AvrTestSimulation
 {
     // ATmega2560: 256 KB flash, 8 KB SRAM, 16 MHz
     private const int Flash = 0x40000;
-    private const int Sram  = 8192;
+    private const int Sram  = 0x10000; // RAMEND
     private const uint Frequency = 16_000_000;
 
     // ── ATmega2560 Timer interrupt vectors (JMP/4-byte vectors) ──────────────
@@ -112,22 +112,22 @@ public sealed class ArduinoMegaSimulation : AvrTestSimulation
         toie: 1, ociea: 2, ocieb: 4, ociec: 8,
         icf: 0x20, icie: 0x20);
 
-    // USART3 — registers 0x130–0x136
-    private static readonly AvrUsartConfig Mega2560Usart3Config = new AvrUsartConfig
+    // USART0 — same I/O registers as ATmega328P (0xC0–0xC6) but different interrupt vectors
+    private static readonly AvrUsartConfig Mega2560Usart0Config = new AvrUsartConfig
     {
-        RxCompleteInterrupt        = 0xD8,  // vector 54
-        DataRegisterEmptyInterrupt = 0xDC,  // vector 55
-        TxCompleteInterrupt        = 0xE0,  // vector 56
-        UCSRA = 0x130, UCSRB = 0x131, UCSRC = 0x132,
-        UBRRL = 0x134, UBRRH = 0x135, UDR   = 0x136,
+        RxCompleteInterrupt        = 0x32,  // Vector 26 — byte addr 0x0064
+        DataRegisterEmptyInterrupt = 0x34,  // Vector 27
+        TxCompleteInterrupt        = 0x36,  // Vector 28
+        UCSRA = 0xC0, UCSRB = 0xC1, UCSRC = 0xC2,
+        UBRRL = 0xC4, UBRRH = 0xC5, UDR   = 0xC6,
     };
 
     // USART1 — registers 0xC8–0xCE
     private static readonly AvrUsartConfig Mega2560Usart1Config = new AvrUsartConfig
     {
-        RxCompleteInterrupt        = 0x90,  // vector 36
-        DataRegisterEmptyInterrupt = 0x94,  // vector 37
-        TxCompleteInterrupt        = 0x98,  // vector 38
+        RxCompleteInterrupt        = 0x48,  // Vector 37
+        DataRegisterEmptyInterrupt = 0x4A,  // Vector 38
+        TxCompleteInterrupt        = 0x4C,  // Vector 39
         UCSRA = 0xC8, UCSRB = 0xC9, UCSRC = 0xCA,
         UBRRL = 0xCC, UBRRH = 0xCD, UDR   = 0xCE,
     };
@@ -135,11 +135,21 @@ public sealed class ArduinoMegaSimulation : AvrTestSimulation
     // USART2 — registers 0xD0–0xD6
     private static readonly AvrUsartConfig Mega2560Usart2Config = new AvrUsartConfig
     {
-        RxCompleteInterrupt        = 0xCC,  // vector 51
-        DataRegisterEmptyInterrupt = 0xD0,  // vector 52
-        TxCompleteInterrupt        = 0xD4,  // vector 53
+        RxCompleteInterrupt        = 0x66,  // Vector 51 — word addr (byte 0xCC)
+        DataRegisterEmptyInterrupt = 0x68,  // Vector 52 — word addr (byte 0xD0)
+        TxCompleteInterrupt        = 0x6A,  // Vector 53 — word addr (byte 0xD4)
         UCSRA = 0xD0, UCSRB = 0xD1, UCSRC = 0xD2,
         UBRRL = 0xD4, UBRRH = 0xD5, UDR   = 0xD6,
+    };
+
+    // USART3 — registers 0x130–0x136
+    private static readonly AvrUsartConfig Mega2560Usart3Config = new AvrUsartConfig
+    {
+        RxCompleteInterrupt        = 0x6C,  // Vector 55
+        DataRegisterEmptyInterrupt = 0x6E,  // Vector 56
+        TxCompleteInterrupt        = 0x70,  // Vector 57
+        UCSRA = 0x130, UCSRB = 0x131, UCSRC = 0x132,
+        UBRRL = 0x134, UBRRH = 0x135, UDR   = 0x136,
     };
 
     // ── GPIO ports ────────────────────────────────────────────────────────────
@@ -213,7 +223,7 @@ public sealed class ArduinoMegaSimulation : AvrTestSimulation
         AddTimer(Mega2560Timer4Config, out var t4); Timer4 = t4;
         AddTimer(Mega2560Timer5Config, out var t5); Timer5 = t5;
 
-        AddUsart(AvrUsart.Usart0Config,    out var s0); Serial0 = s0;
+        AddUsart(Mega2560Usart0Config,     out var s0); Serial0 = s0;
         AddUsart(Mega2560Usart1Config,     out var s1); Serial1 = s1;
         AddUsart(Mega2560Usart2Config,     out var s2); Serial2 = s2;
         AddUsart(Mega2560Usart3Config,     out var s3); Serial3 = s3;
