@@ -92,6 +92,46 @@ public class AvrGpioAssertions : ReferenceTypeAssertions<AvrIoPort, AvrGpioAsser
         return new AndConstraint<AvrGpioAssertions>(this);
     }
 
+    // ── Multi-pin assertions ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Asserts that every pin in <paramref name="pins"/> is driven <c>High</c>.
+    /// All failures are reported in a single assertion scope.
+    /// </summary>
+    public AndConstraint<AvrGpioAssertions> HavePinsHigh(
+        params int[] pins)
+    {
+        using var scope = new AssertionScope();
+        foreach (var pin in pins)
+        {
+            var state = Subject.GetPinState((byte)pin);
+            Execute.Assertion
+                .ForCondition(state == PinState.High)
+                .FailWith("Expected pin {0} to be High, but its state was {1}.", pin, state);
+        }
+
+        return new AndConstraint<AvrGpioAssertions>(this);
+    }
+
+    /// <summary>
+    /// Asserts that every pin in <paramref name="pins"/> is driven <c>Low</c>.
+    /// All failures are reported in a single assertion scope.
+    /// </summary>
+    public AndConstraint<AvrGpioAssertions> HavePinsLow(
+        params int[] pins)
+    {
+        using var scope = new AssertionScope();
+        foreach (var pin in pins)
+        {
+            var state = Subject.GetPinState((byte)pin);
+            Execute.Assertion
+                .ForCondition(state == PinState.Low)
+                .FailWith("Expected pin {0} to be Low, but its state was {1}.", pin, state);
+        }
+
+        return new AndConstraint<AvrGpioAssertions>(this);
+    }
+
     // ── Port-wide assertions ──────────────────────────────────────────────────
 
     /// <summary>
