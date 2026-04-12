@@ -55,22 +55,25 @@ public class ArduinoMegaSamples
     ///     Serial.begin(115200);  Serial.println("ch0");
     ///     Serial1.begin(115200); Serial1.println("ch1");
     ///     Serial2.begin(115200); Serial2.println("ch2");
+    ///     Serial3.begin(115200); Serial3.println("ch3");
     /// }
     /// void loop() {}
     /// </code>
     /// </para>
     /// </summary>
-    [Test, Ignore("Replace placeholder hex with a compiled multi-serial sketch")]
+    [Test]
     public void Serial_AllChannels_ShouldPrintChannelIds()
     {
         var mega = new ArduinoMegaSimulation();
-        mega.WithHex(Placeholders.Break);   // TODO: mega.WithHex(File.ReadAllText("firmware/multi_serial.hex"))
+        var hexPath = Path.Combine(TestContext.CurrentContext.TestDirectory, "Firmware", "multi_serial.hex");
+        mega.WithHex(File.ReadAllText(hexPath));
 
         mega.RunMilliseconds(100);
 
         mega.Serial0.Should().ContainLine("ch0");
         mega.Serial1.Should().ContainLine("ch1");
         mega.Serial2.Should().ContainLine("ch2");
+        mega.Serial3.Should().ContainLine("ch3");
     }
 
     /// <summary>
@@ -85,11 +88,12 @@ public class ArduinoMegaSamples
     /// </code>
     /// </para>
     /// </summary>
-    [Test, Ignore("Replace placeholder hex with a compiled multi-port sketch")]
+    [Test]
     public void Gpio_MultiPort_ShouldControlPortsIndependently()
     {
         var mega = new ArduinoMegaSimulation();
-        mega.WithHex(Placeholders.Break);   // TODO: mega.WithHex(File.ReadAllText("firmware/multi_port.hex"))
+        var hexPath = Path.Combine(TestContext.CurrentContext.TestDirectory, "Firmware", "multi_port.hex");
+        mega.WithHex(File.ReadAllText(hexPath));
 
         mega.RunMilliseconds(10);
 

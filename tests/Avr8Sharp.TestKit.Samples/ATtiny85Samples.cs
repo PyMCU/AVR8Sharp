@@ -88,11 +88,12 @@ public class ATtiny85Samples
     /// </code>
     /// </para>
     /// </summary>
-    [Test, Ignore("Replace placeholder hex with a compiled led-chaser sketch")]
+    [Test]
     public void Gpio_LedChaser_ShouldLightEachLedInTurn()
     {
         var tiny = new ATtiny85Simulation();
-        tiny.WithHex(Placeholders.Break);   // TODO: tiny.WithHex(File.ReadAllText("firmware/led_chaser.hex"))
+        var path = Path.Combine(TestContext.CurrentContext.TestDirectory, "Firmware", "led_chaser.hex");
+        tiny.WithHex(File.ReadAllText(path));   // TODO: tiny.WithHex(File.ReadAllText("firmware/led_chaser.hex"))
 
         // After 125 ms PB0 should be HIGH (first LED on, halfway through first 250 ms step).
         tiny.RunMilliseconds(125);

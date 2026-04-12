@@ -1,6 +1,5 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using AVR8Sharp.Core;
 
 namespace AVR8Sharp.Core.Decoders;
 

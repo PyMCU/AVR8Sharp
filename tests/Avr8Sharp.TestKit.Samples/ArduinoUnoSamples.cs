@@ -126,11 +126,12 @@ public class ArduinoUnoSamples
     /// </code>
     /// </para>
     /// </summary>
-    [Test, Ignore("Replace placeholder hex with a compiled blink sketch")]
+    [Test]
     public void Gpio_Blink_ShouldToggleLedEvery500ms()
     {
         var uno = new ArduinoUnoSimulation();
-        uno.WithHex(Placeholders.Break);    // TODO: uno.WithHex(File.ReadAllText("firmware/blink.hex"))
+        var path = Path.Combine(TestContext.CurrentContext.TestDirectory, "Firmware", "blink.hex");
+        uno.WithHex(File.ReadAllText(path));
 
         uno.RunMilliseconds(500);
         uno.PortB.Should().HavePinHigh(5);  // digital pin 13 HIGH at 500 ms
@@ -149,11 +150,12 @@ public class ArduinoUnoSamples
     /// </code>
     /// </para>
     /// </summary>
-    [Test, Ignore("Replace placeholder hex with a compiled serial sketch")]
+    [Test]
     public void Serial_ShouldPrintStartupMessage()
     {
         var uno = new ArduinoUnoSimulation();
-        uno.WithHex(Placeholders.Break);    // TODO: uno.WithHex(File.ReadAllText("firmware/serial_hello.hex"))
+        var path = Path.Combine(TestContext.CurrentContext.TestDirectory, "Firmware", "serial_hello.hex");
+        uno.WithHex(File.ReadAllText(path));
 
         uno.RunMilliseconds(100);
 

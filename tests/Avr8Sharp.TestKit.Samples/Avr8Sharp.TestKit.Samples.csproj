@@ -23,4 +23,22 @@
         <ProjectReference Include="..\..\src\Avr8Sharp.TestKit\Avr8Sharp.TestKit.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <None Update="Firmware\multi_serial.hex">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="Firmware\multi_port.hex">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="Firmware\blink.hex">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="Firmware\led_chaser.hex">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="Firmware\serial_hello.hex">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
+
 </Project>

@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using AVR8Sharp.Core;
 
 namespace AVR8Sharp.Core.Decoders;
 
