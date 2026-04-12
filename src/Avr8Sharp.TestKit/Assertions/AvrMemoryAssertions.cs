@@ -75,7 +75,20 @@ public class AvrMemoryAssertions : ReferenceTypeAssertions<AvrMemoryView, AvrMem
     public AndConstraint<AvrMemoryAssertions> HaveBytesAt(
         int address, byte[] expected, string because = "", params object[] becauseArgs)
     {
-        var actual = Subject.Data.AsSpan(address, expected.Length);
+        var memory = Subject.Data;
+
+        Execute.Assertion
+            .BecauseOf(because, becauseArgs)
+            .ForCondition(address >= 0 && address + expected.Length <= memory.Length)
+            .FailWith(
+                "Expected to read {0} bytes starting at address 0x{1:X4}{reason}, but the memory only has {2} bytes (Valid range: 0x0000 - 0x{3:X4}).",
+                expected.Length,
+                address,
+                memory.Length,
+                memory.Length - 1);
+
+        var actual = memory.AsSpan(address, expected.Length);
+
         Execute.Assertion
             .BecauseOf(because, becauseArgs)
             .ForCondition(actual.SequenceEqual(expected))
