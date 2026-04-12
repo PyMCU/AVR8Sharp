@@ -99,15 +99,18 @@ public class AvrGpioAssertions : ReferenceTypeAssertions<AvrIoPort, AvrGpioAsser
     /// All failures are reported in a single assertion scope.
     /// </summary>
     public AndConstraint<AvrGpioAssertions> HavePinsHigh(
-        params int[] pins)
+        IEnumerable<int> pins, string because = "", params object[] becauseArgs)
     {
         using var scope = new AssertionScope();
+
         foreach (var pin in pins)
         {
             var state = Subject.GetPinState((byte)pin);
+
             Execute.Assertion
+                .BecauseOf(because, becauseArgs)
                 .ForCondition(state == PinState.High)
-                .FailWith("Expected pin {0} to be High, but its state was {1}.", pin, state);
+                .FailWith("Expected pin {0} to be High{reason}, but its state was {1}.", pin, state); // 2. Agregamos {reason}
         }
 
         return new AndConstraint<AvrGpioAssertions>(this);
@@ -118,15 +121,18 @@ public class AvrGpioAssertions : ReferenceTypeAssertions<AvrIoPort, AvrGpioAsser
     /// All failures are reported in a single assertion scope.
     /// </summary>
     public AndConstraint<AvrGpioAssertions> HavePinsLow(
-        params int[] pins)
+        IEnumerable<int> pins, string because = "", params object[] becauseArgs)
     {
         using var scope = new AssertionScope();
+
         foreach (var pin in pins)
         {
             var state = Subject.GetPinState((byte)pin);
+
             Execute.Assertion
+                .BecauseOf(because, becauseArgs)
                 .ForCondition(state == PinState.Low)
-                .FailWith("Expected pin {0} to be Low, but its state was {1}.", pin, state);
+                .FailWith("Expected pin {0} to be Low{reason}, but its state was {1}.", pin, state);
         }
 
         return new AndConstraint<AvrGpioAssertions>(this);

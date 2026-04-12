@@ -195,7 +195,8 @@ public class AvrTestSimulation
         }
         catch (IndexOutOfRangeException)
         {
-            var pc    = Runner.Cpu.Pc;
+            var pc = Runner.Cpu.Pc;
+            if (pc < Runner.Cpu.ProgramMemory.Length) throw;
             var flash = Runner.Cpu.ProgramMemory.Length * 2;
             throw new InvalidOperationException(
                 $"Simulation crashed: PC=0x{pc:X4} (byte addr 0x{pc * 2:X5}) is out of flash " +
