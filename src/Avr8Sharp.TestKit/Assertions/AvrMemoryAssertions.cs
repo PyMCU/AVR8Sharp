@@ -75,7 +75,7 @@ public class AvrMemoryAssertions : ReferenceTypeAssertions<AvrMemoryView, AvrMem
     public AndConstraint<AvrMemoryAssertions> HaveBytesAt(
         int address, byte[] expected, string because = "", params object[] becauseArgs)
     {
-        var actual = Subject.Data.Skip(address).Take(expected.Length).ToArray();
+        var actual = Subject.Data.AsSpan(address, expected.Length);
         Execute.Assertion
             .BecauseOf(because, becauseArgs)
             .ForCondition(actual.SequenceEqual(expected))
@@ -84,7 +84,7 @@ public class AvrMemoryAssertions : ReferenceTypeAssertions<AvrMemoryView, AvrMem
                 expected.Length,
                 address,
                 string.Join(", ", expected.Select(b => $"0x{b:X2}")),
-                string.Join(", ", actual.Select(b => $"0x{b:X2}")));
+                string.Join(", ", actual.ToArray().Select(b => $"0x{b:X2}")));
 
         return new AndConstraint<AvrMemoryAssertions>(this);
     }
