@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Text;
 using AVR8Sharp.Core.Peripherals;
 
@@ -11,7 +12,7 @@ public class SerialProbe
 {
     private readonly List<byte> _rawBytes = new();
     private readonly AvrUsart _usart;
-    private List<string>? _linesCache;
+    private ReadOnlyCollection<string>? _linesCache;
 
     internal SerialProbe(AvrUsart usart)
     {
@@ -37,7 +38,7 @@ public class SerialProbe
     /// The result is cached and invalidated whenever a new byte arrives.
     /// </summary>
     public IReadOnlyList<string> Lines
-        => _linesCache ??= Text.Split('\n').Select(l => l.TrimEnd('\r')).ToList();
+        => _linesCache ??= Array.AsReadOnly(Text.Split('\n').Select(l => l.TrimEnd('\r')).ToArray());
 
     /// <summary>Clears the captured output buffer.</summary>
     public void Clear()
