@@ -26,7 +26,7 @@ public sealed class ArduinoMegaSimulation : AvrTestSimulation
 {
     // ATmega2560: 256 KB flash, 8 KB SRAM, 16 MHz
     private const int Flash = 0x40000;
-    private const int Sram  = 0x10000; // RAMEND
+    private const int Sram = 0x2100;
     private const uint Frequency = 16_000_000;
 
     // ── ATmega2560 Timer interrupt vectors (JMP/4-byte vectors) ──────────────
