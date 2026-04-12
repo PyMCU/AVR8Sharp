@@ -136,9 +136,9 @@ public sealed class ArduinoMegaSimulation : AvrTestSimulation
     // USART2 — registers 0xD0–0xD6
     private static readonly AvrUsartConfig Mega2560Usart2Config = new AvrUsartConfig
     {
-        RxCompleteInterrupt        = 0x66,  // Vector 51 — word addr (byte 0xCC)
-        DataRegisterEmptyInterrupt = 0x68,  // Vector 52 — word addr (byte 0xD0)
-        TxCompleteInterrupt        = 0x6A,  // Vector 53 — word addr (byte 0xD4)
+        RxCompleteInterrupt        = 0x66,  // Vector 52 — word addr (byte 0xCC)
+        DataRegisterEmptyInterrupt = 0x68,  // Vector 53 — word addr (byte 0xD0)
+        TxCompleteInterrupt        = 0x6A,  // Vector 54 — word addr (byte 0xD4)
         UCSRA = 0xD0, UCSRB = 0xD1, UCSRC = 0xD2,
         UBRRL = 0xD4, UBRRH = 0xD5, UDR   = 0xD6,
     };
