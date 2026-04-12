@@ -79,7 +79,7 @@ public class AvrMemoryAssertions : ReferenceTypeAssertions<AvrMemoryView, AvrMem
 
         Execute.Assertion
             .BecauseOf(because, becauseArgs)
-            .ForCondition(address >= 0 && address + expected.Length <= memory.Length)
+            .ForCondition(expected.Length >= 0 && address >= 0 && address <= memory.Length - expected.Length)
             .FailWith(
                 "Expected to read {0} bytes starting at address 0x{1:X4}{reason}, but the memory only has {2} bytes (Valid range: 0x0000 - 0x{3:X4}).",
                 expected.Length,
@@ -88,16 +88,17 @@ public class AvrMemoryAssertions : ReferenceTypeAssertions<AvrMemoryView, AvrMem
                 memory.Length - 1);
 
         var actual = memory.AsSpan(address, expected.Length);
+        var isMatch = actual.SequenceEqual(expected);
 
         Execute.Assertion
             .BecauseOf(because, becauseArgs)
-            .ForCondition(actual.SequenceEqual(expected))
+            .ForCondition(isMatch)
             .FailWith(
                 "Expected {0} bytes at 0x{1:X4} to equal [{2}]{reason}, but found [{3}].",
                 expected.Length,
                 address,
-                string.Join(", ", expected.Select(b => $"0x{b:X2}")),
-                string.Join(", ", actual.ToArray().Select(b => $"0x{b:X2}")));
+                isMatch ? string.Empty : string.Join(", ", expected.Select(b => $"0x{b:X2}")),
+                isMatch ? string.Empty : string.Join(", ", actual.ToArray().Select(b => $"0x{b:X2}")));
 
         return new AndConstraint<AvrMemoryAssertions>(this);
     }
