@@ -30,38 +30,39 @@ public sealed class ArduinoMegaSimulation : AvrTestSimulation
     private const uint Frequency = 16_000_000;
 
     // ── ATmega2560 Timer interrupt vectors (JMP/4-byte vectors) ──────────────
-    // ATmega2560 uses 4-byte JMP entries; vector N sits at byte address N×4.
-    // The Core stores interrupt addresses as the byte address of the vector.
+    // ATmega2560 uses 4-byte JMP entries; vector N sits at byte address (N-1)×4.
+    // Interrupt addresses are WORD indices (byte_address / 2) because DoAvrInterrupt
+    // sets cpu.Pc = address directly and Pc is a word index into ProgramMemory[].
 
     private static readonly AvrTimerConfig Mega2560Timer0Config =
         AvrTimer.Timer0Config.CreateNew(
-            comparatorAInterrupt: 0x54,   // vector 21
-            comparatorBInterrupt: 0x58,   // vector 22
-            overflowInterrupt:    0x5C);  // vector 23
+            comparatorAInterrupt: 0x2A,   // vector 22 — word addr (byte 0x54)
+            comparatorBInterrupt: 0x2C,   // vector 23 — word addr (byte 0x58)
+            overflowInterrupt:    0x2E);  // vector 24 — word addr (byte 0x5C)
 
     private static readonly AvrTimerConfig Mega2560Timer1Config =
         AvrTimer.Timer1Config.CreateNew(
-            captureInterrupt:     0x40,   // vector 16
-            comparatorAInterrupt: 0x44,   // vector 17
-            comparatorBInterrupt: 0x48,   // vector 18
-            comparatorCInterrupt: 0x4C,   // vector 19
-            overflowInterrupt:    0x50);  // vector 20
+            captureInterrupt:     0x20,   // vector 17 — word addr (byte 0x40)
+            comparatorAInterrupt: 0x22,   // vector 18 — word addr (byte 0x44)
+            comparatorBInterrupt: 0x24,   // vector 19 — word addr (byte 0x48)
+            comparatorCInterrupt: 0x26,   // vector 20 — word addr (byte 0x4C)
+            overflowInterrupt:    0x28);  // vector 21 — word addr (byte 0x50)
 
     private static readonly AvrTimerConfig Mega2560Timer2Config =
         AvrTimer.Timer2Config.CreateNew(
-            comparatorAInterrupt: 0x34,   // vector 13
-            comparatorBInterrupt: 0x38,   // vector 14
-            overflowInterrupt:    0x3C);  // vector 15
+            comparatorAInterrupt: 0x1A,   // vector 14 — word addr (byte 0x34)
+            comparatorBInterrupt: 0x1C,   // vector 15 — word addr (byte 0x38)
+            overflowInterrupt:    0x1E);  // vector 16 — word addr (byte 0x3C)
 
     // Timer 3 — 16-bit, registers 0x90–0x9C, TIMSK3 0x71, TIFR3 0x38
     private static readonly AvrTimerConfig Mega2560Timer3Config = new AvrTimerConfig(
         bits:                 16,
         dividers:             AvrTimer.Timer01Dividers,
-        captureInterrupt:     0x7C,   // vector 31
-        comparatorAInterrupt: 0x80,   // vector 32
-        comparatorBInterrupt: 0x84,   // vector 33
-        comparatorCInterrupt: 0x88,   // vector 34
-        overflowInterrupt:    0x8C,   // vector 35
+        captureInterrupt:     0x3E,   // vector 32 — word addr (byte 0x7C)
+        comparatorAInterrupt: 0x40,   // vector 33 — word addr (byte 0x80)
+        comparatorBInterrupt: 0x42,   // vector 34 — word addr (byte 0x84)
+        comparatorCInterrupt: 0x44,   // vector 35 — word addr (byte 0x88)
+        overflowInterrupt:    0x46,   // vector 36 — word addr (byte 0x8C)
         tccra: 0x90, tccrb: 0x91, tccrc: 0x92,
         tcnt:  0x94, ocra:  0x98, ocrb: 0x9A, ocrc: 0x9C, icr: 0x96,
         timsk: 0x71, tifr:  0x38,
@@ -76,11 +77,11 @@ public sealed class ArduinoMegaSimulation : AvrTestSimulation
     private static readonly AvrTimerConfig Mega2560Timer4Config = new AvrTimerConfig(
         bits:                 16,
         dividers:             AvrTimer.Timer01Dividers,
-        captureInterrupt:     0xA4,   // vector 41
-        comparatorAInterrupt: 0xA8,   // vector 42
-        comparatorBInterrupt: 0xAC,   // vector 43
-        comparatorCInterrupt: 0xB0,   // vector 44
-        overflowInterrupt:    0xB4,   // vector 45
+        captureInterrupt:     0x52,   // vector 42 — word addr (byte 0xA4)
+        comparatorAInterrupt: 0x54,   // vector 43 — word addr (byte 0xA8)
+        comparatorBInterrupt: 0x56,   // vector 44 — word addr (byte 0xAC)
+        comparatorCInterrupt: 0x58,   // vector 45 — word addr (byte 0xB0)
+        overflowInterrupt:    0x5A,   // vector 46 — word addr (byte 0xB4)
         tccra: 0xA0, tccrb: 0xA1, tccrc: 0xA2,
         tcnt:  0xA4, ocra:  0xA8, ocrb: 0xAA, ocrc: 0xAC, icr: 0xA6,
         timsk: 0x72, tifr:  0x39,
@@ -95,11 +96,11 @@ public sealed class ArduinoMegaSimulation : AvrTestSimulation
     private static readonly AvrTimerConfig Mega2560Timer5Config = new AvrTimerConfig(
         bits:                 16,
         dividers:             AvrTimer.Timer01Dividers,
-        captureInterrupt:     0xB8,   // vector 46
-        comparatorAInterrupt: 0xBC,   // vector 47
-        comparatorBInterrupt: 0xC0,   // vector 48
-        comparatorCInterrupt: 0xC4,   // vector 49
-        overflowInterrupt:    0xC8,   // vector 50
+        captureInterrupt:     0x5C,   // vector 47 — word addr (byte 0xB8)
+        comparatorAInterrupt: 0x5E,   // vector 48 — word addr (byte 0xBC)
+        comparatorBInterrupt: 0x60,   // vector 49 — word addr (byte 0xC0)
+        comparatorCInterrupt: 0x62,   // vector 50 — word addr (byte 0xC4)
+        overflowInterrupt:    0x64,   // vector 51 — word addr (byte 0xC8)
         tccra: 0x120, tccrb: 0x121, tccrc: 0x122,
         tcnt:  0x124, icr:   0x126,
         ocra:  0x128, ocrb:  0x12A, ocrc: 0x12C,
