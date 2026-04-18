@@ -366,4 +366,88 @@ Assert.That(asm.Errors, Is.Empty);
 // ZeroPad(4660) = "1234" → resultTable[0]=0x34, resultTable[1]=0x12
 Assert.That(result, Is.EqualTo(new byte[] { 0x34, 0x12 }));
 }
+
+// --- Device definitions (P1) ---
+[Test]
+public void Device_ATmega328P_ConstructorParam()
+{
+var asm = new AvrAssembler(deviceName: "ATmega328P");
+var result = asm.Assemble("out PORTB, r16"); // PORTB = I/O 0x05
+Assert.That(asm.Errors, Is.Empty);
+Assert.That(result, Is.EqualTo(Bytes("05b9"))); // OUT 0x05,r16
+}
+
+[Test]
+public void Device_ATmega328P_Directive()
+{
+var asm = new AvrAssembler();
+var result = asm.Assemble(".device ATmega328P\nout DDRB, r16"); // DDRB = I/O 0x04
+Assert.That(asm.Errors, Is.Empty);
+Assert.That(result, Is.EqualTo(Bytes("04b9"))); // OUT 0x04,r16
+}
+
+[Test]
+public void Device_ATtiny85_ConstructorParam()
+{
+var asm = new AvrAssembler(deviceName: "ATtiny85");
+var result = asm.Assemble("out PORTB, r16"); // ATtiny85 PORTB = I/O 0x18
+Assert.That(asm.Errors, Is.Empty);
+Assert.That(result, Is.EqualTo(Bytes("08bb"))); // OUT 0x18,r16
+}
+
+[Test]
+public void Device_RAMEND_Symbol()
+{
+var asm = new AvrAssembler(deviceName: "ATmega328P");
+var result = asm.Assemble("ldi r16, lo8(RAMEND)"); // RAMEND=0x08FF, lo8=0xFF
+Assert.That(asm.Errors, Is.Empty);
+Assert.That(result, Is.EqualTo(Bytes("0fef"))); // LDI r16,0xFF
+}
+
+[Test]
+public void Device_UnknownDevice_Error()
+{
+var asm = new AvrAssembler();
+asm.Assemble(".device NoSuchDevice\nnop");
+Assert.That(asm.Errors, Has.Count.GreaterThan(0));
+Assert.That(asm.Errors[0], Does.Contain("Unknown device"));
+}
+
+[Test]
+public void Device_CaseInsensitive()
+{
+var asm = new AvrAssembler(deviceName: "atmega328p");
+var result = asm.Assemble("out PORTB, r16");
+Assert.That(asm.Errors, Is.Empty);
+Assert.That(result, Is.EqualTo(Bytes("05b9")));
+}
+
+// --- Multi-file assembly (P2) ---
+[Test]
+public void Global_Extern_DirectivesAccepted()
+{
+var asm = new AvrAssembler();
+var result = asm.Assemble(".global main\n.extern helper\nmain:\nnop");
+Assert.That(asm.Errors, Is.Empty);
+Assert.That(result, Is.EqualTo(Bytes("0000")));
+}
+
+[Test]
+public void MultiFile_SharedSymbols()
+{
+var asm = new AvrAssembler();
+var files = new[]
+{
+".global SHARED_CONST\n.equ SHARED_CONST = 42\nnop",
+"ldi r16, SHARED_CONST"
+};
+var result = asm.AssembleMultiFile(files);
+Assert.That(asm.Errors, Is.Empty);
+Assert.That(result.Length, Is.GreaterThan(0));
+// First file: NOP = 0x0000, second file: LDI r16,42
+Assert.That(result[0], Is.EqualTo(0x00)); // NOP low
+Assert.That(result[1], Is.EqualTo(0x00)); // NOP high
+Assert.That(result[2], Is.EqualTo(0x0A)); // LDI r16,42 low byte
+Assert.That(result[3], Is.EqualTo(0xE2)); // LDI r16,42 high byte
+}
 }

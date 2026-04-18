@@ -566,6 +566,7 @@ public partial class AvrAssembler
 	private readonly List<LineTablePassOne> _lines = new List<LineTablePassOne>();
 	private SymbolTable _symbolTable = new SymbolTable();
 	private readonly Func<string, string>? _fileResolver;
+	private readonly string? _deviceName;
 
 	// Macro storage: name → (paramNames, bodyLines)
 	private Dictionary<string, (List<string> Params, List<string> Body)> _macros
@@ -575,6 +576,17 @@ public partial class AvrAssembler
 
 	public AvrAssembler(Func<string, string>? fileResolver) => _fileResolver = fileResolver;
 
+	/// <summary>
+	/// Creates an assembler with optional file resolver and device name.
+	/// When a device name is specified (e.g. "ATmega328P"), hardware register
+	/// symbols are pre-loaded into the symbol table.
+	/// </summary>
+	public AvrAssembler(Func<string, string>? fileResolver = null, string? deviceName = null)
+	{
+		_fileResolver = fileResolver;
+		_deviceName = deviceName;
+	}
+
 	public LabelTable Labels => _labels;
 	public List<string> Errors => _errors;
 	public List<LineTablePassOne> Lines => _lines;
@@ -582,6 +594,45 @@ public partial class AvrAssembler
 	public byte[] Assemble (string input)
 	{
 		PassOne(input);
+		return _errors.Count > 0 ? [] : PassTwo();
+	}
+
+	/// <summary>
+	/// Assemble multiple source files together.
+	/// Pass 1: Scan all files for .global exports → build combined symbol table.
+	/// Pass 2: Assemble each file sequentially with the combined symbol table.
+	/// This allows cross-file symbol references without a linker.
+	/// </summary>
+	public byte[] AssembleMultiFile(string[] sources)
+	{
+		// ---- Pass 1: collect all .global exported symbols from all files ----
+		var globalSymbols = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+		// First, assemble each file individually to discover symbols
+		foreach (var source in sources)
+		{
+			var scanner = new AvrAssembler(_fileResolver, _deviceName);
+			scanner.Assemble(source);
+			// Collect any labels/symbols from this file
+			foreach (var (name, value) in scanner.Labels)
+			{
+				globalSymbols[name] = value;
+			}
+		}
+
+		// ---- Pass 2: assemble all files concatenated, with combined symbol table ----
+		var combined = string.Join("\n", sources);
+		_labels.Clear();
+		_errors.Clear();
+		_lines.Clear();
+
+		// Pre-seed labels from the global scan
+		foreach (var (name, value) in globalSymbols)
+		{
+			_labels[name] = value;
+		}
+
+		PassOne(combined);
 		return _errors.Count > 0 ? [] : PassTwo();
 	}
 
@@ -640,6 +691,10 @@ public partial class AvrAssembler
 		var replacements = new Dictionary<string, string> ();
 		_symbolTable = new SymbolTable();
 		_macros = new Dictionary<string, (List<string> Params, List<string> Body)>(StringComparer.OrdinalIgnoreCase);
+
+		// Pre-load device definitions if a device was specified
+		if (_deviceName != null)
+			LoadDeviceSymbols(_deviceName);
 
 		// Make symbol table available to static helpers
 		_currentSymbolTable = _symbolTable;
@@ -810,6 +865,13 @@ public partial class AvrAssembler
 				if (dirName == "GLOBAL" || dirName == "EXTERN")
 					continue;
 
+				// Device definition loading
+				if (dirName == "DEVICE")
+				{
+					LoadDeviceSymbols(dirArgs.Trim(), idx);
+					continue;
+				}
+
 				// Unknown dot-directive: fall through to error
 				_errors.Add($"Line {idx}: Unknown directive: .{dirName}");
 				continue;
@@ -905,6 +967,25 @@ public partial class AvrAssembler
 		}
 
 		_currentSymbolTable = null;
+	}
+
+	// -----------------------------------------------------------------------
+	// Device definition loading
+	// -----------------------------------------------------------------------
+	private void LoadDeviceSymbols(string deviceName, int lineIdx = -1)
+	{
+		var def = DeviceDefinitions.Get(deviceName);
+		if (def == null)
+		{
+			if (lineIdx >= 0)
+				_errors.Add($"Line {lineIdx}: Unknown device: {deviceName}");
+			return;
+		}
+
+		foreach (var (name, value) in def.Symbols)
+		{
+			_symbolTable.Set(name, value);
+		}
 	}
 
 	// -----------------------------------------------------------------------
