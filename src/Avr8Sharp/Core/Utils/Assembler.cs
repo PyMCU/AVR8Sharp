@@ -565,7 +565,7 @@ public partial class AvrAssembler
 	static readonly System.Text.RegularExpressions.Regex YzQRegex = new System.Text.RegularExpressions.Regex(@"([YZ])\+(\d+)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds (1));
 	static readonly System.Text.RegularExpressions.Regex CommentsRegex = new System.Text.RegularExpressions.Regex("[#;].*$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds (1));
 	static readonly System.Text.RegularExpressions.Regex LabelRegex = new System.Text.RegularExpressions.Regex(@"^(\w+):", RegexOptions.CultureInvariant, TimeSpan.FromSeconds (1));
-	static readonly System.Text.RegularExpressions.Regex CodeRegex = new System.Text.RegularExpressions.Regex(@"^\s*(\w+)(?:\s+([^,]+)(?:,\s*(\S+))?)?\s*$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds (1));
+	static readonly System.Text.RegularExpressions.Regex CodeRegex = new System.Text.RegularExpressions.Regex(@"^\s*(\w+)(?:\s+([^,]+)(?:,\s*(.+))?)?\s*$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds (1));
 	static readonly System.Text.RegularExpressions.Regex DotDirectiveRegex = new System.Text.RegularExpressions.Regex(@"^\.([\w]+)(?:\s+(.*))?$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds (1));
 	
 	// Thread-local symbol table used by static helper methods (ConstValue, ConstOrLabel)
