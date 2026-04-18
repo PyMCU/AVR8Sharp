@@ -4,10 +4,6 @@ namespace AVR8Sharp.Core.Utils.Encoders;
 
 internal static class LoadStoreEncoders
 {
-	private static readonly System.Text.RegularExpressions.Regex YzQRegex =
-		new System.Text.RegularExpressions.Regex(@"^([YZ])\+(\d+)$",
-			System.Text.RegularExpressions.RegexOptions.CultureInvariant,
-			TimeSpan.FromSeconds(1));
 
 	public static ushort LD(string rd, string src)
 	{
@@ -152,12 +148,10 @@ internal static class LoadStoreEncoders
 
 	private static int StldYzQ(string yzq)
 	{
-		var m = YzQRegex.Match(yzq.ToUpperInvariant());
-		if (!m.Success) throw new Exception($"Invalid displacement address: {yzq}");
-		int q = int.Parse(m.Groups[2].Value);
+		var (baseReg, q) = LineParser.ParseYzDisplacement(yzq);
 		if (q < 0 || q > 63) throw new Exception("Displacement q out of range 0..63");
 		int r = 0x8000;
-		if (m.Groups[1].Value == "Y") r |= 0x8;
+		if (baseReg == 'Y') r |= 0x8;
 		r |= ((q & 0x20) << 8) | ((q & 0x18) << 7) | (q & 0x7);
 		return r;
 	}

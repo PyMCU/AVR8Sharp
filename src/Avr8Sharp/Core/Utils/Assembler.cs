@@ -574,8 +574,6 @@ public partial class AvrAssembler
 
 	public AvrAssembler() { }
 
-	public AvrAssembler(Func<string, string>? fileResolver) => _fileResolver = fileResolver;
-
 	/// <summary>
 	/// Creates an assembler with optional file resolver and device name.
 	/// When a device name is specified (e.g. "ATmega328P"), hardware register
