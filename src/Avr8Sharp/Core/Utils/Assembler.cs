@@ -1,5 +1,4 @@
 #nullable enable
-using System.Text.RegularExpressions;
 using LabelTable = System.Collections.Generic.Dictionary<string, int>;
 using OpCodeHandler = System.Func<string, string, int, System.Collections.Generic.Dictionary<string, int>, object>;
 
@@ -21,12 +20,11 @@ public partial class AvrAssembler
 		} },
 		{ "ADIW", (a, b, _, _) => {
 			var r = 0x9600;
-			var dm = RrIndexRegex?.Match(a);
-			if (!dm.Success) {
+			int regNum = Encoders.EncoderHelpers.TryParseRegister(a.AsSpan());
+			if (regNum < 0 || (regNum != 24 && regNum != 26 && regNum != 28 && regNum != 30)) {
 				throw new Exception("Rd must be 24, 26, 28, or 30");
 			}
-			var d = int.Parse(dm.Groups[1].Value);
-			d = (d - 24) / 2;
+			var d = (regNum - 24) / 2;
 			r |= (d & 0x3) << 4;
 			var k = ConstValue(b, 0, 63);
 			r |= ((k & 0x30) << 2) | (k & 0x0f);
@@ -453,12 +451,11 @@ public partial class AvrAssembler
 		}},
 		{ "SBIW", (a, b, _, _) => {
 			var r = 0x9700;
-			var dm = RrIndexRegex.Match(a);
-			if (!dm.Success) {
+			int regNum = Encoders.EncoderHelpers.TryParseRegister(a.AsSpan());
+			if (regNum < 0 || (regNum != 24 && regNum != 26 && regNum != 28 && regNum != 30)) {
 				throw new Exception("Rd must be 24, 26, 28, or 30");
 			}
-			var d = int.Parse(dm.Groups[1].Value);
-			d = (d - 24) / 2;
+			var d = (regNum - 24) / 2;
 			r |= (d & 0x3) << 4;
 			var k = ConstValue(b, 0, 63);
 			r |= ((k & 0x30) << 2) | (k & 0x0f);
@@ -560,14 +557,6 @@ public partial class AvrAssembler
 		}}
 	};
 	
-	static readonly System.Text.RegularExpressions.Regex RIndexRegex = new System.Text.RegularExpressions.Regex(@"[Rr](\d{1,2})", RegexOptions.CultureInvariant, TimeSpan.FromSeconds (1));
-	static readonly System.Text.RegularExpressions.Regex RrIndexRegex = new System.Text.RegularExpressions.Regex(@"[Rr](24|26|28|30)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds (1));
-	static readonly System.Text.RegularExpressions.Regex YzQRegex = new System.Text.RegularExpressions.Regex(@"([YZ])\+(\d+)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds (1));
-	static readonly System.Text.RegularExpressions.Regex CommentsRegex = new System.Text.RegularExpressions.Regex("[#;].*$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds (1));
-	static readonly System.Text.RegularExpressions.Regex LabelRegex = new System.Text.RegularExpressions.Regex(@"^(\w+):", RegexOptions.CultureInvariant, TimeSpan.FromSeconds (1));
-	static readonly System.Text.RegularExpressions.Regex CodeRegex = new System.Text.RegularExpressions.Regex(@"^\s*(\w+)(?:\s+([^,]+)(?:,\s*(.+))?)?\s*$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds (1));
-	static readonly System.Text.RegularExpressions.Regex DotDirectiveRegex = new System.Text.RegularExpressions.Regex(@"^\.([\w]+)(?:\s+(.*))?$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds (1));
-	
 	// Thread-local symbol table used by static helper methods (ConstValue, ConstOrLabel)
 	[ThreadStatic]
 	private static SymbolTable? _currentSymbolTable;
@@ -605,7 +594,7 @@ public partial class AvrAssembler
 		foreach (var line in rawLines)
 		{
 			var trimmed = line.Trim();
-			var stripped = CommentsRegex.Replace(trimmed, string.Empty).Trim();
+			var stripped = LineParser.StripComments(trimmed).Trim();
 			if (stripped.StartsWith(".include", StringComparison.OrdinalIgnoreCase))
 			{
 				var rest = stripped.Substring(".include".Length).Trim();
@@ -675,23 +664,23 @@ public partial class AvrAssembler
 
 		for (var idx = 0; idx < lineCount; idx++) {
 			var rawLine = lineList[idx];
-			var res = rawLine.Trim();
-			if (string.IsNullOrEmpty(res)) {
+
+			// Parse line using recursive-descent scanner (replaces all regex matching)
+			var parsed = LineParser.Parse(rawLine);
+
+			// Skip empty / comment-only lines (but not label-only lines)
+			if (parsed.IsEmpty && parsed.Label == null)
 				continue;
-			}
-			// Strip comments
-			res = CommentsRegex.Replace(res, string.Empty).Trim();
-			if (string.IsNullOrEmpty (res)) {
-				continue;
-			}
+
+			// Effective keyword for macro/conditional checks
+			string? keyword = parsed.IsDirective ? parsed.DirectiveName : parsed.Mnemonic;
 
 			// ----------------------------------------------------------------
 			// Macro body recording (must happen before conditional skip)
 			// ----------------------------------------------------------------
 			if (recordingMacro != null)
 			{
-				var firstTok = GetFirstWord(res).ToUpperInvariant();
-				if (firstTok == ".ENDMACRO" || firstTok == ".ENDM" || firstTok == "ENDMACRO" || firstTok == "ENDM")
+				if (keyword is "ENDMACRO" or "ENDM")
 				{
 					_macros[recordingMacro] = (macroParams!, macroBody!);
 					recordingMacro = null;
@@ -700,7 +689,7 @@ public partial class AvrAssembler
 				}
 				else
 				{
-					macroBody!.Add(res);
+					macroBody!.Add(LineParser.StripComments(rawLine.Trim()));
 				}
 				continue;
 			}
@@ -708,29 +697,33 @@ public partial class AvrAssembler
 			// ----------------------------------------------------------------
 			// Conditional assembly directives (must process even in false branch)
 			// ----------------------------------------------------------------
+			if (keyword is "IF" or "IFDEF" or "IFNDEF" or "ELSEIF" or "ELSE" or "ENDIF")
 			{
-				var firstTok = GetFirstWord(res).ToUpperInvariant();
-				var directiveName = firstTok.TrimStart('.');
-				if (directiveName == "IF" || directiveName == "IFDEF" || directiveName == "IFNDEF" ||
-				    directiveName == "ELSEIF" || directiveName == "ELSE" || directiveName == "ENDIF")
-				{
-					var argsStr = res.Substring(firstTok.Length).Trim();
-					ProcessConditional(directiveName, argsStr, byteOffset, ref assembling, condStack);
-					continue;
-				}
+				string condArgs = parsed.IsDirective ? parsed.DirectiveArgs
+					: CombineOperands(parsed.Operand1, parsed.Operand2);
+				ProcessConditional(keyword, condArgs, byteOffset, ref assembling, condStack);
+				continue;
 			}
 
 			// Skip lines when in a false conditional branch
 			if (!assembling) continue;
 
 			// ----------------------------------------------------------------
+			// Label handling
+			// ----------------------------------------------------------------
+			if (parsed.Label != null)
+			{
+				_labels[parsed.Label] = byteOffset;
+				_symbolTable.Set(parsed.Label, byteOffset);
+			}
+
+			// ----------------------------------------------------------------
 			// Dot-directives (.equ, .org, .byte, .macro, etc.)
 			// ----------------------------------------------------------------
-			var dotMatch = DotDirectiveRegex.Match(res);
-			if (dotMatch.Success)
+			if (parsed.IsDirective)
 			{
-				var dirName = dotMatch.Groups[1].Value.ToUpperInvariant();
-				var dirArgs = dotMatch.Groups[2].Success ? dotMatch.Groups[2].Value.Trim() : string.Empty;
+				var dirName = parsed.DirectiveName;
+				var dirArgs = parsed.DirectiveArgs;
 
 				// Macro start
 				if (dirName == "MACRO")
@@ -813,54 +806,40 @@ public partial class AvrAssembler
 					continue;
 				}
 
+				// External reference directives (informational only — no linker)
+				if (dirName == "GLOBAL" || dirName == "EXTERN")
+					continue;
+
 				// Unknown dot-directive: fall through to error
 				_errors.Add($"Line {idx}: Unknown directive: .{dirName}");
 				continue;
 			}
 
 			// ----------------------------------------------------------------
-			// Label handling (name: on a line)
+			// Label-only line (no instruction after label)
 			// ----------------------------------------------------------------
+			if (parsed.Mnemonic == null)
+				continue;
+
+			// ----------------------------------------------------------------
+			// Instruction / macro invocation
+			// ----------------------------------------------------------------
+			var instruction = parsed.Mnemonic;
 			var lt = new LineTablePassOne() {
 				Text = rawLine.Trim(),
 				Line = idx + 1,
 				BytesOffset = 0
 			};
 
-			var match = LabelRegex.Match(res);
-			if (match.Success) {
-				var labelName = match.Groups[1].Value;
-				_labels[labelName] = byteOffset;
-				_symbolTable.Set(labelName, byteOffset);
-				res = res.Substring(match.Length).Trim();
-			}
-			if (string.IsNullOrEmpty(res)) {
-				continue;
-			}
-
-			// ----------------------------------------------------------------
-			// Instruction / macro invocation
-			// ----------------------------------------------------------------
-			var codeMatch = CodeRegex.Match(res);
 			try {
-				if (!codeMatch.Success) {
-					throw new Exception("Invalid instruction");
-				}
-
-				if (!codeMatch.Groups[1].Success) {
-					throw new Exception("No instruction found");
-				}
-				
-				var instruction = codeMatch.Groups[1].Value.ToUpper();
-
 				switch (instruction) {
 					case "_REPLACE":
-						if (codeMatch.Groups[2].Success) {
-							replacements[codeMatch.Groups[2].Value.Trim ()] = codeMatch.Groups[3].Value.Trim ();
+						if (!string.IsNullOrEmpty(parsed.Operand1)) {
+							replacements[parsed.Operand1] = parsed.Operand2;
 						}
 						continue;
 					case "_LOC":
-						var num = int.TryParse (codeMatch.Groups[2].Value.Trim (), out var n) ? n : int.MinValue;
+						var num = int.TryParse (parsed.Operand1, out var n) ? n : int.MinValue;
 						if (num == int.MinValue) {
 							throw new Exception("Invalid location");
 						}
@@ -870,7 +849,7 @@ public partial class AvrAssembler
 						byteOffset = num;
 						continue;
 					case "_IW":
-						var num2 = int.TryParse (codeMatch.Groups[2].Value.Trim (), out var n2) ? n2 : int.MinValue;
+						var num2 = int.TryParse (parsed.Operand1, out var n2) ? n2 : int.MinValue;
 						if (num2 == int.MinValue) {
 							throw new Exception("Invalid word");
 						}
@@ -886,9 +865,7 @@ public partial class AvrAssembler
 				// Try macro expansion
 				if (_macros.TryGetValue(instruction, out var macro))
 				{
-					var macroArgs = codeMatch.Groups[2].Success ? codeMatch.Groups[2].Value.Trim() : string.Empty;
-					if (codeMatch.Groups[3].Success)
-						macroArgs += ", " + codeMatch.Groups[3].Value.Trim();
+					var macroArgs = CombineOperands(parsed.Operand1, parsed.Operand2);
 					var expandedLines = ExpandMacro(instruction, macroArgs, macro);
 					// Insert expanded lines immediately after current position
 					lineList = lineList.Take(idx + 1).Concat(expandedLines).Concat(lineList.Skip(idx + 1)).ToList();
@@ -901,8 +878,8 @@ public partial class AvrAssembler
 				}
 				
 				// Apply replacements and symbol substitution on parameters
-				var resMatch2 = ApplyReplacements(codeMatch.Groups[2].Value.Trim(), replacements);
-				var resMatch3 = ApplyReplacements(codeMatch.Groups[3].Value.Trim(), replacements);
+				var resMatch2 = ApplyReplacements(parsed.Operand1, replacements);
+				var resMatch3 = ApplyReplacements(parsed.Operand2, replacements);
 				
 				var bytes = OpTable[instruction](resMatch2, resMatch3, byteOffset, _labels);
 				lt.BytesOffset = byteOffset;
@@ -1122,13 +1099,10 @@ public partial class AvrAssembler
 	// -----------------------------------------------------------------------
 	// Small string helpers
 	// -----------------------------------------------------------------------
-	private static string GetFirstWord(string line)
+	private static string CombineOperands(string op1, string op2)
 	{
-		int i = 0;
-		while (i < line.Length && line[i] == '.') i++;
-		int start = (i > 0) ? 0 : 0;
-		while (i < line.Length && !char.IsWhiteSpace(line[i])) i++;
-		return line[..i];
+		if (string.IsNullOrEmpty(op2)) return op1;
+		return op1 + ", " + op2;
 	}
 
 	private string ApplyReplacements(string value, Dictionary<string, string> replacements)
@@ -1245,12 +1219,10 @@ public partial class AvrAssembler
 	/// </summary>
 	private static int DestRIndex (string r, int min = 0, int max = 31)
 	{
-		var match = RIndexRegex.Match(r);
-		if (!match.Success) {
+		int dest = Encoders.EncoderHelpers.TryParseRegister(r.AsSpan());
+		if (dest < 0) {
 			throw new Exception($"Not a register: {r}");
 		}
-		
-		var dest = int.Parse(match.Groups[1].Value);
 		if (dest < min || dest > max) {
 			throw new Exception($"Rd out of range: {min}<>{max}");
 		}
@@ -1264,11 +1236,10 @@ public partial class AvrAssembler
 	/// </summary>
 	private static int SrcRIndex (string r, int min = 0, int max = 31)
 	{
-		var match = RIndexRegex.Match(r);
-		if (!match.Success) {
+		int dest = Encoders.EncoderHelpers.TryParseRegister(r.AsSpan());
+		if (dest < 0) {
 			throw new Exception($"Not a register: {r}");
 		}
-		var dest = int.Parse(match.Groups[1].Value);
 		if (dest < min || dest > max) {
 			throw new Exception($"Rd out of range: {r}");
 		}
@@ -1450,21 +1421,17 @@ public partial class AvrAssembler
 	/// </summary>
 	private static int StldYzQ (string yzq)
 	{
-		var d = YzQRegex.Match(yzq);
+		var (baseReg, q) = LineParser.ParseYzDisplacement(yzq);
 		var r = 0x8000;
-		if (!d.Success) {
-			throw new Exception("Invalid arguments");
-		}
-		switch (d.Groups[1].Value) {
-			case "Y":
+		switch (baseReg) {
+			case 'Y':
 				r |= 0x8;
 				break;
-			case "Z":
+			case 'Z':
 				break;
 			default:
 				throw new Exception("Not Y or Z with q");
 		}
-		var q = int.Parse(d.Groups[2].Value);
 		if (q < 0 || q > 64) {
 			throw new Exception("q is out of range");
 		}
