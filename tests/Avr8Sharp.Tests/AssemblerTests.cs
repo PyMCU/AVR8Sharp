@@ -782,6 +782,24 @@ public class Assembler
 		Assert.That (Bytes ("5493"), Is.EqualTo (result));
 	}
 	
+	[Test(Description = "CLN (Clear Negative Flag) should encode as BCLR 2 = 0x94A8, not as CLI")]
+	public void CLN ()
+	{
+		var assembler = new AvrAssembler ();
+		var result = assembler.Assemble ("CLN");
+		
+		Assert.That (Bytes ("a894"), Is.EqualTo (result));
+	}
+	
+	[Test(Description = "SEZ (Set Zero Flag) should encode as BSET 1 = 0x9418, not as SET")]
+	public void SEZ ()
+	{
+		var assembler = new AvrAssembler ();
+		var result = assembler.Assemble ("SEZ");
+		
+		Assert.That (Bytes ("1894"), Is.EqualTo (result));
+	}
+	
 	private byte[] Bytes (string hex)
 	{
 		var result = new byte[hex.Length / 2];

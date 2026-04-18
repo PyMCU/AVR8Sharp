@@ -171,7 +171,7 @@ public partial class AvrAssembler
 			return "94f8";
 		}},
 		{ "CLN", (_, _, _, _) => {
-			return "94f8";
+			return "94a8";
 		}},
 		{ "CLR", (a, _, byteLoc, l) => {
 			return OpTable?["EOR"](a, a, byteLoc, l) ?? string.Empty;
@@ -504,7 +504,7 @@ public partial class AvrAssembler
 			return SEFlag (3);
 		}},
 		{ "SEZ", (_, _, _, _) => {
-			return SEFlag (6);
+			return SEFlag (1);
 		}},
 		{ "SLEEP", (_, _, _, _) => {
 			return "9588";
