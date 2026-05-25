@@ -77,7 +77,7 @@ public class AvrRunner(byte[] program, int sramBytes)
 
 	public void Execute<TDecoder> (ref TDecoder decoder, Action<Cpu> callback) where TDecoder : struct, IInstructionDecoder
 	{
-		var cyclesToRun = Cpu.Cycles + _workUnitCycles;
+		var cyclesToRun = Cpu.Cycles + (ulong)_workUnitCycles;
 		while (Cpu.Cycles < cyclesToRun) {
 			decoder.Decode (Cpu);
 			Cpu.Tick ();
@@ -89,10 +89,21 @@ public class AvrRunner(byte[] program, int sramBytes)
 	public void ExecuteInternal<TDecoder> (ref TDecoder decoder) where TDecoder : struct, IInstructionDecoder
 	{
 		var cpu = Cpu;
-		var cyclesToRun = cpu.Cycles + _workUnitCycles;
+		var cyclesToRun = cpu.Cycles + (ulong)_workUnitCycles;
 		while (cpu.Cycles < cyclesToRun) {
 			decoder.Decode (cpu);
 			cpu.Tick ();
+		}
+	}
+
+	public void ExecuteProfiling(ProfilingDecoder decoder)
+	{
+		var cpu = Cpu;
+		var cyclesToRun = cpu.Cycles + (ulong)_workUnitCycles;
+		while (cpu.Cycles < cyclesToRun)
+		{
+			decoder.Decode(cpu);
+			cpu.Tick();
 		}
 	}
 

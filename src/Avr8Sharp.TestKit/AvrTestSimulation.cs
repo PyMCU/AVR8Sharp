@@ -347,4 +347,68 @@ public class AvrTestSimulation
         int byteCount,
         double maxMs = 2000)
         => RunUntilMs(_ => serial.ByteCount >= byteCount, maxMs);
+
+    // ── Profiling (slow path) ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// Slow-path step using a <see cref="ProfilingDecoder"/> that fires a callback before each instruction.
+    /// The hot-path <see cref="Step()"/> is completely unaffected.
+    /// </summary>
+    private void StepProfiling(ProfilingDecoder decoder)
+    {
+        try
+        {
+            decoder.Decode(Runner.Cpu);
+            Runner.Cpu.Tick();
+        }
+        catch (IndexOutOfRangeException)
+        {
+            var pc = Runner.Cpu.Pc;
+            if (pc < Runner.Cpu.ProgramMemory.Length) throw;
+            var flash = Runner.Cpu.ProgramMemory.Length * 2;
+            throw new InvalidOperationException(
+                $"Simulation crashed: PC=0x{pc:X4} (byte addr 0x{pc * 2:X5}) is out of flash " +
+                $"(flash={flash} bytes, 0x{flash:X}). " +
+                $"Cycles={Runner.Cpu.Cycles}, SREG=0x{Runner.Cpu.Sreg:X2}, SP=0x{Runner.Cpu.Sp:X4}.");
+        }
+    }
+
+    /// <summary>Runs exactly <paramref name="cycles"/> CPU cycles through the profiling slow path.</summary>
+    public AvrTestSimulation RunCyclesProfiled(long cycles, ProfilingDecoder decoder)
+    {
+        var target = (long)Runner.Cpu.Cycles + cycles;
+        while ((long)Runner.Cpu.Cycles < target)
+            StepProfiling(decoder);
+        return this;
+    }
+
+    /// <summary>Runs <paramref name="ms"/> simulated milliseconds through the profiling slow path.</summary>
+    public AvrTestSimulation RunMillisecondsProfiled(double ms, ProfilingDecoder decoder)
+        => RunCyclesProfiled((long)(ms / 1000.0 * Runner.Speed), decoder);
+
+    /// <summary>Runs exactly <paramref name="count"/> instructions through the profiling slow path.</summary>
+    public AvrTestSimulation RunInstructionsProfiled(int count, ProfilingDecoder decoder)
+    {
+        for (var i = 0; i < count; i++)
+            StepProfiling(decoder);
+        return this;
+    }
+
+    /// <summary>
+    /// Runs until <paramref name="predicate"/> returns <c>true</c> through the profiling slow path.
+    /// Throws <see cref="TimeoutException"/> if <paramref name="maxInstructions"/> is reached.
+    /// </summary>
+    public AvrTestSimulation RunUntilProfiled(
+        Func<AvrTestSimulation, bool> predicate,
+        ProfilingDecoder decoder,
+        int maxInstructions = 100_000)
+    {
+        for (var i = 0; i < maxInstructions; i++)
+        {
+            if (predicate(this)) return this;
+            StepProfiling(decoder);
+        }
+        throw new TimeoutException(
+            $"RunUntilProfiled: predicate was not satisfied within {maxInstructions} instructions.");
+    }
 }
