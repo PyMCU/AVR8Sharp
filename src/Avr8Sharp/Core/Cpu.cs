@@ -17,7 +17,9 @@ public class Cpu
 	readonly AvrInterruptConfig?[] _pendingInterrupts = new AvrInterruptConfig?[MaxInterrupts];
 	private ClockEventEntry[] _clockEvents = new ClockEventEntry[64];
 	private int _clockEventCount = 0;
+	private int _clockHead = 0;
 	private readonly byte[] _ram;
+	internal byte _sregArith;
 	private ulong _nextEventCycle = ulong.MaxValue;
 	private short _nextInterrupt = -1;
 	private short _maxInterrupt = 0;
@@ -34,7 +36,14 @@ public class Cpu
 		get => Mmio.DataView.GetUint16(93, true);
 		private set => Mmio.DataView.SetUint16(93, value, true);
 	}
-	public byte Sreg => _ram[95];
+	public byte Sreg
+	{
+		get
+		{
+			_ram[95] = (byte)((_ram[95] & 0xc0) | _sregArith);
+			return _ram[95];
+		}
+	}
 	public bool InterruptsEnabled => (_ram[95] & 0x80) != 0;
 
 	public uint Pc;
@@ -56,7 +65,7 @@ public class Cpu
 
 		Pc22Bits = (program.Length * 2) > 0x20000;
 
-		// Reset the CPU
+		RegisterSregHooks();
 		Reset ();
 	}
 
@@ -72,20 +81,35 @@ public class Cpu
 
 		Pc22Bits = program.Length > 0x20000;
 
-		// Reset the CPU
+		RegisterSregHooks();
 		Reset ();
+	}
+
+	private void RegisterSregHooks()
+	{
+		Mmio.RegisterRead(95, _ => {
+			_ram[95] = (byte)((_ram[95] & 0xc0) | _sregArith);
+			return _ram[95];
+		});
+		Mmio.RegisterWrite(95, (value, oldValue, _, mask) => {
+			var masked = (byte)((oldValue & ~mask) | (value & mask));
+			_sregArith = (byte)(masked & 0x3f);
+			return false;
+		});
 	}
 	
 	public void Reset ()
 	{
 		// Reset the CPU
 		Sp = (ushort)(Mmio.Data.Length - 1);
-		Mmio.Data[95] = 0; // Clear SREG (all flags including global interrupt enable)
+		Mmio.Data[95] = 0;
+		_sregArith = 0;
 		Pc = 0;
 		for (var i = 0; i < _pendingInterrupts.Length; i++) {
 			_pendingInterrupts[i] = null;
 		}
 		_nextInterrupt = -1;
+		_clockHead = 0;
 		_clockEventCount = 0;
 		_nextEventCycle = ulong.MaxValue;
 		Array.Clear(_clockEvents, 0, _clockEvents.Length);
@@ -193,22 +217,31 @@ public class Cpu
 	{
 		var targetCycles = Cycles + (ulong)Math.Max(1, cycles);
 
-		if (_clockEventCount == _clockEvents.Length) {
-			Array.Resize(ref _clockEvents, _clockEvents.Length * 2);
-		}
-		
-		var i = _clockEventCount - 1;
-		while (i >= 0 && _clockEvents[i].Cycles > targetCycles)
+		if (_clockEventCount == _clockEvents.Length)
 		{
-			_clockEvents[i + 1] = _clockEvents[i];
+			// Compact circular buffer into a fresh linear array before growing
+			var newArray = new ClockEventEntry[_clockEvents.Length * 2];
+			for (int k = 0; k < _clockEventCount; k++)
+				newArray[k] = _clockEvents[(_clockHead + k) % _clockEvents.Length];
+			_clockEvents = newArray;
+			_clockHead = 0;
+		}
+
+		// Insertion sort: walk backward from tail toward head, shifting elements
+		// toward the tail until we find the right slot for targetCycles.
+		var i = _clockEventCount - 1;
+		while (i >= 0)
+		{
+			var physIdx = (_clockHead + i) % _clockEvents.Length;
+			if (_clockEvents[physIdx].Cycles <= targetCycles) break;
+			_clockEvents[(_clockHead + i + 1) % _clockEvents.Length] = _clockEvents[physIdx];
 			i--;
 		}
-		
-		_clockEvents[i + 1] = new ClockEventEntry { Callback = callback, Cycles = targetCycles };
+
+		_clockEvents[(_clockHead + i + 1) % _clockEvents.Length] = new ClockEventEntry { Callback = callback, Cycles = targetCycles };
 		_clockEventCount++;
 
-		_nextEventCycle = _clockEvents[0].Cycles;
-
+		_nextEventCycle = _clockEvents[_clockHead].Cycles;
 		return callback;
 	}
 	
@@ -220,18 +253,23 @@ public class Cpu
 	
 	public bool ClearClockEvent(Action callback)
 	{
-		for (var i = 0; i < _clockEventCount; i++)
+		for (var li = 0; li < _clockEventCount; li++)
 		{
-			if (_clockEvents[i].Callback != callback) continue;
-			for (var j = i; j < _clockEventCount - 1; j++)
+			var physIdx = (_clockHead + li) % _clockEvents.Length;
+			if (_clockEvents[physIdx].Callback != callback) continue;
+
+			// Shift elements after li one logical step toward head to fill the gap
+			for (var lj = li; lj < _clockEventCount - 1; lj++)
 			{
-				_clockEvents[j] = _clockEvents[j + 1];
+				var src = (_clockHead + lj + 1) % _clockEvents.Length;
+				var dst = (_clockHead + lj) % _clockEvents.Length;
+				_clockEvents[dst] = _clockEvents[src];
 			}
-            
+
 			_clockEventCount--;
-			_clockEvents[_clockEventCount] = default;
-            
-			_nextEventCycle = _clockEventCount > 0 ? _clockEvents[0].Cycles : ulong.MaxValue;
+			_clockEvents[(_clockHead + _clockEventCount) % _clockEvents.Length] = default;
+
+			_nextEventCycle = _clockEventCount > 0 ? _clockEvents[_clockHead].Cycles : ulong.MaxValue;
 			return true;
 		}
 		return false;
@@ -240,7 +278,7 @@ public class Cpu
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	public void Tick()
 	{
-		if (Cycles >= _nextEventCycle) 
+		if (Cycles >= _nextEventCycle)
 		{
 			ProcessClockEvents();
 		}
@@ -258,21 +296,16 @@ public class Cpu
 	
 	private void ProcessClockEvents()
 	{
-		while (_clockEventCount > 0 && _clockEvents[0].Cycles <= Cycles)
+		while (_clockEventCount > 0 && _clockEvents[_clockHead].Cycles <= Cycles)
 		{
-			var callback = _clockEvents[0].Callback;
-
-			for (int i = 0; i < _clockEventCount - 1; i++)
-			{
-				_clockEvents[i] = _clockEvents[i + 1];
-			}
+			var callback = _clockEvents[_clockHead].Callback;
+			_clockEvents[_clockHead] = default;
+			_clockHead = (_clockHead + 1) % _clockEvents.Length;
 			_clockEventCount--;
-			_clockEvents[_clockEventCount] = default;
-
 			callback();
 		}
 
-		_nextEventCycle = _clockEventCount > 0 ? _clockEvents[0].Cycles : ulong.MaxValue;
+		_nextEventCycle = _clockEventCount > 0 ? _clockEvents[_clockHead].Cycles : ulong.MaxValue;
 	}
 }
 

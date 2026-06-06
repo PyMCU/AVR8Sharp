@@ -9,17 +9,17 @@ public static class Opcodes
     {
         var d = cpu.Mmio.Data[(opcode & 0x1f0) >> 4];
         var r = cpu.Mmio.Data[(opcode & 0xf) | (opcode & 0x200) >> 5];
-        var sum = d + r + (cpu.Mmio.Data[95] & 1);
+        var sum = d + r + (cpu._sregArith & 1);
         var R = (byte)(sum & 255);
         cpu.Mmio.Data[(opcode & 0x1f0) >> 4] = R;
-        var sreg = cpu.Mmio.Data[95] & 0xc0;
+        var sreg = 0;
         sreg |= R == 0 ? 2 : 0;
         sreg |= (128 & R) != 0 ? 4 : 0;
         sreg |= ((R ^ r) & (d ^ R) & 128) != 0 ? 8 : 0;
         sreg |= (sreg >> 2 & 1 ^ sreg >> 3 & 1) != 0 ? 0x10 : 0;
         sreg |= (sum & 256) != 0 ? 1 : 0;
         sreg |= (1 & (d & r | r & ~R | ~R & d)) != 0 ? 0x20 : 0;
-        cpu.Mmio.Data[95] = (byte)sreg;
+        cpu._sregArith = (byte)sreg;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -29,14 +29,14 @@ public static class Opcodes
         var r = cpu.Mmio.Data[(opcode & 0xf) | (opcode & 0x200) >> 5];
         var R = (byte)(d + r);
         cpu.Mmio.Data[(opcode & 0x1f0) >> 4] = R;
-        var sreg = cpu.Mmio.Data[95] & 0xc0;
+        var sreg = 0;
         sreg |= R == 0 ? 2 : 0;
         sreg |= (128 & R) != 0 ? 4 : 0;
         sreg |= ((R ^ r) & (R ^ d) & 128) != 0 ? 8 : 0;
         sreg |= (sreg >> 2 & 1 ^ sreg >> 3 & 1) != 0 ? 0x10 : 0;
         sreg |= (d + r & 256) != 0 ? 1 : 0;
         sreg |= (8 & (d & r | r & ~R | ~R & d)) != 0 ? 0x20 : 0;
-        cpu.Mmio.Data[95] = (byte)sreg;
+        cpu._sregArith = (byte)sreg;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -46,13 +46,13 @@ public static class Opcodes
         var value = cpu.Mmio.DataView.GetUint16(addr, true);
         var R = (ushort)(value + ((opcode & 0xf) | ((opcode & 0xc0) >> 2)) & 0xffff);
         cpu.Mmio.DataView.SetUint16(addr, R, true);
-        var sreg = cpu.Mmio.Data[95] & 0xe0;
+        var sreg = cpu._sregArith & 0x20;
         sreg |= R == 0 ? 2 : 0;
         sreg |= (0x8000 & R) != 0 ? 4 : 0;
         sreg |= (~value & R & 0x8000) != 0 ? 8 : 0;
         sreg |= ((sreg >> 2 & 1) ^ (sreg >> 3 & 1)) != 0 ? 0x10 : 0;
         sreg |= (~R & value & 0x8000) != 0 ? 1 : 0;
-        cpu.Mmio.Data[95] = (byte)sreg;
+        cpu._sregArith = (byte)sreg;
         cpu.Cycles++;
     }
 
@@ -61,11 +61,11 @@ public static class Opcodes
     {
         var R = (byte)(cpu.Mmio.Data[(opcode & 0x1f0) >> 4] & cpu.Mmio.Data[(opcode & 0xf) | (opcode & 0x200) >> 5]);
         cpu.Mmio.Data[(opcode & 0x1f0) >> 4] = R;
-        var sreg = cpu.Mmio.Data[95] & 0xe1;
+        var sreg = cpu._sregArith & 0x21;
         sreg |= R == 0 ? 2 : 0;
         sreg |= (128 & R) != 0 ? 4 : 0;
         sreg |= ((sreg >> 2 & 1) ^ (sreg >> 3 & 1)) != 0 ? 0x10 : 0;
-        cpu.Mmio.Data[95] = (byte)sreg;
+        cpu._sregArith = (byte)sreg;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -73,11 +73,11 @@ public static class Opcodes
     {
         var R = (byte)(cpu.Mmio.Data[((opcode & 0xf0) >> 4) + 16] & ((opcode & 0xf) | ((opcode & 0xf00) >> 4)));
         cpu.Mmio.Data[((opcode & 0xf0) >> 4) + 16] = R;
-        var sreg = cpu.Mmio.Data[95] & 0xe1;
+        var sreg = cpu._sregArith & 0x21;
         sreg |= R == 0 ? 2 : 0;
         sreg |= (128 & R) != 0 ? 4 : 0;
         sreg |= ((sreg >> 2 & 1) ^ (sreg >> 3 & 1)) != 0 ? 0x10 : 0;
-        cpu.Mmio.Data[95] = (byte)sreg;
+        cpu._sregArith = (byte)sreg;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -86,19 +86,21 @@ public static class Opcodes
         var value = cpu.Mmio.Data[(opcode & 0x1f0) >> 4];
         var R = (byte)((value >> 1) | (128 & value));
         cpu.Mmio.Data[(opcode & 0x1f0) >> 4] = R;
-        var sreg = cpu.Mmio.Data[95] & 0xe0;
+        var sreg = cpu._sregArith & 0x20;
         sreg |= R == 0 ? 2 : 0;
         sreg |= (128 & R) != 0 ? 4 : 0;
         sreg |= value & 1;
         sreg |= (((sreg >> 2) & 1) ^ (sreg & 1)) != 0 ? 8 : 0;
         sreg |= (((sreg >> 2) & 1) ^ ((sreg >> 3) & 1)) != 0 ? 0x10 : 0;
-        cpu.Mmio.Data[95] = (byte)sreg;
+        cpu._sregArith = (byte)sreg;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void BCLR(ref Cpu cpu, ref ushort opcode)
     {
-        cpu.Mmio.Data[95] &= (byte)~(1 << ((opcode & 0x70) >> 4));
+        var bit = (opcode & 0x70) >> 4;
+        if (bit < 6) cpu._sregArith &= (byte)~(1 << bit);
+        else cpu.Mmio.Data[95] &= (byte)~(1 << bit);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -112,7 +114,7 @@ public static class Opcodes
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void BRBC(ref Cpu cpu, ref ushort opcode)
     {
-        if ((cpu.Mmio.Data[95] & (1 << (opcode & 7))) == 0)
+        if ((((cpu.Mmio.Data[95] & 0xc0) | cpu._sregArith) & (1 << (opcode & 7))) == 0)
         {
             cpu.Pc = (uint)(cpu.Pc + (((opcode & 0x1f8) >> 3) - ((opcode & 0x200) != 0 ? 0x40 : 0)));
             cpu.Cycles++;
@@ -122,7 +124,7 @@ public static class Opcodes
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void BRBS(ref Cpu cpu, ref ushort opcode)
     {
-        if ((cpu.Mmio.Data[95] & (1 << (opcode & 7))) != 0)
+        if ((((cpu.Mmio.Data[95] & 0xc0) | cpu._sregArith) & (1 << (opcode & 7))) != 0)
         {
             cpu.Pc = (uint)(cpu.Pc + (((opcode & 0x1f8) >> 3) - ((opcode & 0x200) != 0 ? 0x40 : 0)));
             cpu.Cycles++;
@@ -132,7 +134,9 @@ public static class Opcodes
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void BSET(ref Cpu cpu, ref ushort opcode)
     {
-        cpu.Mmio.Data[95] |= (byte)(1 << ((opcode & 0x70) >> 4));
+        var bit = (opcode & 0x70) >> 4;
+        if (bit < 6) cpu._sregArith |= (byte)(1 << bit);
+        else cpu.Mmio.Data[95] |= (byte)(1 << bit);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -177,11 +181,11 @@ public static class Opcodes
         var d = (opcode & 0x1f0) >> 4;
         var R = (byte)(255 - cpu.Mmio.Data[d]);
         cpu.Mmio.Data[d] = R;
-        var sreg = (cpu.Mmio.Data[95] & 0xe1) | 1;
+        var sreg = (cpu._sregArith & 0x20) | 1;
         sreg |= R == 0 ? 2 : 0;
         sreg |= (128 & R) != 0 ? 4 : 0;
         sreg |= ((sreg >> 2) & 1 ^ (sreg >> 3) & 1) != 0 ? 0x10 : 0;
-        cpu.Mmio.Data[95] = (byte)sreg;
+        cpu._sregArith = (byte)sreg;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -190,14 +194,14 @@ public static class Opcodes
         var val1 = cpu.Mmio.Data[(opcode & 0x1f0) >> 4];
         var val2 = cpu.Mmio.Data[(opcode & 0xf) | ((opcode & 0x200) >> 5)];
         var R = val1 - val2;
-        var sreg = cpu.Mmio.Data[95] & 0xc0;
+        var sreg = 0;
         sreg |= R == 0 ? 2 : 0;
         sreg |= (128 & R) != 0 ? 4 : 0;
         sreg |= ((val1 ^ val2) & (val1 ^ R) & 128) != 0 ? 8 : 0;
         sreg |= ((sreg >> 2 & 1) ^ (sreg >> 3 & 1)) != 0 ? 0x10 : 0;
         sreg |= val2 > val1 ? 1 : 0;
         sreg |= (8 & (~val1 & val2 | val2 & R | R & ~val1)) != 0 ? 0x20 : 0;
-        cpu.Mmio.Data[95] = (byte)sreg;
+        cpu._sregArith = (byte)sreg;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -205,14 +209,14 @@ public static class Opcodes
     {
         var arg1 = cpu.Mmio.Data[(opcode & 0x1f0) >> 4];
         var arg2 = cpu.Mmio.Data[(opcode & 0xf) | ((opcode & 0x200) >> 5)];
-        int sreg = cpu.Mmio.Data[95];
-        var r = arg1 - arg2 - (sreg & 1);
-        sreg = (sreg & 0xc0) | ((r == 0 && ((sreg >> 1) & 1) != 0) ? 2 : 0) | (arg2 + (sreg & 1) > arg1 ? 1 : 0);
+        int oldArith = cpu._sregArith;
+        var r = arg1 - arg2 - (oldArith & 1);
+        var sreg = ((r == 0 && ((oldArith >> 1) & 1) != 0) ? 2 : 0) | (arg2 + (oldArith & 1) > arg1 ? 1 : 0);
         sreg |= ((128 & r) != 0 ? 4 : 0);
         sreg |= ((arg1 ^ arg2) & (arg1 ^ r) & 128) != 0 ? 8 : 0;
         sreg |= (((sreg >> 2) & 1) ^ ((sreg >> 3) & 1)) != 0 ? 0x10 : 0;
         sreg |= (8 & ((~arg1 & arg2) | (arg2 & r) | (r & ~arg1))) != 0 ? 0x20 : 0;
-        cpu.Mmio.Data[95] = (byte)sreg;
+        cpu._sregArith = (byte)sreg;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -221,14 +225,14 @@ public static class Opcodes
         var arg1 = cpu.Mmio.Data[((opcode & 0xf0) >> 4) + 16];
         var arg2 = (opcode & 0xf) | ((opcode & 0xf00) >> 4);
         var r = arg1 - arg2;
-        var sreg = cpu.Mmio.Data[95] & 0xc0;
+        var sreg = 0;
         sreg |= r == 0 ? 2 : 0;
         sreg |= (128 & r) != 0 ? 4 : 0;
         sreg |= ((arg1 ^ arg2) & (arg1 ^ r) & 128) != 0 ? 8 : 0;
         sreg |= (((sreg >> 2) & 1) ^ ((sreg >> 3) & 1)) != 0 ? 0x10 : 0;
         sreg |= arg2 > arg1 ? 1 : 0;
         sreg |= (1 & ((~arg1 & arg2) | (arg2 & r) | (r & ~arg1))) != 0 ? 0x20 : 0;
-        cpu.Mmio.Data[95] = (byte)sreg;
+        cpu._sregArith = (byte)sreg;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -244,12 +248,12 @@ public static class Opcodes
         var value = cpu.Mmio.Data[(opcode & 0x1f0) >> 4];
         var r = (byte)(value - 1);
         cpu.Mmio.Data[(opcode & 0x1f0) >> 4] = r;
-        var sreg = cpu.Mmio.Data[95] & 0xe1;
+        var sreg = cpu._sregArith & 0x21;
         sreg |= r == 0 ? 2 : 0;
         sreg |= (128 & r) != 0 ? 4 : 0;
         sreg |= 128 == value ? 8 : 0;
         sreg |= (((sreg >> 2) & 1) ^ ((sreg >> 3) & 1)) != 0 ? 0x10 : 0;
-        cpu.Mmio.Data[95] = (byte)sreg;
+        cpu._sregArith = (byte)sreg;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -310,11 +314,11 @@ public static class Opcodes
     {
         var R = (byte)(cpu.Mmio.Data[(opcode & 0x1f0) >> 4] ^ cpu.Mmio.Data[(opcode & 0xf) | ((opcode & 0x200) >> 5)]);
         cpu.Mmio.Data[(opcode & 0x1f0) >> 4] = R;
-        var sreg = cpu.Mmio.Data[95] & 0xe1;
+        var sreg = cpu._sregArith & 0x21;
         sreg |= R == 0 ? 2 : 0;
         sreg |= (128 & R) != 0 ? 4 : 0;
         sreg |= ((sreg >> 2 & 1) ^ (sreg >> 3 & 1)) != 0 ? 0x10 : 0;
-        cpu.Mmio.Data[95] = (byte)sreg;
+        cpu._sregArith = (byte)sreg;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -324,7 +328,7 @@ public static class Opcodes
         var v2 = cpu.Mmio.Data[(opcode & 7) + 16];
         var R = (v1 * v2) << 1;
         cpu.Mmio.DataView.SetUint16(0, (ushort)R, true);
-        cpu.Mmio.Data[95] = (byte)(cpu.Mmio.Data[95] & 0xfc | ((0xffff & R) != 0 ? 0 : 2) | ((v1 * v2 & 0x8000) != 0 ? 1 : 0));
+        cpu._sregArith = (byte)((cpu._sregArith & 0x3c) | ((0xffff & R) != 0 ? 0 : 2) | ((v1 * v2 & 0x8000) != 0 ? 1 : 0));
         cpu.Cycles++;
     }
 
@@ -335,7 +339,7 @@ public static class Opcodes
         var v2 = cpu.Mmio.DataView.GetInt8((opcode & 7) + 16);
         var R = (v1 * v2) << 1;
         cpu.Mmio.DataView.SetInt16(0, (short)R, true);
-        cpu.Mmio.Data[95] = (byte)(cpu.Mmio.Data[95] & 0xfc | ((0xffff & R) != 0 ? 0 : 2) | ((v1 * v2 & 0x8000) != 0 ? 1 : 0));
+        cpu._sregArith = (byte)((cpu._sregArith & 0x3c) | ((0xffff & R) != 0 ? 0 : 2) | ((v1 * v2 & 0x8000) != 0 ? 1 : 0));
         cpu.Cycles++;
     }
 
@@ -346,7 +350,7 @@ public static class Opcodes
         var v2 = cpu.Mmio.Data[(opcode & 7) + 16];
         var R = (v1 * v2) << 1;
         cpu.Mmio.DataView.SetInt16(0, (short)R, true);
-        cpu.Mmio.Data[95] = (byte)((cpu.Mmio.Data[95] & 0xfc) | ((0xffff & R) != 0 ? 0 : 2) | ((v1 * v2 & 0x8000) != 0 ? 1 : 0));
+        cpu._sregArith = (byte)((cpu._sregArith & 0x3c) | ((0xffff & R) != 0 ? 0 : 2) | ((v1 * v2 & 0x8000) != 0 ? 1 : 0));
         cpu.Cycles++;
     }
 
@@ -387,12 +391,12 @@ public static class Opcodes
         var d = cpu.Mmio.Data[(opcode & 0x1f0) >> 4];
         var r = (d + 1) & 255;
         cpu.Mmio.Data[(opcode & 0x1f0) >> 4] = (byte)r;
-        var sreg = cpu.Mmio.Data[95] & 0xe1;
+        var sreg = cpu._sregArith & 0x21;
         sreg |= r == 0 ? 2 : 0;
         sreg |= (128 & r) != 0 ? 4 : 0;
         sreg |= 127 == d ? 8 : 0;
         sreg |= (((sreg >> 2) & 1) ^ ((sreg >> 3) & 1)) != 0 ? 0x10 : 0;
-        cpu.Mmio.Data[95] = (byte)sreg;
+        cpu._sregArith = (byte)sreg;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -569,12 +573,12 @@ public static class Opcodes
         var value = cpu.Mmio.Data[(opcode & 0x1f0) >> 4];
         var R = (byte)(value >> 1);
         cpu.Mmio.Data[(opcode & 0x1f0) >> 4] = R;
-        var sreg = cpu.Mmio.Data[95] & 0xe0;
+        var sreg = cpu._sregArith & 0x20;
         sreg |= R == 0 ? 2 : 0;
         sreg |= value & 1;
         sreg |= ((sreg >> 2) & 1 ^ (sreg & 1)) != 0 ? 8 : 0;
         sreg |= (((sreg >> 2) & 1) ^ ((sreg >> 3) & 1)) != 0 ? 0x10 : 0;
-        cpu.Mmio.Data[95] = (byte)sreg;
+        cpu._sregArith = (byte)sreg;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -597,7 +601,7 @@ public static class Opcodes
     {
         var R = cpu.Mmio.Data[(opcode & 0x1f0) >> 4] * cpu.Mmio.Data[(opcode & 0xf) | ((opcode & 0x200) >> 5)];
         cpu.Mmio.DataView.SetUint16(0, (ushort)R, true);
-        cpu.Mmio.Data[95] = (byte)(cpu.Mmio.Data[95] & 0xfc | ((0xffff & R) != 0 ? 0 : 2) | ((0x8000 & R) != 0 ? 1 : 0));
+        cpu._sregArith = (byte)((cpu._sregArith & 0x3c) | ((0xffff & R) != 0 ? 0 : 2) | ((0x8000 & R) != 0 ? 1 : 0));
         cpu.Cycles++;
     }
 
@@ -606,7 +610,7 @@ public static class Opcodes
     {
         var R = cpu.Mmio.DataView.GetInt8(((opcode & 0xf0) >> 4) + 16) * cpu.Mmio.DataView.GetInt8((opcode & 0xf) + 16);
         cpu.Mmio.DataView.SetInt16(0, (short)R, true);
-        cpu.Mmio.Data[95] = (byte)(cpu.Mmio.Data[95] & 0xfc | ((0xffff & R) != 0 ? 0 : 2) | ((0x8000 & R) != 0 ? 1 : 0));
+        cpu._sregArith = (byte)((cpu._sregArith & 0x3c) | ((0xffff & R) != 0 ? 0 : 2) | ((0x8000 & R) != 0 ? 1 : 0));
         cpu.Cycles++;
     }
 
@@ -615,7 +619,7 @@ public static class Opcodes
     {
         var R = cpu.Mmio.DataView.GetInt8(((opcode & 0x70) >> 4) + 16) * cpu.Mmio.Data[(opcode & 7) + 16];
         cpu.Mmio.DataView.SetInt16(0, (short)R, true);
-        cpu.Mmio.Data[95] = (byte)(cpu.Mmio.Data[95] & 0xfc | ((0xffff & R) != 0 ? 0 : 2) | ((0x8000 & R) != 0 ? 1 : 0));
+        cpu._sregArith = (byte)((cpu._sregArith & 0x3c) | ((0xffff & R) != 0 ? 0 : 2) | ((0x8000 & R) != 0 ? 1 : 0));
         cpu.Cycles++;
     }
 
@@ -626,14 +630,14 @@ public static class Opcodes
         var value = cpu.Mmio.Data[d];
         var R = (byte)(0 - value);
         cpu.Mmio.Data[d] = R;
-        var sreg = cpu.Mmio.Data[95] & 0xc0;
+        var sreg = 0;
         sreg |= R == 0 ? 2 : 0;
         sreg |= (128 & R) != 0 ? 4 : 0;
         sreg |= 128 == R ? 8 : 0;
         sreg |= (((sreg >> 2) & 1) ^ ((sreg >> 3) & 1)) != 0 ? 0x10 : 0;
         sreg |= R == 0 ? 0 : 1;
         sreg |= (1 & (R | value)) != 0 ? 0x20 : 0;
-        cpu.Mmio.Data[95] = (byte)sreg;
+        cpu._sregArith = (byte)sreg;
     }
     
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -657,11 +661,11 @@ public static class Opcodes
     {
         var R = cpu.Mmio.Data[(opcode & 0x1f0) >> 4] | cpu.Mmio.Data[(opcode & 0xf) | ((opcode & 0x200) >> 5)];
         cpu.Mmio.Data[(opcode & 0x1f0) >> 4] = (byte)R;
-        var sreg = cpu.Mmio.Data[95] & 0xe1;
+        var sreg = cpu._sregArith & 0x21;
         sreg |= R == 0 ? 2 : 0;
         sreg |= (128 & R) != 0 ? 4 : 0;
         sreg |= ((sreg >> 2 & 1) ^ (sreg >> 3 & 1)) != 0 ? 0x10 : 0;
-        cpu.Mmio.Data[95] = (byte)sreg;
+        cpu._sregArith = (byte)sreg;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -669,11 +673,11 @@ public static class Opcodes
     {
         var R = cpu.Mmio.Data[((opcode & 0xf0) >> 4) + 16] | ((opcode & 0xf) | ((opcode & 0xf00) >> 4));
         cpu.Mmio.Data[((opcode & 0xf0) >> 4) + 16] = (byte)R;
-        var sreg = cpu.Mmio.Data[95] & 0xe1;
+        var sreg = cpu._sregArith & 0x21;
         sreg |= R == 0 ? 2 : 0;
         sreg |= (128 & R) != 0 ? 4 : 0;
         sreg |= ((sreg >> 2 & 1) ^ (sreg >> 3 & 1)) != 0 ? 0x10 : 0;
-        cpu.Mmio.Data[95] = (byte)sreg;
+        cpu._sregArith = (byte)sreg;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -758,15 +762,15 @@ public static class Opcodes
     public static void ROR(ref Cpu cpu, ref ushort opcode)
     {
         var d = cpu.Mmio.Data[(opcode & 0x1f0) >> 4];
-        var r = (byte)((d >> 1) | ((cpu.Mmio.Data[95] & 1) << 7));
+        var r = (byte)((d >> 1) | ((cpu._sregArith & 1) << 7));
         cpu.Mmio.Data[(opcode & 0x1f0) >> 4] = r;
-        var sreg = cpu.Mmio.Data[95] & 0xe0;
+        var sreg = cpu._sregArith & 0x20;
         sreg |= r == 0 ? 2 : 0;
         sreg |= (128 & r) != 0 ? 4 : 0;
         sreg |= d & 1;
         sreg |= ((sreg >> 2) & 1 ^ (sreg & 1)) != 0 ? 8 : 0;
         sreg |= (((sreg >> 2) & 1) ^ ((sreg >> 3) & 1)) != 0 ? 0x10 : 0;
-        cpu.Mmio.Data[95] = (byte)sreg;
+        cpu._sregArith = (byte)sreg;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -774,15 +778,15 @@ public static class Opcodes
     {
         var val1 = cpu.Mmio.Data[(opcode & 0x1f0) >> 4];
         var val2 = cpu.Mmio.Data[(opcode & 0xf) | ((opcode & 0x200) >> 5)];
-        int sreg = cpu.Mmio.Data[95];
-        var R = (byte)(val1 - val2 - (sreg & 1));
+        int oldArith = cpu._sregArith;
+        var R = (byte)(val1 - val2 - (oldArith & 1));
         cpu.Mmio.Data[(opcode & 0x1f0) >> 4] = R;
-        sreg = (sreg & 0xc0) | ((R == 0 && ((sreg >> 1) & 1) != 0) ? 2 : 0) | (val2 + (sreg & 1) > val1 ? 1 : 0);
+        var sreg = ((R == 0 && ((oldArith >> 1) & 1) != 0) ? 2 : 0) | (val2 + (oldArith & 1) > val1 ? 1 : 0);
         sreg |= ((128 & R) != 0 ? 4 : 0);
         sreg |= ((val1 ^ val2) & (val1 ^ R) & 128) != 0 ? 8 : 0;
         sreg |= (((sreg >> 2) & 1) ^ ((sreg >> 3) & 1)) != 0 ? 0x10 : 0;
         sreg |= (8 & ((~val1 & val2) | (val2 & R) | (R & ~val1))) != 0 ? 0x20 : 0;
-        cpu.Mmio.Data[95] = (byte)sreg;
+        cpu._sregArith = (byte)sreg;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -790,15 +794,15 @@ public static class Opcodes
     {
         var val1 = cpu.Mmio.Data[((opcode & 0xf0) >> 4) + 16];
         var val2 = (opcode & 0xf) | ((opcode & 0xf00) >> 4);
-        int sreg = cpu.Mmio.Data[95];
-        var R = (byte)(val1 - val2 - (sreg & 1));
+        int oldArith = cpu._sregArith;
+        var R = (byte)(val1 - val2 - (oldArith & 1));
         cpu.Mmio.Data[((opcode & 0xf0) >> 4) + 16] = R;
-        sreg = (sreg & 0xc0) | ((R == 0 && ((sreg >> 1) & 1) != 0) ? 2 : 0) | (val2 + (sreg & 1) > val1 ? 1 : 0);
+        var sreg = ((R == 0 && ((oldArith >> 1) & 1) != 0) ? 2 : 0) | (val2 + (oldArith & 1) > val1 ? 1 : 0);
         sreg |= ((128 & R) != 0 ? 4 : 0);
         sreg |= ((val1 ^ val2) & (val1 ^ R) & 128) != 0 ? 8 : 0;
         sreg |= (((sreg >> 2) & 1) ^ ((sreg >> 3) & 1)) != 0 ? 0x10 : 0;
         sreg |= (8 & ((~val1 & val2) | (val2 & R) | (R & ~val1))) != 0 ? 0x20 : 0;
-        cpu.Mmio.Data[95] = (byte)sreg;
+        cpu._sregArith = (byte)sreg;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -832,14 +836,14 @@ public static class Opcodes
         var l = (opcode & 0xf) | ((opcode & 0xc0) >> 2);
         var R = a - l;
         cpu.Mmio.DataView.SetUint16((ushort)i, (ushort)R, true);
-        var sreg = cpu.Mmio.Data[95] & 0xc0;
+        var sreg = 0;
         sreg |= R == 0 ? 2 : 0;
         sreg |= (0x8000 & R) != 0 ? 4 : 0;
         sreg |= (a & ~R & 0x8000) != 0 ? 8 : 0;
         sreg |= (((sreg >> 2) & 1) ^ ((sreg >> 3) & 1)) != 0 ? 0x10 : 0;
         sreg |= l > a ? 1 : 0;
         sreg |= (1 & ((~a & l) | (l & R) | (R & ~a))) != 0 ? 0x20 : 0;
-        cpu.Mmio.Data[95] = (byte)sreg;
+        cpu._sregArith = (byte)sreg;
         cpu.Cycles++;
     }
 
@@ -983,14 +987,14 @@ public static class Opcodes
         var R = (byte)(val1 - val2);
 
         cpu.Mmio.Data[(opcode & 0x1f0) >> 4] = R;
-        var sreg = cpu.Mmio.Data[95] & 0xc0;
+        var sreg = 0;
         sreg |= R == 0 ? 2 : 0;
         sreg |= (128 & R) != 0 ? 4 : 0;
         sreg |= ((val1 ^ val2) & (val1 ^ R) & 128) != 0 ? 8 : 0;
         sreg |= (((sreg >> 2) & 1) ^ ((sreg >> 3) & 1)) != 0 ? 0x10 : 0;
         sreg |= val2 > val1 ? 1 : 0;
         sreg |= (8 & ((~val1 & val2) | (val2 & R) | (R & ~val1))) != 0 ? 0x20 : 0;
-        cpu.Mmio.Data[95] = (byte)sreg;
+        cpu._sregArith = (byte)sreg;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1000,14 +1004,14 @@ public static class Opcodes
         var val2 = (opcode & 0xf) | ((opcode & 0xf00) >> 4);
         var R = (byte)(val1 - val2);
         cpu.Mmio.Data[((opcode & 0xf0) >> 4) + 16] = R;
-        var sreg = cpu.Mmio.Data[95] & 0xc0;
+        var sreg = 0;
         sreg |= R == 0 ? 2 : 0;
         sreg |= (128 & R) != 0 ? 4 : 0;
         sreg |= ((val1 ^ val2) & (val1 ^ R) & 128) != 0 ? 8 : 0;
         sreg |= (((sreg >> 2) & 1) ^ ((sreg >> 3) & 1)) != 0 ? 0x10 : 0;
         sreg |= val2 > val1 ? 1 : 0;
         sreg |= (1 & ((~val1 & val2) | (val2 & R) | (R & ~val1))) != 0 ? 0x20 : 0;
-        cpu.Mmio.Data[95] = (byte)sreg;
+        cpu._sregArith = (byte)sreg;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -6,7 +6,7 @@ namespace AVR8Sharp.Core.Decoders;
 /// </summary>
 public sealed class ProfilingDecoder : IInstructionDecoder
 {
-    private LutDecoder _inner = new();
+    private NativeLutDecoder _inner = new();
     private readonly Action<uint, ulong> _onInstruction;
 
     public ProfilingDecoder(Action<uint, ulong> onInstruction)
