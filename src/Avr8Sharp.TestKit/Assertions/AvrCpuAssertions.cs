@@ -65,7 +65,7 @@ public class AvrCpuAssertions : ReferenceTypeAssertions<AvrCpu, AvrCpuAssertions
 
     /// <summary>Asserts that the cycle counter equals <paramref name="expected"/>.</summary>
     public AndConstraint<AvrCpuAssertions> HaveCycles(
-        int expected, string because = "", params object[] becauseArgs)
+        ulong expected, string because = "", params object[] becauseArgs)
     {
         Execute.Assertion
             .BecauseOf(because, becauseArgs)

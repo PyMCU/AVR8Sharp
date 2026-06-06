@@ -158,7 +158,7 @@ public static class Opcodes
 
         cpu.Mmio.DataView.SetUint16(93, (ushort)(sp - (cpu.Pc22Bits ? 3 : 2)), true);
         cpu.Pc = k - 1;
-        cpu.Cycles += cpu.Pc22Bits ? 4 : 3;
+        cpu.Cycles += cpu.Pc22Bits ? 4UL : 3UL;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -364,7 +364,7 @@ public static class Opcodes
 
         cpu.Mmio.DataView.SetUint16(93, (ushort)(sp - (cpu.Pc22Bits ? 3 : 2)), true);
         cpu.Pc = (uint)(cpu.Mmio.DataView.GetUint16(30, true) - 1);
-        cpu.Cycles += cpu.Pc22Bits ? 3 : 2;
+        cpu.Cycles += cpu.Pc22Bits ? 3UL : 2UL;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -715,7 +715,7 @@ public static class Opcodes
 
         cpu.Mmio.DataView.SetUint16(93, (ushort)(sp - (cpu.Pc22Bits ? 3 : 2)), true);
         cpu.Pc += (ushort)k;
-        cpu.Cycles += cpu.Pc22Bits ? 3 : 2;
+        cpu.Cycles += cpu.Pc22Bits ? 3UL : 2UL;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -729,7 +729,7 @@ public static class Opcodes
             cpu.Pc |= (uint)(cpu.Mmio.Data[i - 2] << 16);
         }
 
-        cpu.Cycles += cpu.Pc22Bits ? 4 : 3;
+        cpu.Cycles += cpu.Pc22Bits ? 4UL : 3UL;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -743,7 +743,7 @@ public static class Opcodes
             cpu.Pc |= (uint)(cpu.Mmio.Data[i - 2] << 16);
         }
 
-        cpu.Cycles += cpu.Pc22Bits ? 4 : 3;
+        cpu.Cycles += cpu.Pc22Bits ? 4UL : 3UL;
         cpu.Mmio.Data[95] |= 0x80; // Enable interrupts
     }
 
@@ -861,7 +861,7 @@ public static class Opcodes
         var nextOpcode = cpu.ProgramMemory[(int)(cpu.Pc + 1)];
         var skipSize = IsTwoWordInstruction(nextOpcode) ? 2 : 1;
         cpu.Pc += (ushort)skipSize;
-        cpu.Cycles += skipSize;
+        cpu.Cycles += (ulong)skipSize;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

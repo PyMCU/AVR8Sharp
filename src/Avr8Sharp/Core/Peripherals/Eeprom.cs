@@ -22,8 +22,8 @@ public class AvrEeprom
         writeCycles: 28800
     );
 
-    private uint _writeEnabledCycles = 0;
-    private uint _writeCompleteCycles = 0;
+    private ulong _writeEnabledCycles = 0;
+    private ulong _writeCompleteCycles = 0;
     readonly AvrEepromConfig _config;
     readonly AvrInterruptConfig _eer;
     readonly IEepromBackend _backend;
@@ -56,7 +56,7 @@ public class AvrEeprom
             if ((eecr & EEMPE) != 0)
             {
                 var eempeCycles = 4;
-                _writeEnabledCycles = (uint)(cpu.Cycles + eempeCycles);
+                _writeEnabledCycles = cpu.Cycles + (ulong)eempeCycles;
                 cpu.AddClockEvent(() => { cpu.Mmio.Data[_config.EECR] &= ~EEMPE & 0xFF; }, eempeCycles);
             }
 
@@ -102,7 +102,7 @@ public class AvrEeprom
                     return true;
                 }
 
-                _writeCompleteCycles = (uint)(cpu.Cycles + duration);
+                _writeCompleteCycles = cpu.Cycles + (ulong)duration;
                 cpu.Mmio.Data[_config.EECR] |= EEPE;
 
                 cpu.AddClockEvent(() => {

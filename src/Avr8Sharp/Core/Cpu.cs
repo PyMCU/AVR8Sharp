@@ -18,7 +18,7 @@ public class Cpu
 	private ClockEventEntry[] _clockEvents = new ClockEventEntry[64];
 	private int _clockEventCount = 0;
 	private readonly byte[] _ram;
-	private int _nextEventCycle = int.MaxValue;
+	private ulong _nextEventCycle = ulong.MaxValue;
 	private short _nextInterrupt = -1;
 	private short _maxInterrupt = 0;
     #endregion
@@ -37,7 +37,7 @@ public class Cpu
 	public bool InterruptsEnabled => (_ram[95] & 0x80) != 0;
 
 	public uint Pc;
-	public int Cycles;
+	public ulong Cycles;
 
 	public List<AvrIoPort> GpioPorts { get; } = [];
 	public Dictionary<uint, AvrIoPort> GpioByPort { get; } = [];
@@ -86,7 +86,7 @@ public class Cpu
 		}
 		_nextInterrupt = -1;
 		_clockEventCount = 0;
-		_nextEventCycle = int.MaxValue;
+		_nextEventCycle = ulong.MaxValue;
 		Array.Clear(_clockEvents, 0, _clockEvents.Length);
 	}
 	
@@ -189,7 +189,7 @@ public class Cpu
 	
 	public Action AddClockEvent(Action callback, int cycles)
 	{
-		var targetCycles = Cycles + Math.Max(1, cycles);
+		var targetCycles = Cycles + (ulong)Math.Max(1, cycles);
 
 		if (_clockEventCount == _clockEvents.Length) {
 			Array.Resize(ref _clockEvents, _clockEvents.Length * 2);
@@ -229,7 +229,7 @@ public class Cpu
 			_clockEventCount--;
 			_clockEvents[_clockEventCount] = default;
             
-			_nextEventCycle = _clockEventCount > 0 ? _clockEvents[0].Cycles : int.MaxValue;
+			_nextEventCycle = _clockEventCount > 0 ? _clockEvents[0].Cycles : ulong.MaxValue;
 			return true;
 		}
 		return false;
@@ -270,7 +270,7 @@ public class Cpu
 			callback();
 		}
 
-		_nextEventCycle = _clockEventCount > 0 ? _clockEvents[0].Cycles : int.MaxValue;
+		_nextEventCycle = _clockEventCount > 0 ? _clockEvents[0].Cycles : ulong.MaxValue;
 	}
 }
 
@@ -288,5 +288,5 @@ public class AvrInterruptConfig (byte address, ushort enableRegister, int enable
 public struct ClockEventEntry
 {
 	public Action Callback;
-	public int Cycles;
+	public ulong Cycles;
 }
