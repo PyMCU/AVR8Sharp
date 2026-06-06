@@ -7,6 +7,7 @@ Task-oriented guides for the main use cases.
 
 end-to-end
 testkit
+patterns
 ci-validation
 custom-boards
 ```
