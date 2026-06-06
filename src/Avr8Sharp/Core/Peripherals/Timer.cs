@@ -224,7 +224,7 @@ public class AvrTimer
 
     private readonly int _max;
     private readonly bool _hasCaptureInterrupt;
-    private int _lastCycle = 0;
+    private ulong _lastCycle = 0;
     private ushort _ocrA = 0;
     private ushort _nextOcrA = 0;
     private ushort _ocrB = 0;
@@ -643,26 +643,26 @@ public class AvrTimer
     {
         var delta = _cpu.Cycles - _lastCycle;
 
-        if (_divider != 0 && delta >= _divider || external)
+        if (_divider != 0 && delta >= (ulong)_divider || external)
         {
-            var counterDelta = external ? 1 : delta / _divider;
-            _lastCycle += counterDelta * _divider;
+            var counterDelta = external ? 1UL : delta / (ulong)_divider;
+            _lastCycle += counterDelta * (ulong)_divider;
             var val = _tcnt;
             var phasePwm = _timerMode == TimerMode.PWMPhaseCorrect || _timerMode == TimerMode.PWMPhaseFrequencyCorrect;
             int newVal;
             if (phasePwm) 
             {
                 newVal = PhasePwmCount(val, (byte)counterDelta);
-            } 
-            else 
+            }
+            else
             {
-                newVal = val + counterDelta;
-                while (newVal > _cachedTop) 
+                newVal = val + (int)counterDelta;
+                while (newVal > _cachedTop)
                 {
                     newVal -= (_cachedTop + 1);
                 }
             }
-            var overflow = val + counterDelta > _cachedTop;
+            var overflow = val + (int)counterDelta > _cachedTop;
             // A CPU write overrides (has priority over) all counter clear or count operations.
             if (!_tcntUpdated)
             {
@@ -738,7 +738,7 @@ public class AvrTimer
 
             if (newDivider != 0)
             {
-                _cpu.AddClockEvent(_countAction, _lastCycle + newDivider - _cpu.Cycles);
+                _cpu.AddClockEvent(_countAction, (int)(_lastCycle + (ulong)newDivider - _cpu.Cycles));
             }
             else if (_externalClockPort != null &&
                      (CS == (int)ExternalClockMode.FallingEdge || CS == (int)ExternalClockMode.RisingEdge))
@@ -752,7 +752,7 @@ public class AvrTimer
 
         if (reschedule && _divider != 0)
         {
-            _cpu.AddClockEvent(_countAction, _lastCycle + _divider - _cpu.Cycles);
+            _cpu.AddClockEvent(_countAction, (int)(_lastCycle + (ulong)_divider - _cpu.Cycles));
         }
     }
     

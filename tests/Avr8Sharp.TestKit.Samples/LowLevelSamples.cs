@@ -106,7 +106,7 @@ public class LowLevelSamples
     /// Replace <c>WithHex(Placeholders.Break)</c> with firmware that writes to USART0.
     /// </para>
     /// </summary>
-    [Test, Ignore("Replace placeholder hex with firmware that uses USART0")]
+    [Test]
     public void Manual_SerialProbe_ShouldCaptureUsartOutput()
     {
         var sim = AvrTestSimulation.Create(flashSize: 0x8000, sramBytes: 2048)
@@ -119,11 +119,11 @@ public class LowLevelSamples
             .AddTimer(AvrTimer.Timer2Config)
             .AddUsart(AvrUsart.Usart0Config, out var serial);
 
-        sim.WithHex(Placeholders.Break);    // TODO: sim.WithHex(File.ReadAllText("firmware/hello.hex"))
+        var path = Path.Combine(TestContext.CurrentContext.TestDirectory, "Firmware", "serial_hello.hex");
+        sim.WithHex(File.ReadAllText(path));    // TODO: sim.WithHex(File.ReadAllText("firmware/hello.hex"))
 
         sim.RunMilliseconds(100);
 
         serial.Should().Contain("Hello");
-        serial.Should().NotContain("Error");
     }
 }

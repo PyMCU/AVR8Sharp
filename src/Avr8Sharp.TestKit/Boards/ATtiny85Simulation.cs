@@ -111,6 +111,14 @@ public sealed class ATtiny85Simulation : AvrTestSimulation
         ocieb: 0x20, // OCIE1B = TIMSK bit 5
         ociec: 0);
 
+    // ── EEPROM ────────────────────────────────────────────────────────────────
+    // ATtiny85: EECR=0x3C, EEDR=0x3D, EEARL=0x3E; no EEARH (9-bit address, 512 bytes)
+    // EE_RDY: vector 7, word address 0x06
+    private static readonly AvrEepromConfig Tiny85EepromConfig = new AvrEepromConfig(
+        eepromReadyInterrupt: 0x06,
+        eecr: 0x3C, eedr: 0x3D, eearl: 0x3E, eearh: 0x00,
+        eraseCycles: 28800, writeCycles: 28800);
+
     // ── GPIO ──────────────────────────────────────────────────────────────────
     /// <summary>
     /// Port B — the only I/O port on the ATtiny85.
@@ -128,6 +136,9 @@ public sealed class ATtiny85Simulation : AvrTestSimulation
     /// </summary>
     public AvrTimer Timer1 { get; }
 
+    /// <summary>ATtiny85 internal EEPROM — 512 bytes, volatile (in-memory backend).</summary>
+    public AvrEeprom Eeprom { get; }
+
     public ATtiny85Simulation() : base(Flash, Sram)
     {
         WithFrequency(Frequency);
@@ -135,5 +146,6 @@ public sealed class ATtiny85Simulation : AvrTestSimulation
         AddGpio(Tiny85PortBConfig, out var portB); PortB = portB;
         AddTimer(Tiny85Timer0Config, out var t0);  Timer0 = t0;
         AddTimer(Tiny85Timer1Config, out var t1);  Timer1 = t1;
+        AddEeprom(Tiny85EepromConfig, out var eeprom, 512); Eeprom = eeprom;
     }
 }

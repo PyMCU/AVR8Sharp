@@ -8,26 +8,8 @@ namespace Avr8Sharp.Demo;
 
 public static class Program
 {
-	const string HexiUrl = "https://hexi.wokwi.com";
-	const string BlinkCode = @"
-// Green LED connected to LED_BUILTIN,
-// Red LED connected to pin 12. Enjoy!
-
-void setup() {
-  Serial.begin(115200);
-  pinMode(LED_BUILTIN, OUTPUT);
-}
-
-void loop() {
-  Serial.println(""AVR8Sharp is awesome!"");
-  digitalWrite(LED_BUILTIN, HIGH);
-  delay(500);
-  digitalWrite(LED_BUILTIN, LOW);
-  delay(500);
-}
-";
-
-	private const string BlinkHex = """
+	#if DEBUG
+	private const string PrecompiledBlinkHex = """
 	                                :100000000C945D000C9485000C9485000C94850084
 	                                :100010000C9485000C9485000C9485000C9485004C
 	                                :100020000C9485000C9485000C9485000C9485003C
@@ -155,19 +137,43 @@ void loop() {
 	                                :00000001FF
 
 	                                """;
+	#else
+	const string HexiUrl = "https://hexi.wokwi.com";
+	const string BlinkCode = @"
+// Green LED connected to LED_BUILTIN,
+// Red LED connected to pin 12. Enjoy!
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(LED_BUILTIN, OUTPUT);
+}
+
+void loop() {
+  Serial.println(""AVR8Sharp is awesome!"");
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(500);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(500);
+}
+";
 	public static readonly HttpClient Client = new HttpClient ();
+	#endif
 
 	public static void Main ()
 	{
 		// Compile the code using the Hexi API
-		// var result = Compile (BlinkCode);
-		// var hex = result.Hex;
+#if DEBUG
+		var hex = PrecompiledBlinkHex;
+#else
+		var result = Compile (BlinkCode);
+		var hex = result.Hex;
+#endif
 		var watch = new Stopwatch ();
 		// Create the AVR runner
 		var runner = AvrBuilder.Create ()
 			.SetSpeed (16_000_000)
 			.SetWorkUnitCycles (1_000)
-			.SetHex (BlinkHex)
+			.SetHex (hex)
 			.AddGpioPort (AvrIoPort.PortBConfig, out var portB)
 			.AddGpioPort (AvrIoPort.PortCConfig, out _)
 			.AddGpioPort (AvrIoPort.PortDConfig, out _)
@@ -213,6 +219,7 @@ void loop() {
 		Console.WriteLine ($"Execution time: {watch.ElapsedMilliseconds} ms");
 	}
 
+	#if !DEBUG
 	public static HexiResult Compile (string source)
 	{
 		var content = new StringContent (JsonConvert.SerializeObject (new {
@@ -229,4 +236,5 @@ void loop() {
 		public string Stderr { get; set; }
 		public string Hex { get; set; }
 	}
+	#endif
 }

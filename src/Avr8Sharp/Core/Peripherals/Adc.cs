@@ -114,7 +114,7 @@ public class AvrAdc
                 refs |= 0x4;
             }
 
-            return _config.AdcReferences[refs] ?? ReferenceVoltageType;
+            return _config.AdcReferences[refs] ?? AdcReference.AVCC;
         }
     }
 

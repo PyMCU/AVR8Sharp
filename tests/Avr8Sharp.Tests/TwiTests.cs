@@ -810,6 +810,72 @@ public class Twi : AvrTestBase
             });
         }
 
+        [Test(Description = "SlaveAddress property returns the upper 7 bits of TWAR")]
+        public void SlaveAddress_ReturnsCurrentTwarAddress()
+        {
+            // Write 0x90 directly to the TWAR data array (address 0x48 << 1 = 0x90)
+            Cpu.Mmio.Data[TWAR] = 0x90;
+            Assert.That(_twi.SlaveAddress, Is.EqualTo(0x48));
+
+            // Write 0x44 (address 0x22)
+            Cpu.Mmio.Data[TWAR] = 0x44;
+            Assert.That(_twi.SlaveAddress, Is.EqualTo(0x22));
+
+            // TWGCE bit (bit 0) must not affect the address
+            Cpu.Mmio.Data[TWAR] = (byte)(0x90 | 0x01);
+            Assert.That(_twi.SlaveAddress, Is.EqualTo(0x48));
+        }
+
+        [Test(Description = "SlaveAddressChanged event fires with the new address when TWAR is written via Cpu.WriteData")]
+        public void SlaveAddressChanged_FiredWhenTwarWrittenViaCpu()
+        {
+            byte? receivedAddress = null;
+            _twi.SlaveAddressChanged += addr => receivedAddress = addr;
+
+            Cpu.WriteData((ushort)TWAR, 0x90); // address 0x48
+            Assert.That(receivedAddress, Is.EqualTo(0x48), "Event must fire with address 0x48 when TWAR=0x90");
+
+            receivedAddress = null;
+            Cpu.WriteData((ushort)TWAR, 0x44); // address 0x22
+            Assert.That(receivedAddress, Is.EqualTo(0x22), "Event must fire with address 0x22 when TWAR=0x44");
+        }
+
+        [Test(Description = "SlaveAddressChanged event fires with zero when TWAR is cleared")]
+        public void SlaveAddressChanged_FiredWithZeroWhenTwarCleared()
+        {
+            byte? receivedAddress = null;
+            _twi.SlaveAddressChanged += addr => receivedAddress = addr;
+
+            Cpu.WriteData((ushort)TWAR, 0x00);
+            Assert.That(receivedAddress, Is.EqualTo(0), "Event must fire with address 0 when TWAR is cleared");
+        }
+
+        [Test(Description = "SlaveAddressChanged event fires when TWAR is written via AVR sts instruction")]
+        public void SlaveAddressChanged_FiredViaAssemblyStoreInstruction()
+        {
+            var asmCode = $@"
+        ldi r16, 0x44
+        sts {TWAR}, r16
+        break
+    ";
+            var program = new AsmProgram(asmCode).Compile();
+            Cpu.LoadProgram(program.Program);
+
+            byte? receivedAddress = null;
+            _twi.SlaveAddressChanged += addr => receivedAddress = addr;
+
+            var runner = new TestProgramRunner(Cpu, _ => { });
+            runner.RunInstructions(4);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(receivedAddress, Is.EqualTo(0x22),
+                    "SlaveAddressChanged must fire with 0x22 when sts TWAR,r16 stores 0x44");
+                Assert.That(_twi.SlaveAddress, Is.EqualTo(0x22),
+                    "SlaveAddress property must reflect the value written by the sts instruction");
+            });
+        }
+
         [Test(Description = "Interrupt: Jumps to TWI vector only when TWIE and Global Interrupts are enabled")]
         public void SlaveAddressMatch_JumpsToInterruptOnlyWhenEnabled()
         {

@@ -17,7 +17,7 @@ public class AvrClock
         2, 4, 8, 16, 32, 64, 128,
     ];
 
-    int _clockEnabledCycles = 0;
+    ulong _clockEnabledCycles = 0;
     int _prescalerValue = 1;
     int _cyclesDelta = 0;
     readonly uint _baseFreqHz = 0;
@@ -35,17 +35,17 @@ public class AvrClock
 
     public uint TimeNanos
     {
-        get { return (uint)((_cpu.Cycles + _cyclesDelta) / (double)Frequency * 1e9); }
+        get { return (uint)(((double)_cpu.Cycles + _cyclesDelta) / Frequency * 1e9); }
     }
 
     public uint TimeMicros
     {
-        get { return (uint)((_cpu.Cycles + _cyclesDelta) / (double)Frequency * 1e6); }
+        get { return (uint)(((double)_cpu.Cycles + _cyclesDelta) / Frequency * 1e6); }
     }
 
     public uint TimeMillis
     {
-        get { return (uint)((_cpu.Cycles + _cyclesDelta) / (double)Frequency * 1e3); }
+        get { return (uint)(((double)_cpu.Cycles + _cyclesDelta) / Frequency * 1e3); }
     }
 
     public AvrClock(Cpu cpu, uint baseFreqHz, AvrClockConfig clockConfig)
@@ -67,8 +67,8 @@ public class AvrClock
                 cpu.Mmio.Data[clockConfig.CLKPR] = (byte)index;
                 if (oldPrescaler != _prescalerValue)
                 {
-                    _cyclesDelta = (int)((cpu.Cycles + _cyclesDelta) * (oldPrescaler / (double)_prescalerValue) -
-                                         cpu.Cycles);
+                    _cyclesDelta = (int)(((double)cpu.Cycles + _cyclesDelta) * (oldPrescaler / (double)_prescalerValue) -
+                                         (double)cpu.Cycles);
                 }
             }
 

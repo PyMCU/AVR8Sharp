@@ -408,4 +408,73 @@ public class Eeprom : AvrTestBase
 
 		Assert.That(Cpu.Cycles - cyclesBefore, Is.GreaterThanOrEqualTo(4));
 	}
+
+	[TestFixture]
+	public class Reset : AvrTestBase
+	{
+		private EepromMemoryBackend _backend;
+		private AvrEeprom _eeprom;
+
+		protected override void SetupPeripherals()
+		{
+			_backend = new EepromMemoryBackend(1024);
+			_eeprom = new AvrEeprom(Cpu, _backend);
+		}
+
+		[Test(Description = "After CPU reset during a write-in-progress, EEPE must be clear and a new write must succeed")]
+		public void WriteInProgress_ResetClearsEepeAndAllowsNewWrite()
+		{
+			// Start a write to address 5
+			Cpu.WriteData(EEARL, 5);
+			Cpu.WriteData(EEDR, 0xAA);
+			Cpu.WriteData(EECR, (byte)EEMPE);
+			Cpu.WriteData(EECR, (byte)EEPE);
+
+			// Sanity: write should be in progress
+			Assert.That(Cpu.ReadData(EECR) & EEPE, Is.EqualTo(EEPE), "EEPE must be set before reset");
+
+			// Simulate a CPU reset (e.g. watchdog)
+			Cpu.Reset();
+
+			// EEPE must be cleared after reset
+			Assert.That(Cpu.ReadData(EECR) & EEPE, Is.Zero, "EEPE must be cleared by reset");
+
+			// A fresh write to a different address must succeed without stale _writeCompleteCycles blocking it
+			Cpu.WriteData(EEARL, 10);
+			Cpu.WriteData(EEDR, 0x55);
+			Cpu.WriteData(EECR, (byte)EEMPE);
+			Cpu.WriteData(EECR, (byte)EEPE);
+
+			Cpu.Cycles += 60_000;
+			Cpu.Tick();
+
+			Assert.Multiple(() =>
+			{
+				Assert.That(_backend.ReadMemory(10), Is.EqualTo(0x55), "New write after reset must complete normally");
+				Assert.That(Cpu.ReadData(EECR) & EEPE, Is.Zero, "EEPE must be clear after the new write completes");
+			});
+		}
+
+		[Test(Description = "After CPU reset, the EEMPE write-enable window must be invalidated")]
+		public void WriteEnableWindow_ResetInvalidatesWindow()
+		{
+			// Set EEMPE to open the write window
+			Cpu.WriteData(EECR, (byte)EEMPE);
+
+			// Reset fires while the 4-cycle window is still open
+			Cpu.Reset();
+
+			// Attempt to write using EEPE only (no EEMPE set after reset)
+			Cpu.WriteData(EEARL, 7);
+			Cpu.WriteData(EEDR, 0x77);
+			Cpu.WriteData(EECR, (byte)EEPE);
+			Cpu.Tick();
+
+			Assert.Multiple(() =>
+			{
+				Assert.That(_backend.ReadMemory(7), Is.EqualTo(0xFF), "Write must be rejected: EEMPE window was invalidated by reset");
+				Assert.That(Cpu.ReadData(EECR) & EEPE, Is.Zero, "EEPE must be automatically cleared after rejected write");
+			});
+		}
+	}
 }

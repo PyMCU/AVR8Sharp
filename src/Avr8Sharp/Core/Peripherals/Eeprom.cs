@@ -22,14 +22,16 @@ public class AvrEeprom
         writeCycles: 28800
     );
 
-    private uint _writeEnabledCycles = 0;
-    private uint _writeCompleteCycles = 0;
+    private ulong _writeEnabledCycles = 0;
+    private ulong _writeCompleteCycles = 0;
     readonly AvrEepromConfig _config;
     readonly AvrInterruptConfig _eer;
     readonly IEepromBackend _backend;
+    readonly Cpu _cpu;
 
     public AvrEeprom(Cpu cpu, IEepromBackend backend, AvrEepromConfig? config = null)
     {
+        _cpu = cpu;
         _backend = backend;
         _config = config ?? EepromConfig;
         _eer = new AvrInterruptConfig(
@@ -41,6 +43,7 @@ public class AvrEeprom
             constant: true,
             inverseFlag: true
         );
+        cpu.OnPeripheralReset += Reset;
         cpu.Mmio.RegisterWrite(_config.EECR, (eecr, _, _, _) =>
         {
             var addr = (ushort)((cpu.Mmio.Data[_config.EEARH] << 8) | cpu.Mmio.Data[_config.EEARL]);
@@ -56,7 +59,7 @@ public class AvrEeprom
             if ((eecr & EEMPE) != 0)
             {
                 var eempeCycles = 4;
-                _writeEnabledCycles = (uint)(cpu.Cycles + eempeCycles);
+                _writeEnabledCycles = cpu.Cycles + (ulong)eempeCycles;
                 cpu.AddClockEvent(() => { cpu.Mmio.Data[_config.EECR] &= ~EEMPE & 0xFF; }, eempeCycles);
             }
 
@@ -102,7 +105,7 @@ public class AvrEeprom
                     return true;
                 }
 
-                _writeCompleteCycles = (uint)(cpu.Cycles + duration);
+                _writeCompleteCycles = cpu.Cycles + (ulong)duration;
                 cpu.Mmio.Data[_config.EECR] |= EEPE;
 
                 cpu.AddClockEvent(() => {
@@ -119,6 +122,18 @@ public class AvrEeprom
 
             return true;
         });
+    }
+
+    /// <summary>
+    /// Resets EEPROM state after a CPU reset. Clears the write-enable window and
+    /// the write-in-progress flag so stale cycle values from before the reset cannot
+    /// block or spuriously allow writes in the new execution context.
+    /// </summary>
+    public void Reset()
+    {
+        _writeEnabledCycles = 0;
+        _writeCompleteCycles = 0;
+        _cpu.Mmio.Data[_config.EECR] &= unchecked((byte)~(EEPE | EEMPE));
     }
 }
 

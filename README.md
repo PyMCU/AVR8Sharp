@@ -1,133 +1,167 @@
-# AVR8Sharp
+# Avr8Sharp
 
-![Build Status](https://github.com/begeistert/AVR8Sharp/actions/workflows/ci.yml/badge.svg)
+![Build Status](https://github.com/PyMCU/avr8sharp/actions/workflows/ci.yml/badge.svg)
 [![NuGet](https://img.shields.io/nuget/v/Avr8Sharp.svg)](https://www.nuget.org/packages/Avr8Sharp)
-[![License](https://img.shields.io/github/license/begeistert/AVR8Sharp)](https://github.com/begeistert/AVR8Sharp/blob/main/LICENSE)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![.NET Version](https://img.shields.io/badge/.NET-10.0-purple)
 
-**AVR8Sharp** is a .NET library that emulates the AVR 8-bit microcontroller family. It is a port of the [avr8js](https://github.com/wokwi/avr8js) library originally written in TypeScript, with additional accuracy fixes and C#-specific optimizations.
+**Avr8Sharp** is a high-performance emulator for the **AVR 8-bit microcontroller** family,
+written entirely in modern **C# (.NET 10)**. It runs real, unmodified Arduino and AVR
+firmware — and is designed as a deterministic **firmware testkit** for validating the output
+of the [PyMCU](https://docs.pymcu.org) compiler in CI.
 
-The library executes precompiled AVR firmware and provides a configurable peripheral layer for simulating the microcontroller's I/O — suitable for unit testing firmware, building interactive simulators, or running automated hardware-in-the-loop style tests without physical hardware.
-
-```mermaid
-graph LR
-    A[Precompiled Firmware] --> B[AVR8Sharp]
-    B <--> C[Glue Code]
-    C <--> D[Peripheral / Hardware Simulation]
-    D <--> E[Simulation UI / Test Assertions]
-```
-
-## Installation
+It is a C# port and re-imagination of [avr8js](https://github.com/wokwi/avr8js) by
+Uri Shaked, with accuracy fixes and .NET-specific optimizations.
 
 ```bash
 dotnet add package Avr8Sharp
+dotnet add package Avr8Sharp.TestKit   # fluent harness for firmware tests
 ```
-
-## Usage
-
-The library uses a **builder pattern** to configure the CPU, clock speed, and peripherals. The example below loads a HEX file and runs it as an Arduino Uno (ATmega328P), printing any bytes sent over the USART serial port.
 
 ```csharp
-using AVR8Sharp.Core;
-using AVR8Sharp.Core.Peripherals;
+using Avr8Sharp.TestKit.Boards;
 
-// Load firmware from an Intel HEX file
-var hex = File.ReadAllText("firmware.hex");
+var uno = new ArduinoUnoSimulation()
+    .WithHex(File.ReadAllText("sketch.hex"));
 
-// Build the simulation
-var runner = AvrBuilder.Create()
-    .SetSpeed(16_000_000)          // 16 MHz clock
-    .SetWorkUnitCycles(500_000)    // cycles to execute per Execute() call
-    .SetHex(hex)
-    .AddGpioPort(AvrIoPort.PortBConfig, out _)
-    .AddGpioPort(AvrIoPort.PortCConfig, out _)
-    .AddGpioPort(AvrIoPort.PortDConfig, out _)
-    .AddUsart(AvrUsart.Usart0Config, out var usart)
-    .AddTimer(AvrTimer.Timer0Config, out _)
-    .AddTimer(AvrTimer.Timer1Config, out _)
-    .AddTimer(AvrTimer.Timer2Config, out _)
-    .Build();
+uno.RunMilliseconds(500);
 
-// Print every line the firmware sends over serial
-var line = new StringBuilder();
-usart.OnByteTransmit = b => {
-    var c = (char)b;
-    line.Append(c);
-    if (c != '\n') return;
-    Console.WriteLine(line.ToString().TrimEnd());
-    line.Clear();
-};
-
-// Run the simulation loop
-while (true)
-{
-    runner.Execute();
-}
+uno.PortB.Should().HavePinHigh(5);    // LED_BUILTIN
+uno.Serial.Should().Contain("Hello");
 ```
 
-The snippet above will run the following Arduino sketch:
+---
 
-```cpp
-void setup() {
-    Serial.begin(115200);
-    pinMode(LED_BUILTIN, OUTPUT);
-}
+## Supported chips
 
-void loop() {
-    Serial.println("AVR8Sharp is awesome!");
-    digitalWrite(LED_BUILTIN, HIGH);
-    delay(500);
-    digitalWrite(LED_BUILTIN, LOW);
-    delay(500);
-}
+| Board preset | Chip | Flash | SRAM | Timers | Serial |
+|---|---|---|---|---|---|
+| `ArduinoUnoSimulation` | ATmega328P | 32 KB | 2 KB | 0–2 | USART0 |
+| `ArduinoMegaSimulation` | ATmega2560 | 256 KB | 8 KB | 0–5 | USART0–3 |
+| `ATtiny85Simulation` | ATtiny85 | 8 KB | 512 B | TC0, TC1 | USI |
+
+Any AVR 8-bit device can be modelled via `AvrTestSimulation.Create()` with custom
+peripheral configs.
+
+## Features
+
+- **Full AVR Enhanced instruction set** — all ATmega328P / ATmega2560 instructions
+- **Datasheet-accurate flags** — half-carry, overflow, sign, and carry verified against
+  Microchip datasheets; accuracy bugs from avr8js corrected
+- **Board presets** — Uno, Mega 2560, ATtiny85 with all peripherals wired up
+- **Peripherals** — GPIO, USART, Timers (8/16-bit), SPI, TWI (I²C), ADC, EEPROM, USI,
+  Watchdog
+- **Fluent TestKit** — `RunUntilSerial`, `RunToBreak`, `RunUntilMs` with bounded,
+  never-hanging runs
+- **FluentAssertions extensions** — CPU, GPIO, memory, and serial probe assertions
+- **Inline assembly** — load and run short assembly snippets without an external toolchain
+- **AOT-friendly** — trimmable and NativeAOT-compatible
+
+## Getting Started
+
+```bash
+git clone https://github.com/PyMCU/avr8sharp.git
+cd avr8sharp
+dotnet restore
+dotnet build
 ```
 
-### Peripherals
-
-All peripherals are optional and added via the builder. Each peripheral exposes callbacks and properties for interacting with the simulation from the host:
-
-| Peripheral | Builder method | Key callbacks / properties |
-|---|---|---|
-| GPIO port | `AddGpioPort` | `SetPinValue`, `GetPinState`, `AddListener` |
-| USART | `AddUsart` | `OnByteTransmit`, `WriteByte` |
-| Timer | `AddTimer` | `OnOutputCompareMatch`, timer OC pins |
-| SPI | `AddSpi` | `OnTransfer`, `SimulateIncomingMasterByte` |
-| TWI (I2C) | `AddTwi` | `EventHandler`, `SimulateIncomingAddress`, `SimulateIncomingData` |
-| ADC | `AddAdc` | `ChannelValues[]`, `TemperatureVoltage` |
-| EEPROM | `AddEeprom` | `EepromMemoryBackend` |
-| USI | `AddUsi` | `OnStartCondition`, `OnStopCondition` |
-
-### Decoders
-
-Three instruction decoders are available. The default (`NativeLut`) is the fastest:
-
-```csharp
-AvrBuilder.Create()
-    .UseNativeDecoder()   // unsafe function-pointer LUT — fastest (default)
-    // .UseLutDecoder()   // delegate LUT — portable
-    // .UseSwitchDecoder() // switch/case — simplest
-    ...
-```
-
-## Supported Chips
-
-AVR8Sharp targets the ATmega328P by default and includes pre-built configurations for:
-
-- **ATmega328P** — Arduino Uno/Nano (Timers 0–2, USART0, SPI, TWI, ADC)
-- **ATmega2560** — Arduino Mega (adds Timers 3–5, USART1–3)
-- **ATtiny85** — USI, Timer0/1
-
-Because the peripheral register addresses are fully configurable, most AVR 8-bit devices can be modelled by supplying the appropriate register map.
-
-## Testing
+**Run the tests:**
 
 ```bash
 dotnet test
 ```
 
+## TestKit
+
+```csharp
+using Avr8Sharp.TestKit.Boards;
+
+var uno = new ArduinoUnoSimulation()
+    .WithHex(File.ReadAllText("blink.hex"));
+
+// Blocks until "PASS" appears on Serial, or throws TimeoutException after 5 s
+uno.RunUntilSerial(uno.Serial, "PASS", maxMs: 5000);
+
+uno.Serial.Should().Contain("PASS");
+uno.PortB.Should().HavePinHigh(5);
+```
+
+### Validating firmware in CI
+
+```csharp
+[Test]
+public void Firmware_output_matches_expected()
+{
+    var mega = new ArduinoMegaSimulation()
+        .WithHex(File.ReadAllText("firmware.hex"));
+
+    mega.RunUntilSerial(mega.Serial0, "done", maxMs: 3000);
+
+    mega.Serial0.Should().Contain("done");
+    // Cycle-count regression guard — deterministic across machines
+    Assert.That(mega.Cpu.Cycles, Is.LessThanOrEqualTo(1_000_000));
+}
+```
+
+## Solution structure
+
+| Project | Description |
+|---|---|
+| `src/Avr8Sharp` | Core library — CPU, instruction decoders, peripherals |
+| `src/Avr8Sharp.TestKit` | Fluent test harness, board presets, probes, assertions |
+| `tests/Avr8Sharp.Tests` | Unit and integration tests |
+
+## Architecture notes
+
+- **Instruction decoder:** 65 536-entry flat LUT of `delegate*` function pointers —
+  O(1) dispatch with no opcode branch (`NativeLutDecoder`)
+- **SREG lazy evaluation:** arithmetic flags written to a split field (`_sregArith`);
+  I/T flags always accurate in `_ram[95]` — avoids redundant flag computation
+- **ProcessClockEvents O(1):** circular deque with `_clockHead` pointer; no array shift
+  on timer reprogramming
+- **MmioController inline chains:** up to 4 write hooks per address stored inline in a
+  value struct — no closure allocations
+
+## Roadmap
+
+### Core / CPU
+- [x] Full AVR Enhanced instruction set (ATmega328P / ATmega2560)
+- [x] ATtiny85 Reduced Core
+- [x] Interrupts, SREG, SP, cycle-accurate timing
+- [x] Accuracy fixes: half-carry in ADC, CPI, NEG, SBIW, SUBI
+- [ ] `SPM` (self-programming flash)
+
+### Peripherals
+- [x] GPIO with pin-change and external interrupts
+- [x] USART (multiple channels on Mega)
+- [x] Timers 0–5 (8-bit and 16-bit)
+- [x] SPI
+- [x] TWI / I²C (master mode)
+- [x] ADC
+- [x] EEPROM (read/write/erase)
+- [x] USI
+- [x] Watchdog
+- [ ] ATtiny85 TC1 CTC and PWM modes
+- [ ] TWI slave mode
+
+### Ecosystem
+- [x] Board presets: Uno, Mega 2560, ATtiny85
+- [x] FluentAssertions extensions
+- [x] Inline AVR assembler
+- [ ] DocFX API reference
+
+## Contributing
+
+1. Fork the repository.
+2. Create a feature branch (`git checkout -b feature/my-feature`).
+3. Ensure all tests pass (`dotnet test`).
+4. Commit following [Conventional Commits](https://www.conventionalcommits.org/).
+5. Open a Pull Request against `main`.
+
 ## License
 
-Copyright (c) 2019-present Uri Shaked.
+MIT License — see [LICENSE](LICENSE).
 
-Copyright (c) 2025-present Iván Montiel.
-
-Licensed under the [MIT License](LICENSE).
+Based on the original work from [avr8js](https://github.com/wokwi/avr8js) © 2019–present Uri Shaked.  
+C# Port © 2025–present Iván Montiel Cardona.

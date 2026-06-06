@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Text;
 using AVR8Sharp.Core.Peripherals;
 
@@ -11,11 +12,16 @@ public class SerialProbe
 {
     private readonly List<byte> _rawBytes = new();
     private readonly AvrUsart _usart;
+    private ReadOnlyCollection<string>? _linesCache;
 
     internal SerialProbe(AvrUsart usart)
     {
         _usart = usart;
-        usart.OnByteTransmit = b => _rawBytes.Add(b);
+        usart.OnByteTransmit = b =>
+        {
+            _rawBytes.Add(b);
+            _linesCache = null;
+        };
     }
 
     /// <summary>All characters received so far as a single string (Latin-1 encoded).</summary>
@@ -29,12 +35,17 @@ public class SerialProbe
 
     /// <summary>
     /// The received text split on <c>'\n'</c>, with trailing <c>'\r'</c> stripped from each line.
+    /// The result is cached and invalidated whenever a new byte arrives.
     /// </summary>
     public IReadOnlyList<string> Lines
-        => Text.Split('\n').Select(l => l.TrimEnd('\r')).ToList();
+        => _linesCache ??= Array.AsReadOnly(Text.Split('\n').Select(l => l.TrimEnd('\r')).ToArray());
 
     /// <summary>Clears the captured output buffer.</summary>
-    public void Clear() => _rawBytes.Clear();
+    public void Clear()
+    {
+        _rawBytes.Clear();
+        _linesCache = null;
+    }
 
     /// <summary>
     /// Injects a byte into the USART receiver, simulating an incoming character

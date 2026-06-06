@@ -39,13 +39,16 @@ public class AvrTestSimulation
     internal readonly AvrRunner Runner;
 
     public AvrCpu Cpu => Runner.Cpu;
-    public SwitchDecoder Decoder = new SwitchDecoder();
+
+    private LutDecoder _decoder;
+
     public byte[] Data => Runner.Cpu.Mmio.Data;
     public AvrMemoryView Memory => new(Runner.Cpu.Mmio.Data);
 
     protected AvrTestSimulation(int flashSize, int sramBytes)
     {
         Runner = new AvrRunner(new byte[flashSize], sramBytes);
+        _decoder = new LutDecoder();
     }
 
     /// <summary>Creates a new blank simulation with the given flash and SRAM sizes.</summary>
@@ -84,6 +87,17 @@ public class AvrTestSimulation
     public AvrTestSimulation WithProgram(byte[] bytes)
     {
         Runner.LoadProgram(bytes);
+        return this;
+    }
+
+    /// <summary>
+    /// Resets the CPU to its power-on state: PC=0, SP=RAMEND, SREG=0, pending interrupts cleared.
+    /// Does not clear the loaded program.
+    /// Returns <c>this</c> for chaining.
+    /// </summary>
+    public AvrTestSimulation Reset()
+    {
+        Runner.Cpu.Reset();
         return this;
     }
 
@@ -126,17 +140,17 @@ public class AvrTestSimulation
     }
 
     /// <summary>Adds an EEPROM peripheral with a volatile in-memory backend.</summary>
-    public AvrTestSimulation AddEeprom(AvrEepromConfig config, out AvrEeprom eeprom)
+    public AvrTestSimulation AddEeprom(AvrEepromConfig config, out AvrEeprom eeprom, uint eepromSize = 1024)
     {
-        var backend = new EepromMemoryBackend(1024);
+        var backend = new EepromMemoryBackend(eepromSize);
         eeprom = new AvrEeprom(Runner.Cpu, backend, config);
         return this;
     }
 
     /// <summary>Adds an EEPROM peripheral (no out handle).</summary>
-    public AvrTestSimulation AddEeprom(AvrEepromConfig config)
+    public AvrTestSimulation AddEeprom(AvrEepromConfig config, uint eepromSize = 1024)
     {
-        var backend = new EepromMemoryBackend(1024);
+        var backend = new EepromMemoryBackend(eepromSize);
         _ = new AvrEeprom(Runner.Cpu, backend, config);
         return this;
     }
@@ -165,6 +179,30 @@ public class AvrTestSimulation
     // ── Execution ────────────────────────────────────────────────────────────
 
     /// <summary>
+    /// Executes one decoded instruction and one CPU tick.
+    /// Converts a raw <see cref="IndexOutOfRangeException"/> (PC out of flash) into an
+    /// <see cref="InvalidOperationException"/> with diagnostic context.
+    /// </summary>
+    private void Step()
+    {
+        try
+        {
+            _decoder.Decode(Runner.Cpu);
+            Runner.Cpu.Tick();
+        }
+        catch (IndexOutOfRangeException)
+        {
+            var pc = Runner.Cpu.Pc;
+            if (pc < Runner.Cpu.ProgramMemory.Length) throw;
+            var flash = Runner.Cpu.ProgramMemory.Length * 2;
+            throw new InvalidOperationException(
+                $"Simulation crashed: PC=0x{pc:X4} (byte addr 0x{pc * 2:X5}) is out of flash " +
+                $"(flash={flash} bytes, 0x{flash:X}). " +
+                $"Cycles={Runner.Cpu.Cycles}, SREG=0x{Runner.Cpu.Sreg:X2}, SP=0x{Runner.Cpu.Sp:X4}.");
+        }
+    }
+
+    /// <summary>
     /// Runs the simulation for exactly <paramref name="cycles"/> CPU cycles.
     /// Returns <c>this</c> for chaining.
     /// </summary>
@@ -172,10 +210,7 @@ public class AvrTestSimulation
     {
         var target = (long)Runner.Cpu.Cycles + cycles;
         while ((long)Runner.Cpu.Cycles < target)
-        {
-            Decoder.Decode(Runner.Cpu);
-            Runner.Cpu.Tick();
-        }
+            Step();
         return this;
     }
 
@@ -193,10 +228,7 @@ public class AvrTestSimulation
     public AvrTestSimulation RunInstructions(int count)
     {
         for (var i = 0; i < count; i++)
-        {
-            Decoder.Decode(Runner.Cpu);
-            Runner.Cpu.Tick();
-        }
+            Step();
         return this;
     }
 
@@ -214,8 +246,7 @@ public class AvrTestSimulation
         {
             if (predicate(this))
                 return this;
-            Decoder.Decode(Runner.Cpu);
-            Runner.Cpu.Tick();
+            Step();
         }
         throw new TimeoutException(
             $"RunUntil: predicate was not satisfied within {maxInstructions} instructions.");
@@ -233,19 +264,36 @@ public class AvrTestSimulation
             var pc = Runner.Cpu.Pc;
             if (Runner.Cpu.ProgramMemory[(int)pc] == BreakOpcode)
                 return this;
-            Decoder.Decode(Runner.Cpu);
-            Runner.Cpu.Tick();
+            Step();
         }
         throw new TimeoutException(
             $"RunToBreak: BREAK instruction not reached within {maxInstructions} instructions.");
     }
 
     /// <summary>
-    /// Runs until the program counter reaches <paramref name="byteAddress"/> (byte address = PC × 2).
+    /// Runs until the program counter reaches <paramref name="byteAddress"/>.
+    /// <para>
+    /// <paramref name="byteAddress"/> is the byte offset into flash, as shown in
+    /// <c>avr-objdump</c> / disassembly output (= <c>PC × 2</c>).
+    /// Use <see cref="RunToWordAddress"/> if you prefer the word-index convention
+    /// used by timer and interrupt vector configurations.
+    /// </para>
     /// Returns <c>this</c> for chaining.
     /// </summary>
     public AvrTestSimulation RunToAddress(int byteAddress, int maxInstructions = 100_000)
         => RunUntil(s => (int)(s.Cpu.Pc * 2) == byteAddress, maxInstructions);
+
+    /// <summary>
+    /// Runs until the program counter equals <paramref name="wordAddress"/>.
+    /// <para>
+    /// <paramref name="wordAddress"/> is the word index into program memory — the same
+    /// convention used by timer configs, interrupt vector addresses, and <c>cpu.Pc</c>.
+    /// Use <see cref="RunToAddress"/> if you prefer the byte-offset convention from disassembly.
+    /// </para>
+    /// Returns <c>this</c> for chaining.
+    /// </summary>
+    public AvrTestSimulation RunToWordAddress(uint wordAddress, int maxInstructions = 100_000)
+        => RunUntil(s => s.Cpu.Pc == wordAddress, maxInstructions);
 
     // ── Cycle-based helpers ───────────────────────────────────────────────────
 
@@ -263,11 +311,11 @@ public class AvrTestSimulation
         while ((long)Runner.Cpu.Cycles < deadline)
         {
             if (predicate(this)) return this;
-            Decoder.Decode(Runner.Cpu);
-            Runner.Cpu.Tick();
+            Step();
         }
         throw new TimeoutException(
-            $"RunUntilMs: predicate was not satisfied within {maxMs} ms of simulated time.");
+            $"RunUntilMs: predicate was not satisfied within {maxMs} ms of simulated time " +
+            $"({Runner.Cpu.Cycles} cycles elapsed).");
     }
 
     /// <summary>
@@ -299,4 +347,68 @@ public class AvrTestSimulation
         int byteCount,
         double maxMs = 2000)
         => RunUntilMs(_ => serial.ByteCount >= byteCount, maxMs);
+
+    // ── Profiling (slow path) ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// Slow-path step using a <see cref="ProfilingDecoder"/> that fires a callback before each instruction.
+    /// The hot-path <see cref="Step()"/> is completely unaffected.
+    /// </summary>
+    private void StepProfiling(ProfilingDecoder decoder)
+    {
+        try
+        {
+            decoder.Decode(Runner.Cpu);
+            Runner.Cpu.Tick();
+        }
+        catch (IndexOutOfRangeException)
+        {
+            var pc = Runner.Cpu.Pc;
+            if (pc < Runner.Cpu.ProgramMemory.Length) throw;
+            var flash = Runner.Cpu.ProgramMemory.Length * 2;
+            throw new InvalidOperationException(
+                $"Simulation crashed: PC=0x{pc:X4} (byte addr 0x{pc * 2:X5}) is out of flash " +
+                $"(flash={flash} bytes, 0x{flash:X}). " +
+                $"Cycles={Runner.Cpu.Cycles}, SREG=0x{Runner.Cpu.Sreg:X2}, SP=0x{Runner.Cpu.Sp:X4}.");
+        }
+    }
+
+    /// <summary>Runs exactly <paramref name="cycles"/> CPU cycles through the profiling slow path.</summary>
+    public AvrTestSimulation RunCyclesProfiled(long cycles, ProfilingDecoder decoder)
+    {
+        var target = (long)Runner.Cpu.Cycles + cycles;
+        while ((long)Runner.Cpu.Cycles < target)
+            StepProfiling(decoder);
+        return this;
+    }
+
+    /// <summary>Runs <paramref name="ms"/> simulated milliseconds through the profiling slow path.</summary>
+    public AvrTestSimulation RunMillisecondsProfiled(double ms, ProfilingDecoder decoder)
+        => RunCyclesProfiled((long)(ms / 1000.0 * Runner.Speed), decoder);
+
+    /// <summary>Runs exactly <paramref name="count"/> instructions through the profiling slow path.</summary>
+    public AvrTestSimulation RunInstructionsProfiled(int count, ProfilingDecoder decoder)
+    {
+        for (var i = 0; i < count; i++)
+            StepProfiling(decoder);
+        return this;
+    }
+
+    /// <summary>
+    /// Runs until <paramref name="predicate"/> returns <c>true</c> through the profiling slow path.
+    /// Throws <see cref="TimeoutException"/> if <paramref name="maxInstructions"/> is reached.
+    /// </summary>
+    public AvrTestSimulation RunUntilProfiled(
+        Func<AvrTestSimulation, bool> predicate,
+        ProfilingDecoder decoder,
+        int maxInstructions = 100_000)
+    {
+        for (var i = 0; i < maxInstructions; i++)
+        {
+            if (predicate(this)) return this;
+            StepProfiling(decoder);
+        }
+        throw new TimeoutException(
+            $"RunUntilProfiled: predicate was not satisfied within {maxInstructions} instructions.");
+    }
 }

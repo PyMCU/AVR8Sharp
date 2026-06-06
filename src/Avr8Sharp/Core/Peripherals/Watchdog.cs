@@ -33,8 +33,8 @@ public class AvrWatchdog
     private readonly AvrWatchdogConfig _config;
     private readonly AvrClock _clock;
 
-    private int _changeEnabledCycles = 0;
-    private int _watchdogTimeout = 0;
+    private ulong _changeEnabledCycles = 0;
+    private ulong _watchdogTimeout = 0;
     private bool _enabledValue = false;
     private bool _scheduled = false;
 
@@ -96,7 +96,7 @@ public class AvrWatchdog
             {
                 ResetWatchdog();
 
-                _cpu.UpdateClockEvent(CheckWatchdog, _watchdogTimeout - _cpu.Cycles);
+                _cpu.UpdateClockEvent(CheckWatchdog, (int)(_watchdogTimeout - _cpu.Cycles));
                 _scheduled = true;
             }
             else if (_scheduled)
@@ -113,7 +113,7 @@ public class AvrWatchdog
     private void ResetWatchdog()
     {
         var cycles = (int)Math.Floor((_clock.Frequency / _clockFrequency) * Prescaler);
-        _watchdogTimeout = _cpu.Cycles + cycles;
+        _watchdogTimeout = _cpu.Cycles + (ulong)cycles;
     }
 
     private void CheckWatchdog()
@@ -148,7 +148,7 @@ public class AvrWatchdog
         if (Enabled)
         {
             _scheduled = true;
-            _cpu.AddClockEvent(CheckWatchdog, _watchdogTimeout - _cpu.Cycles);
+            _cpu.AddClockEvent(CheckWatchdog, (int)(_watchdogTimeout - _cpu.Cycles));
         }
         else
         {

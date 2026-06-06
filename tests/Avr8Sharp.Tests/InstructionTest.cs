@@ -22,14 +22,14 @@ public class Instruction : AvrTestBase
 		]);
 		Cpu.Mmio.Data[R0] = 10;
 		Cpu.Mmio.Data[R1] = 20;
-		Cpu.Mmio.Data[SREG] = SREG_C;
+		Cpu.WriteData((ushort)SREG, (byte)(SREG_C));
 		decoder.Decode(Cpu);
         Assert.Multiple(() =>
         {
             Assert.That(Cpu.Pc, Is.EqualTo(1));
             Assert.That(Cpu.Cycles, Is.EqualTo(1));
             Assert.That(Cpu.Mmio.Data[R0], Is.EqualTo(31));
-            Assert.That(Cpu.Mmio.Data[SREG], Is.EqualTo(0));
+            Assert.That(Cpu.Sreg, Is.EqualTo(0));
         });
     }
 	
@@ -41,14 +41,14 @@ public class Instruction : AvrTestBase
 		]);
 		Cpu.Mmio.Data[R0] = 10;
 		Cpu.Mmio.Data[R1] = 245;
-		Cpu.Mmio.Data[SREG] = SREG_C;
+		Cpu.WriteData((ushort)SREG, (byte)(SREG_C));
 		decoder.Decode(Cpu);
 		Assert.Multiple(() =>
 		{
 			Assert.That(Cpu.Pc, Is.EqualTo(1));
 			Assert.That(Cpu.Cycles, Is.EqualTo(1));
 			Assert.That(Cpu.Mmio.Data[R0], Is.EqualTo(0));
-			Assert.That(Cpu.Mmio.Data[SREG], Is.EqualTo(SREG_H | SREG_Z | SREG_C));
+			Assert.That(Cpu.Sreg, Is.EqualTo(SREG_H | SREG_Z | SREG_C));
 		});
 	}
 	
@@ -66,7 +66,7 @@ public class Instruction : AvrTestBase
 			Assert.That(Cpu.Pc, Is.EqualTo(1));
 			Assert.That(Cpu.Cycles, Is.EqualTo(1));
 			Assert.That(Cpu.Mmio.Data[R0], Is.EqualTo(0));
-			Assert.That(Cpu.Mmio.Data[SREG], Is.EqualTo(SREG_H | SREG_Z | SREG_C));
+			Assert.That(Cpu.Sreg, Is.EqualTo(SREG_H | SREG_Z | SREG_C));
 		});
 	}
 	
@@ -78,14 +78,14 @@ public class Instruction : AvrTestBase
 		]);
 		Cpu.Mmio.Data[R0] = 11;
 		Cpu.Mmio.Data[R1] = 244;
-		Cpu.Mmio.Data[SREG] = SREG_C;
+		Cpu.WriteData((ushort)SREG, (byte)(SREG_C));
 		decoder.Decode(Cpu);
 		Assert.Multiple(() =>
 		{
 			Assert.That(Cpu.Pc, Is.EqualTo(1));
 			Assert.That(Cpu.Cycles, Is.EqualTo(1));
 			Assert.That(Cpu.Mmio.Data[R0], Is.EqualTo(255));
-			Assert.That(Cpu.Mmio.Data[SREG], Is.EqualTo(SREG_S | SREG_N));
+			Assert.That(Cpu.Sreg, Is.EqualTo(SREG_S | SREG_N));
 		});
 	}
 	
@@ -97,14 +97,14 @@ public class Instruction : AvrTestBase
 		]);
 		Cpu.Mmio.Data[R0] = 11;
 		Cpu.Mmio.Data[R1] = 245;
-		Cpu.Mmio.Data[SREG] = SREG_C;
+		Cpu.WriteData((ushort)SREG, (byte)(SREG_C));
 		decoder.Decode(Cpu);
 		Assert.Multiple(() =>
 		{
 			Assert.That(Cpu.Pc, Is.EqualTo(1));
 			Assert.That(Cpu.Cycles, Is.EqualTo(1));
 			Assert.That(Cpu.Mmio.Data[R0], Is.EqualTo(0));
-			Assert.That(Cpu.Mmio.Data[SREG], Is.EqualTo(SREG_H | SREG_Z | SREG_C));
+			Assert.That(Cpu.Sreg, Is.EqualTo(SREG_H | SREG_Z | SREG_C));
 		});
 	}
 	
@@ -114,13 +114,13 @@ public class Instruction : AvrTestBase
 		LoadProgram ([
 			"bclr 2"
 		]);
-		Cpu.Mmio.Data[SREG] = 0xff;
+		Cpu.WriteData((ushort)SREG, (byte)(0xff));
 		decoder.Decode(Cpu);
 		Assert.Multiple(() =>
 		{
 			Assert.That(Cpu.Pc, Is.EqualTo(1));
 			Assert.That(Cpu.Cycles, Is.EqualTo(1));
-			Assert.That(Cpu.Mmio.Data[SREG], Is.EqualTo(0xfb));
+			Assert.That(Cpu.Sreg, Is.EqualTo(0xfb));
 		});
 	}
 	
@@ -131,14 +131,14 @@ public class Instruction : AvrTestBase
 			"bld r4, 7"
 		]);
 		Cpu.Mmio.Data[R4] = 0x15;
-		Cpu.Mmio.Data[SREG] = 0x40;
+		Cpu.WriteData((ushort)SREG, (byte)(0x40));
 		decoder.Decode(Cpu);
 		Assert.Multiple(() =>
 		{
 			Assert.That(Cpu.Pc, Is.EqualTo(1));
 			Assert.That(Cpu.Cycles, Is.EqualTo(1));
 			Assert.That(Cpu.Mmio.Data[R4], Is.EqualTo(0x95));
-			Assert.That(Cpu.Mmio.Data[SREG], Is.EqualTo(0x40));
+			Assert.That(Cpu.Sreg, Is.EqualTo(0x40));
 		});
 	}
 
@@ -148,7 +148,7 @@ public class Instruction : AvrTestBase
 		LoadProgram ([
 			"brbc 0, +8",
 		]);
-		Cpu.Mmio.Data[SREG] = SREG_V;
+		Cpu.WriteData((ushort)SREG, (byte)(SREG_V));
 		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
@@ -163,7 +163,7 @@ public class Instruction : AvrTestBase
 		LoadProgram ([
 			"brbc 0, +8",
 		]);
-		Cpu.Mmio.Data[SREG] = SREG_C;
+		Cpu.WriteData((ushort)SREG, (byte)(SREG_C));
 		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
@@ -178,7 +178,7 @@ public class Instruction : AvrTestBase
 		LoadProgram ([
 			"brbs 3, +92",
 		]);
-		Cpu.Mmio.Data[SREG] = SREG_V;
+		Cpu.WriteData((ushort)SREG, (byte)(SREG_V));
 		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
@@ -193,7 +193,7 @@ public class Instruction : AvrTestBase
 		LoadProgram ([
 			"brbs 3, -4",
 		]);
-		Cpu.Mmio.Data[SREG] = SREG_V;
+		Cpu.WriteData((ushort)SREG, (byte)(SREG_V));
 		decoder.Decode(Cpu);
 		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
@@ -209,7 +209,7 @@ public class Instruction : AvrTestBase
 		LoadProgram ([
 			"brbs 3, -4",
 		]);
-		Cpu.Mmio.Data[SREG] = 0x0;
+		Cpu.WriteData((ushort)SREG, (byte)(0x0));
 		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
@@ -284,7 +284,7 @@ public class Instruction : AvrTestBase
 		{
 			Assert.That (Cpu.Pc, Is.EqualTo (1));
 			Assert.That (Cpu.Cycles, Is.EqualTo (1));
-			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (0));
+			Assert.That (Cpu.Sreg, Is.EqualTo (0));
 		});
 	}
 	
@@ -296,13 +296,13 @@ public class Instruction : AvrTestBase
 		]);
 		Cpu.Mmio.Data[R1] = 0;
 		Cpu.Mmio.Data[R24] = 0;
-		Cpu.Mmio.Data[SREG] = SREG_I | SREG_C;
+		Cpu.WriteData((ushort)SREG, (byte)(SREG_I | SREG_C));
 		decoder.Decode(Cpu);
 		Assert.Multiple (() =>
 		{
 			Assert.That (Cpu.Pc, Is.EqualTo (1));
 			Assert.That (Cpu.Cycles, Is.EqualTo (1));
-			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_I | SREG_H | SREG_S | SREG_N | SREG_C));
+			Assert.That (Cpu.Sreg, Is.EqualTo (SREG_I | SREG_H | SREG_S | SREG_N | SREG_C));
 		});
 	}
 	
@@ -318,7 +318,7 @@ public class Instruction : AvrTestBase
 		{
 			Assert.That (Cpu.Pc, Is.EqualTo (1));
 			Assert.That (Cpu.Cycles, Is.EqualTo (1));
-			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_H | SREG_S | SREG_N | SREG_C));
+			Assert.That (Cpu.Sreg, Is.EqualTo (SREG_H | SREG_S | SREG_N | SREG_C));
 		});
 	}
 	
@@ -567,7 +567,7 @@ public class Instruction : AvrTestBase
 			Assert.That (Cpu.Pc, Is.EqualTo (1));
 			Assert.That (Cpu.Cycles, Is.EqualTo (1));
 			Assert.That (Cpu.Mmio.Data[R5], Is.EqualTo (0x80));
-			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_N | SREG_V));
+			Assert.That (Cpu.Sreg, Is.EqualTo (SREG_N | SREG_V));
 		});
 	}
 	
@@ -584,7 +584,7 @@ public class Instruction : AvrTestBase
 			Assert.That (Cpu.Pc, Is.EqualTo (1));
 			Assert.That (Cpu.Cycles, Is.EqualTo (1));
 			Assert.That (Cpu.Mmio.Data[R5], Is.EqualTo (0x00));
-			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo ( SREG_Z));
+			Assert.That (Cpu.Sreg, Is.EqualTo ( SREG_Z));
 		});
 	}
 	
@@ -959,7 +959,7 @@ public class Instruction : AvrTestBase
 			Assert.That (Cpu.Pc, Is.EqualTo (1));
 			Assert.That (Cpu.Cycles, Is.EqualTo (1));
 			Assert.That (Cpu.Mmio.Data[R7], Is.EqualTo (0x22));
-			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_S | SREG_V | SREG_C));
+			Assert.That (Cpu.Sreg, Is.EqualTo (SREG_S | SREG_V | SREG_C));
 		});
 	}
 	
@@ -1011,7 +1011,7 @@ public class Instruction : AvrTestBase
 			Assert.That (Cpu.Pc, Is.EqualTo (1));
 			Assert.That (Cpu.Cycles, Is.EqualTo (2));
 			Assert.That (Cpu.Mmio.DataView.GetUint16 (0, true), Is.EqualTo (500));
-			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (0));
+			Assert.That (Cpu.Sreg, Is.EqualTo (0));
 		});
 	}
 	
@@ -1029,7 +1029,7 @@ public class Instruction : AvrTestBase
 			Assert.That (Cpu.Pc, Is.EqualTo (1));
 			Assert.That (Cpu.Cycles, Is.EqualTo (2));
 			Assert.That (Cpu.Mmio.DataView.GetUint16 (0, true), Is.EqualTo (40000));
-			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_C));
+			Assert.That (Cpu.Sreg, Is.EqualTo (SREG_C));
 		});
 	}
 	
@@ -1047,7 +1047,7 @@ public class Instruction : AvrTestBase
 			Assert.That (Cpu.Pc, Is.EqualTo (1));
 			Assert.That (Cpu.Cycles, Is.EqualTo (2));
 			Assert.That (Cpu.Mmio.DataView.GetUint16 (0, true), Is.EqualTo (0));
-			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_Z));
+			Assert.That (Cpu.Sreg, Is.EqualTo (SREG_Z));
 		});
 	}
 	
@@ -1065,7 +1065,7 @@ public class Instruction : AvrTestBase
 			Assert.That (Cpu.Pc, Is.EqualTo (1));
 			Assert.That (Cpu.Cycles, Is.EqualTo (2));
 			Assert.That (Cpu.Mmio.DataView.GetInt16 (0, true), Is.EqualTo (-500));
-			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_C));
+			Assert.That (Cpu.Sreg, Is.EqualTo (SREG_C));
 		});
 	}
 	
@@ -1083,7 +1083,7 @@ public class Instruction : AvrTestBase
 			Assert.That (Cpu.Pc, Is.EqualTo (1));
 			Assert.That (Cpu.Cycles, Is.EqualTo (2));
 			Assert.That (Cpu.Mmio.DataView.GetInt16 (0, true), Is.EqualTo (-1000));
-			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_C));
+			Assert.That (Cpu.Sreg, Is.EqualTo (SREG_C));
 		});
 	}
 	
@@ -1100,10 +1100,66 @@ public class Instruction : AvrTestBase
 			Assert.That (Cpu.Pc, Is.EqualTo (1));
 			Assert.That (Cpu.Cycles, Is.EqualTo (1));
 			Assert.That (Cpu.Mmio.Data[R20], Is.EqualTo (0xaa));
-			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_S | SREG_N | SREG_C));
+			Assert.That (Cpu.Sreg, Is.EqualTo (SREG_H | SREG_S | SREG_N | SREG_C));
 		});
 	}
-	
+
+	[Test (Description = "NEG: half-carry set when bit 3 of result is set (regression: 1& vs 8&)")]
+	public void NEG_HalfCarry ()
+	{
+		LoadProgram ([ "neg r20" ]);
+		Cpu.Mmio.Data[R20] = 0x08;   // R = (byte)(0 - 0x08) = 0xF8; R3=1, d3=1 → H=1
+		decoder.Decode(Cpu);
+		Assert.That (Cpu.Sreg, Is.EqualTo (SREG_H | SREG_S | SREG_N | SREG_C));
+	}
+
+	[Test (Description = "ADC: half-carry set on nibble carry (regression: 1& vs 8&)")]
+	public void ADC_HalfCarry ()
+	{
+		LoadProgram ([ "adc r0, r1" ]);
+		Cpu.Mmio.Data[R0] = 0x08;
+		Cpu.Mmio.Data[R1] = 0x08;    // 0x08 + 0x08 = 0x10: carry from bit 3 → H=1
+		decoder.Decode(Cpu);
+		Assert.That (Cpu.Sreg, Is.EqualTo (SREG_H));
+	}
+
+	[Test (Description = "CPI: half-carry set on nibble borrow (regression: 1& vs 8&)")]
+	public void CPI_HalfCarry ()
+	{
+		LoadProgram ([ "cpi r16, 0x08" ]);
+		Cpu.Mmio.Data[R16] = 0x10;   // 0x10 - 0x08 = 0x08: borrow from bit 3 → H=1
+		decoder.Decode(Cpu);
+		Assert.That (Cpu.Sreg, Is.EqualTo (SREG_H));
+	}
+
+	[Test (Description = "SUBI: half-carry set on nibble borrow (regression: 1& vs 8&)")]
+	public void SUBI_HalfCarry ()
+	{
+		LoadProgram ([ "subi r16, 0x08" ]);
+		Cpu.Mmio.Data[R16] = 0x10;   // 0x10 - 0x08 = 0x08: borrow from bit 3 → H=1
+		decoder.Decode(Cpu);
+		Assert.Multiple(() =>
+		{
+			Assert.That (Cpu.Mmio.Data[R16], Is.EqualTo (0x08));
+			Assert.That (Cpu.Sreg, Is.EqualTo (SREG_H));
+		});
+	}
+
+	[Test (Description = "SBIW: half-carry set on nibble borrow (regression: 1& vs 8&)")]
+	public void SBIW_HalfCarry ()
+	{
+		LoadProgram ([ "sbiw r24, 8" ]);
+		Cpu.Mmio.Data[R24] = 0x10;
+		Cpu.Mmio.Data[R25] = 0x00;   // r25:r24 = 0x0010; 0x0010 - 8 = 0x0008, borrow at bit 3 → H=1
+		decoder.Decode(Cpu);
+		Assert.Multiple(() =>
+		{
+			Assert.That (Cpu.Mmio.Data[R24], Is.EqualTo (0x08));
+			Assert.That (Cpu.Mmio.Data[R25], Is.EqualTo (0x00));
+			Assert.That (Cpu.Sreg, Is.EqualTo (SREG_H));
+		});
+	}
+
 	[Test (Description = "Should execute NOP instruction")]
 	public void NOP ()
 	{
@@ -1282,7 +1338,7 @@ public class Instruction : AvrTestBase
 			Assert.That (Cpu.Pc, Is.EqualTo (200));
 			Assert.That (Cpu.Cycles, Is.EqualTo (4));
 			Assert.That (Cpu.Mmio.Data[SP], Is.EqualTo (0xc2));
-			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_I));
+			Assert.That (Cpu.Sreg, Is.EqualTo (SREG_I));
 		});
 	}
 	
@@ -1303,7 +1359,7 @@ public class Instruction : AvrTestBase
 			Assert.That (Cpu.Pc, Is.EqualTo (0x10030));
 			Assert.That (Cpu.Cycles, Is.EqualTo (5));
 			Assert.That (Cpu.Mmio.Data[SP], Is.EqualTo (0xc3));
-			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_I));
+			Assert.That (Cpu.Sreg, Is.EqualTo (SREG_I));
 		});
 	}
 	
@@ -1334,7 +1390,7 @@ public class Instruction : AvrTestBase
 			Assert.That (Cpu.Pc, Is.EqualTo (1));
 			Assert.That (Cpu.Cycles, Is.EqualTo (1));
 			Assert.That (Cpu.Mmio.Data[R0], Is.EqualTo (0x08));
-			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_S | SREG_V | SREG_C));
+			Assert.That (Cpu.Sreg, Is.EqualTo (SREG_S | SREG_V | SREG_C));
 		});
 	}
 	
@@ -1346,14 +1402,14 @@ public class Instruction : AvrTestBase
 		]);
 		Cpu.Mmio.Data[R0] = 0x00;
 		Cpu.Mmio.Data[R1] = 10;
-		Cpu.Mmio.Data[95] = SREG_C;
+		Cpu.WriteData(95, (byte)(SREG_C));
 		decoder.Decode(Cpu);     
 		Assert.Multiple (() =>
 		{
 			Assert.That (Cpu.Pc, Is.EqualTo (1));
 			Assert.That (Cpu.Cycles, Is.EqualTo (1));
 			Assert.That (Cpu.Mmio.Data[R0], Is.EqualTo (245));
-			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_H | SREG_S | SREG_N | SREG_C));
+			Assert.That (Cpu.Sreg, Is.EqualTo (SREG_H | SREG_S | SREG_N | SREG_C));
 		});
 	}
 	
@@ -1364,13 +1420,13 @@ public class Instruction : AvrTestBase
 			"sbci r23, 3",
 		]);
 		Cpu.Mmio.Data[R23] = 3;
-		Cpu.Mmio.Data[SREG] = SREG_I | SREG_C;
+		Cpu.WriteData((ushort)SREG, (byte)(SREG_I | SREG_C));
 		decoder.Decode(Cpu);     
 		Assert.Multiple (() =>
 		{
 			Assert.That (Cpu.Pc, Is.EqualTo (1));
 			Assert.That (Cpu.Cycles, Is.EqualTo (1));
-			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_I | SREG_H | SREG_S | SREG_N | SREG_C));
+			Assert.That (Cpu.Sreg, Is.EqualTo (SREG_I | SREG_H | SREG_S | SREG_N | SREG_C));
 		});
 	}
 	
@@ -1664,7 +1720,7 @@ public class Instruction : AvrTestBase
 			Assert.That (Cpu.Pc, Is.EqualTo (1));
 			Assert.That (Cpu.Cycles, Is.EqualTo (1));
 			Assert.That (Cpu.Mmio.Data[R0], Is.EqualTo (246));
-			Assert.That (Cpu.Mmio.Data[SREG], Is.EqualTo (SREG_S | SREG_N | SREG_C | SREG_H));
+			Assert.That (Cpu.Sreg, Is.EqualTo (SREG_S | SREG_N | SREG_C | SREG_H));
 		});
 	}
 	

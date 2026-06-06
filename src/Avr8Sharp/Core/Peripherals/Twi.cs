@@ -90,6 +90,19 @@ public class AvrTwi
 
     public int Status => _cpu.Mmio.Data[_config.TWSR] & TWSR_TWS_MASK;
 
+    /// <summary>
+    /// The 7-bit slave address currently written in TWAR by the firmware (i.e. the
+    /// address passed to <c>Wire.begin(address)</c>). Returns 0 when the device is
+    /// not configured as a slave.
+    /// </summary>
+    public byte SlaveAddress => (byte)((_cpu.Mmio.Data[_config.TWAR] & TWAR_TWA_MASK) >> 1);
+
+    /// <summary>
+    /// Raised whenever the firmware writes to TWAR. The argument is the new 7-bit
+    /// slave address (0 means slave mode disabled).
+    /// </summary>
+    public event Action<byte>? SlaveAddressChanged;
+
     public AvrTwi(Cpu cpu, AvrTwiConfig config, uint freqHz)
     {
         _cpu = cpu;
@@ -107,6 +120,13 @@ public class AvrTwi
         );
 
         UpdateStatus(STATUS_TWI_IDLE);
+
+        cpu.Mmio.RegisterWrite(_config.TWAR, (value, _, _, _) =>
+        {
+            _cpu.Mmio.Data[_config.TWAR] = value;
+            SlaveAddressChanged?.Invoke((byte)((value & TWAR_TWA_MASK) >> 1));
+            return true;
+        });
 
         cpu.Mmio.RegisterWrite(_config.TWCR, (value, _, _, _) =>
         {
@@ -165,6 +185,14 @@ public class AvrTwi
         _cpu.Mmio.Data[_config.TWCR] &= ~TWCR_TWSTO & 0xff;
         UpdateStatus(STATUS_TWI_IDLE);
     }
+
+    /// <summary>
+    /// Preloads TWDR with the address byte so that <see cref="CompleteConnect"/> can
+    /// determine whether the transaction is Master Transmitter (R/W = 0) or Master
+    /// Receiver (R/W = 1). In a real firmware flow the firmware writes this before
+    /// triggering TWCR; call this from direct bridge code paths that bypass firmware.
+    /// </summary>
+    public void SetTwdr(byte value) => _cpu.Mmio.Data[_config.TWDR] = value;
 
     public void CompleteConnect(bool ack)
     {
