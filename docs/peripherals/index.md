@@ -20,9 +20,18 @@ API (or wired up automatically by the board presets).
 | USI | ✅ | Three-wire and two-wire mode |
 | Watchdog | ✅ | Prescaler, reset, interrupt mode |
 
+For the mapping between Arduino pin numbers and simulator port/pin properties, see
+[Board pin maps](board-maps.md).
+
 ```{note}
 Per-peripheral reference pages are being filled in. For now, the API surface is documented
 via XML-doc comments in the source; see [Reference](../reference/index.md).
+```
+
+```{toctree}
+:hidden:
+
+board-maps
 ```
 
 ## GPIO

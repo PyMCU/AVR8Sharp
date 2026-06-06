@@ -88,6 +88,90 @@ mega.RunUntilSerial(mega.Serial0, "OK", maxMs: 5000);
 mega.Serial0.Should().Contain("OK");
 ```
 
+## Full GitHub Actions pipeline
+
+The following workflow compiles a sketch with `arduino-cli` and then runs the .NET tests
+that validate its output. Copy it to `.github/workflows/firmware-test.yml`:
+
+```yaml
+name: Firmware integration tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.x"
+
+      - name: Install arduino-cli
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh \
+            | sh -s -- --bindir /usr/local/bin
+          arduino-cli core install arduino:avr
+
+      - name: Compile sketch
+        run: |
+          arduino-cli compile \
+            --fqbn arduino:avr:uno \
+            --output-dir build/ \
+            sketch/
+
+      - name: Run firmware tests
+        run: dotnet test tests/ --logger "console;verbosity=normal"
+```
+
+### Loading the `.hex` file in tests
+
+Use a path relative to the test binary output directory so it works both locally and in
+CI regardless of the working directory:
+
+```csharp
+private static string HexPath => Path.Combine(
+    TestContext.CurrentContext.TestDirectory,   // NUnit
+    "..", "..", "..", "..", "build", "sketch.ino.hex");
+```
+
+For xUnit, use `AppContext.BaseDirectory` in the same pattern.
+
+### Multi-chip CI matrix
+
+Test against several targets in one run:
+
+```yaml
+strategy:
+  matrix:
+    include:
+      - fqbn: arduino:avr:uno
+        hex_stem: sketch.ino
+      - fqbn: arduino:avr:mega
+        hex_stem: sketch.ino
+
+steps:
+  - name: Compile sketch (${{ matrix.fqbn }})
+    run: |
+      arduino-cli compile \
+        --fqbn ${{ matrix.fqbn }} \
+        --output-dir build/${{ matrix.fqbn }}/ \
+        sketch/
+
+  - name: Run tests
+    run: dotnet test tests/ -e FQBN=${{ matrix.fqbn }}
+    env:
+      HEX_PATH: build/${{ matrix.fqbn }}/${{ matrix.hex_stem }}.hex
+```
+
+---
+
 Supported FQBNs for each board preset:
 
 | Preset | FQBN |

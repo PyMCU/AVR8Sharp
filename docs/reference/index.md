@@ -32,6 +32,11 @@ Three decoders are available; the default is `NativeLutDecoder`:
 The decoder is selected via `AvrRunner.SetDecoder(DecoderType)` or the
 `UseNativeLutDecoder` / `UseLutDecoder` / `UseSwitchDecoder` builder methods.
 
+## Assertions
+
+See the [Assertions reference](assertions.md) for the full list of `.Should()` methods
+available on `Cpu`, GPIO ports, `Memory`, and `SerialProbe`.
+
 ## API documentation
 
 The full public API is documented with XML-doc comments in the source. A generated API
@@ -39,6 +44,8 @@ reference is planned; until then, browse the
 [source on GitHub](https://github.com/PyMCU/avr8sharp/tree/main/src) or rely on
 IntelliSense from the NuGet packages.
 
-```{note}
-This page is a stub. Per-namespace reference pages will be added as the docs site grows.
+```{toctree}
+:hidden:
+
+assertions
 ```

@@ -5,8 +5,13 @@ Avr8Sharp targets **.NET 10**. You need the .NET 10 SDK installed.
 ## From NuGet
 
 ```bash
-dotnet add package Avr8Sharp              # the emulator core
-dotnet add package Avr8Sharp.TestKit      # fluent harness for firmware tests (optional)
+dotnet add package Avr8Sharp --prerelease              # the emulator core
+dotnet add package Avr8Sharp.TestKit --prerelease      # fluent harness for firmware tests (optional)
+```
+
+```{note}
+The current release (`1.1.0-beta1`) is a pre-release. Pass `--prerelease` (or set
+`<Version>*-*</Version>` in your `.csproj`) until the first stable release is published.
 ```
 
 | Package | Purpose |
