@@ -25,6 +25,7 @@ public class Cpu
 
 	#region Public Properties
 	public Action OnWatchdogReset { get; set; } = () => { };
+	public event Action? OnPeripheralReset;
 	public MmioController Mmio { get; }
 	public ushort[] ProgramMemory { get; }
 	public byte[] ProgBytes { get; }
@@ -88,6 +89,7 @@ public class Cpu
 		_clockEventCount = 0;
 		_nextEventCycle = ulong.MaxValue;
 		Array.Clear(_clockEvents, 0, _clockEvents.Length);
+		OnPeripheralReset?.Invoke();
 	}
 	
 	public void LoadProgram (ushort[] program)
