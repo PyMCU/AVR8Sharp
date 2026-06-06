@@ -18,7 +18,7 @@ public static class Opcodes
         sreg |= ((R ^ r) & (d ^ R) & 128) != 0 ? 8 : 0;
         sreg |= (sreg >> 2 & 1 ^ sreg >> 3 & 1) != 0 ? 0x10 : 0;
         sreg |= (sum & 256) != 0 ? 1 : 0;
-        sreg |= (1 & (d & r | r & ~R | ~R & d)) != 0 ? 0x20 : 0;
+        sreg |= (8 & (d & r | r & ~R | ~R & d)) != 0 ? 0x20 : 0;
         cpu._sregArith = (byte)sreg;
     }
 
@@ -231,7 +231,7 @@ public static class Opcodes
         sreg |= ((arg1 ^ arg2) & (arg1 ^ r) & 128) != 0 ? 8 : 0;
         sreg |= (((sreg >> 2) & 1) ^ ((sreg >> 3) & 1)) != 0 ? 0x10 : 0;
         sreg |= arg2 > arg1 ? 1 : 0;
-        sreg |= (1 & ((~arg1 & arg2) | (arg2 & r) | (r & ~arg1))) != 0 ? 0x20 : 0;
+        sreg |= (8 & ((~arg1 & arg2) | (arg2 & r) | (r & ~arg1))) != 0 ? 0x20 : 0;
         cpu._sregArith = (byte)sreg;
     }
 
@@ -636,10 +636,10 @@ public static class Opcodes
         sreg |= 128 == R ? 8 : 0;
         sreg |= (((sreg >> 2) & 1) ^ ((sreg >> 3) & 1)) != 0 ? 0x10 : 0;
         sreg |= R == 0 ? 0 : 1;
-        sreg |= (1 & (R | value)) != 0 ? 0x20 : 0;
+        sreg |= (8 & (R | value)) != 0 ? 0x20 : 0;
         cpu._sregArith = (byte)sreg;
     }
-    
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void NOP(ref Cpu cpu, ref ushort opcode) { }
 
@@ -842,7 +842,7 @@ public static class Opcodes
         sreg |= (a & ~R & 0x8000) != 0 ? 8 : 0;
         sreg |= (((sreg >> 2) & 1) ^ ((sreg >> 3) & 1)) != 0 ? 0x10 : 0;
         sreg |= l > a ? 1 : 0;
-        sreg |= (1 & ((~a & l) | (l & R) | (R & ~a))) != 0 ? 0x20 : 0;
+        sreg |= (8 & ((~a & l) | (l & R) | (R & ~a))) != 0 ? 0x20 : 0;
         cpu._sregArith = (byte)sreg;
         cpu.Cycles++;
     }
@@ -1010,7 +1010,7 @@ public static class Opcodes
         sreg |= ((val1 ^ val2) & (val1 ^ R) & 128) != 0 ? 8 : 0;
         sreg |= (((sreg >> 2) & 1) ^ ((sreg >> 3) & 1)) != 0 ? 0x10 : 0;
         sreg |= val2 > val1 ? 1 : 0;
-        sreg |= (1 & ((~val1 & val2) | (val2 & R) | (R & ~val1))) != 0 ? 0x20 : 0;
+        sreg |= (8 & ((~val1 & val2) | (val2 & R) | (R & ~val1))) != 0 ? 0x20 : 0;
         cpu._sregArith = (byte)sreg;
     }
 

@@ -1100,10 +1100,66 @@ public class Instruction : AvrTestBase
 			Assert.That (Cpu.Pc, Is.EqualTo (1));
 			Assert.That (Cpu.Cycles, Is.EqualTo (1));
 			Assert.That (Cpu.Mmio.Data[R20], Is.EqualTo (0xaa));
-			Assert.That (Cpu.Sreg, Is.EqualTo (SREG_S | SREG_N | SREG_C));
+			Assert.That (Cpu.Sreg, Is.EqualTo (SREG_H | SREG_S | SREG_N | SREG_C));
 		});
 	}
-	
+
+	[Test (Description = "NEG: half-carry set when bit 3 of result is set (regression: 1& vs 8&)")]
+	public void NEG_HalfCarry ()
+	{
+		LoadProgram ([ "neg r20" ]);
+		Cpu.Mmio.Data[R20] = 0x08;   // R = (byte)(0 - 0x08) = 0xF8; R3=1, d3=1 → H=1
+		decoder.Decode(Cpu);
+		Assert.That (Cpu.Sreg, Is.EqualTo (SREG_H | SREG_S | SREG_N | SREG_C));
+	}
+
+	[Test (Description = "ADC: half-carry set on nibble carry (regression: 1& vs 8&)")]
+	public void ADC_HalfCarry ()
+	{
+		LoadProgram ([ "adc r0, r1" ]);
+		Cpu.Mmio.Data[R0] = 0x08;
+		Cpu.Mmio.Data[R1] = 0x08;    // 0x08 + 0x08 = 0x10: carry from bit 3 → H=1
+		decoder.Decode(Cpu);
+		Assert.That (Cpu.Sreg, Is.EqualTo (SREG_H));
+	}
+
+	[Test (Description = "CPI: half-carry set on nibble borrow (regression: 1& vs 8&)")]
+	public void CPI_HalfCarry ()
+	{
+		LoadProgram ([ "cpi r16, 0x08" ]);
+		Cpu.Mmio.Data[R16] = 0x10;   // 0x10 - 0x08 = 0x08: borrow from bit 3 → H=1
+		decoder.Decode(Cpu);
+		Assert.That (Cpu.Sreg, Is.EqualTo (SREG_H));
+	}
+
+	[Test (Description = "SUBI: half-carry set on nibble borrow (regression: 1& vs 8&)")]
+	public void SUBI_HalfCarry ()
+	{
+		LoadProgram ([ "subi r16, 0x08" ]);
+		Cpu.Mmio.Data[R16] = 0x10;   // 0x10 - 0x08 = 0x08: borrow from bit 3 → H=1
+		decoder.Decode(Cpu);
+		Assert.Multiple(() =>
+		{
+			Assert.That (Cpu.Mmio.Data[R16], Is.EqualTo (0x08));
+			Assert.That (Cpu.Sreg, Is.EqualTo (SREG_H));
+		});
+	}
+
+	[Test (Description = "SBIW: half-carry set on nibble borrow (regression: 1& vs 8&)")]
+	public void SBIW_HalfCarry ()
+	{
+		LoadProgram ([ "sbiw r24, 8" ]);
+		Cpu.Mmio.Data[R24] = 0x10;
+		Cpu.Mmio.Data[R25] = 0x00;   // r25:r24 = 0x0010; 0x0010 - 8 = 0x0008, borrow at bit 3 → H=1
+		decoder.Decode(Cpu);
+		Assert.Multiple(() =>
+		{
+			Assert.That (Cpu.Mmio.Data[R24], Is.EqualTo (0x08));
+			Assert.That (Cpu.Mmio.Data[R25], Is.EqualTo (0x00));
+			Assert.That (Cpu.Sreg, Is.EqualTo (SREG_H));
+		});
+	}
+
 	[Test (Description = "Should execute NOP instruction")]
 	public void NOP ()
 	{

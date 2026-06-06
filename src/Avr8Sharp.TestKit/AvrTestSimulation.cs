@@ -140,17 +140,17 @@ public class AvrTestSimulation
     }
 
     /// <summary>Adds an EEPROM peripheral with a volatile in-memory backend.</summary>
-    public AvrTestSimulation AddEeprom(AvrEepromConfig config, out AvrEeprom eeprom)
+    public AvrTestSimulation AddEeprom(AvrEepromConfig config, out AvrEeprom eeprom, uint eepromSize = 1024)
     {
-        var backend = new EepromMemoryBackend(1024);
+        var backend = new EepromMemoryBackend(eepromSize);
         eeprom = new AvrEeprom(Runner.Cpu, backend, config);
         return this;
     }
 
     /// <summary>Adds an EEPROM peripheral (no out handle).</summary>
-    public AvrTestSimulation AddEeprom(AvrEepromConfig config)
+    public AvrTestSimulation AddEeprom(AvrEepromConfig config, uint eepromSize = 1024)
     {
-        var backend = new EepromMemoryBackend(1024);
+        var backend = new EepromMemoryBackend(eepromSize);
         _ = new AvrEeprom(Runner.Cpu, backend, config);
         return this;
     }

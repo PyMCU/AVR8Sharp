@@ -24,10 +24,13 @@ namespace Avr8Sharp.TestKit.Boards;
 /// </example>
 public sealed class ArduinoMegaSimulation : AvrTestSimulation
 {
-    // ATmega2560: 256 KB flash, 8 KB SRAM, 16 MHz
+    // ATmega2560: 256 KB flash, 8 KB SRAM + 256 B extended I/O, 4 KB EEPROM, 16 MHz
+    // Sram = 0x100 (extended I/O, 0x100-0x1FF) + 0x2000 (SRAM, 0x200-0x21FF) = 0x2100
+    // Total _ram = Sram + RegisterSpace (0x100) = 0x2200, covering 0x0000–0x21FF.
     private const int Flash = 0x40000;
     private const int Sram = 0x2100;
     private const uint Frequency = 16_000_000;
+    private const uint EepromSize = 4096;
 
     // ── ATmega2560 Timer interrupt vectors (JMP/4-byte vectors) ──────────────
     // ATmega2560 uses 4-byte JMP entries; vector N sits at byte address (N-1)×4.
@@ -153,6 +156,13 @@ public sealed class ArduinoMegaSimulation : AvrTestSimulation
         UBRRL = 0x134, UBRRH = 0x135, UDR   = 0x136,
     };
 
+    // EEPROM — same I/O register addresses as ATmega328P; interrupt vector differs
+    // ATmega2560 EE_RDY: vector 30, byte addr 0x74, word addr 0x3A
+    private static readonly AvrEepromConfig Mega2560EepromConfig = new AvrEepromConfig(
+        eepromReadyInterrupt: 0x3A,
+        eecr: 0x3F, eedr: 0x40, eearl: 0x41, eearh: 0x42,
+        eraseCycles: 28800, writeCycles: 28800);
+
     // ── GPIO ports ────────────────────────────────────────────────────────────
     /// <summary>Port A — digital pins 22–29.</summary>
     public AvrIoPort PortA { get; }
@@ -201,6 +211,10 @@ public sealed class ArduinoMegaSimulation : AvrTestSimulation
     /// <summary>Captures USART3 output (TX = PJ1, "Serial3" in Arduino IDE).</summary>
     public SerialProbe Serial3 { get; }
 
+    // ── EEPROM ────────────────────────────────────────────────────────────────
+    /// <summary>ATmega2560 internal EEPROM — 4096 bytes, volatile (in-memory backend).</summary>
+    public AvrEeprom Eeprom { get; }
+
     public ArduinoMegaSimulation() : base(Flash, Sram)
     {
         WithFrequency(Frequency);
@@ -228,5 +242,7 @@ public sealed class ArduinoMegaSimulation : AvrTestSimulation
         AddUsart(Mega2560Usart1Config,     out var s1); Serial1 = s1;
         AddUsart(Mega2560Usart2Config,     out var s2); Serial2 = s2;
         AddUsart(Mega2560Usart3Config,     out var s3); Serial3 = s3;
+
+        AddEeprom(Mega2560EepromConfig, out var eeprom, EepromSize); Eeprom = eeprom;
     }
 }
