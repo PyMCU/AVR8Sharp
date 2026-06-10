@@ -25,7 +25,15 @@ public unsafe struct NativeLutDecoder : IInstructionDecoder
 
         LookupTable[opcode](ref cpu, ref opcode);
 
-        cpu.Pc = (cpu.Pc + 1u) % (uint)cpu.ProgramMemory.Length;
+        // Equivalent to (Pc + 1) % Length, but the division only runs on the rare
+        // wrap path (end of flash, or a jump/branch that left Pc out of range via
+        // uint under/overflow). The common sequential step takes just a predicted
+        // branch — no per-instruction integer division — and stays correct for any
+        // Length (power-of-two or not).
+        var len = (uint)cpu.ProgramMemory.Length;
+        var pc = cpu.Pc + 1u;
+        if (pc >= len) pc %= len;
+        cpu.Pc = pc;
         cpu.Cycles++;
     }
     

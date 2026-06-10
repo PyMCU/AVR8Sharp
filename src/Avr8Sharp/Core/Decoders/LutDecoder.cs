@@ -15,7 +15,13 @@ public struct LutDecoder : IInstructionDecoder
 
         Table.Value[opcode](ref cpu, ref opcode);
 
-        cpu.Pc = (cpu.Pc + 1u) % (uint)cpu.ProgramMemory.Length;
+        // Equivalent to (Pc + 1) % Length, but the division only runs on the rare
+        // wrap path (end of flash, or a jump/branch that left Pc out of range via
+        // uint under/overflow). See NativeLutDecoder for the full rationale.
+        var len = (uint)cpu.ProgramMemory.Length;
+        var pc = cpu.Pc + 1u;
+        if (pc >= len) pc %= len;
+        cpu.Pc = pc;
         cpu.Cycles++;
     }
 
