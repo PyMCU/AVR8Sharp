@@ -36,6 +36,14 @@ public class Cpu
 		get => Mmio.DataView.GetUint16(93, true);
 		private set => Mmio.DataView.SetUint16(93, value, true);
 	}
+	/// <summary>
+	/// Lowest data address the stack may occupy (a chip's RAMSTART). A PUSH/CALL that
+	/// would write below it has overflowed the stack into the I/O/register space and
+	/// throws <see cref="AvrStackOverflowException"/>. Default 0 disables the check (no
+	/// address is below 0), so raw cores and unit tests that park SP low are unaffected;
+	/// a board/simulation sets it to the chip's SRAM start to catch overflow.
+	/// </summary>
+	public int StackLowLimit { get; set; } = 0;
 	public byte Sreg
 	{
 		get

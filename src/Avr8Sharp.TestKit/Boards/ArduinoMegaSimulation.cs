@@ -219,6 +219,10 @@ public sealed class ArduinoMegaSimulation : AvrTestSimulation
     {
         WithFrequency(Frequency);
 
+        // ATmega2560 SRAM starts at 0x200 (extended I/O occupies 0x100-0x1FF); a
+        // PUSH/CALL below it has overflowed the stack into the I/O/register space.
+        Cpu.StackLowLimit = 0x200;
+
         AddGpio(AvrIoPort.PortAConfig, out var pA); PortA = pA;
         AddGpio(AvrIoPort.PortBConfig, out var pB); PortB = pB;
         AddGpio(AvrIoPort.PortCConfig, out var pC); PortC = pC;

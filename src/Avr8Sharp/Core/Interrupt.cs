@@ -21,6 +21,8 @@ public static class AvrInterrupt
 	{
 		OnInterruptDispatch?.Invoke(address, cpu.Pc);
 		var sp = cpu.Mmio.DataView.GetUint16(93, true);
+		if (sp - (cpu.Pc22Bits ? 2 : 1) < cpu.StackLowLimit)
+			throw new AvrStackOverflowException(cpu.Pc, sp - (cpu.Pc22Bits ? 2 : 1), cpu.StackLowLimit);
 		cpu.Mmio.Data[sp] = (byte)(cpu.Pc & 0xff);
 		cpu.Mmio.Data[sp - 1] = (byte)(cpu.Pc >> 8 & 0xff);
 		if (cpu.Pc22Bits)

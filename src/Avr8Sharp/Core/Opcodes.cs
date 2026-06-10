@@ -153,6 +153,8 @@ public static class Opcodes
         var k = (uint)(cpu.ProgramMemory[(int)(cpu.Pc + 1)] | ((opcode & 1) << 16) | ((opcode & 0x1f0) << 13));
         var ret = cpu.Pc + 2;
         var sp = cpu.Mmio.DataView.GetUint16(93, true);
+        if (sp - (cpu.Pc22Bits ? 2 : 1) < cpu.StackLowLimit)
+            throw new AvrStackOverflowException(cpu.Pc, sp - (cpu.Pc22Bits ? 2 : 1), cpu.StackLowLimit);
         cpu.Mmio.Data[sp] = (byte)(ret & 255);
         cpu.Mmio.Data[sp - 1] = (byte)((ret >> 8) & 255);
         if (cpu.Pc22Bits)
@@ -359,6 +361,8 @@ public static class Opcodes
     {
         var retAddr = cpu.Pc + 1;
         var sp = cpu.Mmio.DataView.GetUint16(93, true);
+        if (sp - (cpu.Pc22Bits ? 2 : 1) < cpu.StackLowLimit)
+            throw new AvrStackOverflowException(cpu.Pc, sp - (cpu.Pc22Bits ? 2 : 1), cpu.StackLowLimit);
         cpu.Mmio.Data[sp] = (byte)(retAddr & 255);
         cpu.Mmio.Data[sp - 1] = (byte)((retAddr >> 8) & 255);
         if (cpu.Pc22Bits)
@@ -699,6 +703,8 @@ public static class Opcodes
     public static void PUSH(ref Cpu cpu, ref ushort opcode)
     {
         var value = cpu.Mmio.DataView.GetUint16(93, true);
+        if (value < cpu.StackLowLimit)
+            throw new AvrStackOverflowException(cpu.Pc, value, cpu.StackLowLimit);
         cpu.Mmio.Data[value] = cpu.Mmio.Data[(opcode & 0x1f0) >> 4];
         cpu.Mmio.DataView.SetUint16(93, (ushort)(value - 1), true);
         cpu.Cycles++;
@@ -710,6 +716,8 @@ public static class Opcodes
         var k = (opcode & 0x7ff) - ((opcode & 0x800) != 0 ? 0x800 : 0);
         var retAddr = cpu.Pc + 1;
         var sp = cpu.Mmio.DataView.GetUint16(93, true);
+        if (sp - (cpu.Pc22Bits ? 2 : 1) < cpu.StackLowLimit)
+            throw new AvrStackOverflowException(cpu.Pc, sp - (cpu.Pc22Bits ? 2 : 1), cpu.StackLowLimit);
         cpu.Mmio.Data[sp] = (byte)(retAddr & 255);
         cpu.Mmio.Data[sp - 1] = (byte)((retAddr >> 8) & 255);
         if (cpu.Pc22Bits)

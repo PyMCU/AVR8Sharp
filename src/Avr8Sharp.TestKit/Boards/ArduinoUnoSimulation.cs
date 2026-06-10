@@ -57,6 +57,11 @@ public sealed class ArduinoUnoSimulation : AvrTestSimulation
     {
         WithFrequency(Frequency);
 
+        // ATmega328P SRAM starts at 0x100; a PUSH/CALL below it has overflowed the
+        // stack into the I/O/register space. Surface it instead of silently corrupting
+        // peripheral state.
+        Cpu.StackLowLimit = 0x100;
+
         AddGpio(AvrIoPort.PortBConfig, out var portB); PortB = portB;
         AddGpio(AvrIoPort.PortCConfig, out var portC); PortC = portC;
         AddGpio(AvrIoPort.PortDConfig, out var portD); PortD = portD;

@@ -249,6 +249,30 @@ public class Instruction : AvrTestBase
 		Assert.Throws<AVR8Sharp.Core.AvrStackUnderflowException> (() => decoder.Decode (Cpu));
 	}
 
+	[Test (Description = "Should throw AvrStackOverflowException when a PUSH crosses the stack limit")]
+	public void PUSH_StackOverflow ()
+	{
+		LoadProgram ([
+			"push r0",
+		]);
+		// Park SP just below a configured RAMSTART: the push writes into the I/O space.
+		Cpu.StackLowLimit = 0x100;
+		Cpu.Mmio.DataView.SetUint16 (93, 0xFF, true);
+		Assert.Throws<AVR8Sharp.Core.AvrStackOverflowException> (() => decoder.Decode (Cpu));
+	}
+
+	[Test (Description = "Should throw AvrStackOverflowException when a CALL would push below the stack limit")]
+	public void CALL_StackOverflow ()
+	{
+		LoadProgram ([
+			"call 0xb8",
+		]);
+		Cpu.StackLowLimit = 0x100;
+		// SP == limit: a 2-byte return-address push reaches 0xFF, one below the limit.
+		Cpu.Mmio.DataView.SetUint16 (93, 0x100, true);
+		Assert.Throws<AVR8Sharp.Core.AvrStackOverflowException> (() => decoder.Decode (Cpu));
+	}
+
 	[Test (Description = "Should push 3-byte return address when executing CALL instruction on device with >128k flash")]
 	public void CALL_3Byte ()
 	{
