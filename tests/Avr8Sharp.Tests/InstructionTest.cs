@@ -236,6 +236,19 @@ public class Instruction : AvrTestBase
 		});
 	}
 	
+	[Test (Description = "Should throw AvrStackUnderflowException on RET with an empty (underflowed) stack")]
+	public void RET_StackUnderflow ()
+	{
+		LoadProgram ([
+			"ret",
+		]);
+		// SP parked at the very top of SRAM: a RET pops a return address from past
+		// the end of memory -- the empty-stack case. Should surface as a clear
+		// stack-underflow diagnostic, not a bare IndexOutOfRangeException.
+		Cpu.Mmio.DataView.SetUint16 (93, (ushort)(Cpu.Mmio.Data.Length - 1), true);
+		Assert.Throws<AVR8Sharp.Core.AvrStackUnderflowException> (() => decoder.Decode (Cpu));
+	}
+
 	[Test (Description = "Should push 3-byte return address when executing CALL instruction on device with >128k flash")]
 	public void CALL_3Byte ()
 	{

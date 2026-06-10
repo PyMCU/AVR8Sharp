@@ -726,6 +726,8 @@ public static class Opcodes
     public static void RET(ref Cpu cpu, ref ushort opcode)
     {
         var i = cpu.Mmio.DataView.GetUint16(93, true) + (cpu.Pc22Bits ? 3 : 2);
+        if (i >= cpu.Mmio.Data.Length)
+            throw new AvrStackUnderflowException(cpu.Pc, i - (cpu.Pc22Bits ? 3 : 2));
         cpu.Mmio.DataView.SetUint16(93, (ushort)i, true);
         cpu.Pc = (uint)((cpu.Mmio.Data[i - 1] << 8) + cpu.Mmio.Data[i] - 1);
         if (cpu.Pc22Bits)
@@ -740,6 +742,8 @@ public static class Opcodes
     public static void RETI(ref Cpu cpu, ref ushort opcode)
     {
         var i = cpu.Mmio.DataView.GetUint16(93, true) + (cpu.Pc22Bits ? 3 : 2);
+        if (i >= cpu.Mmio.Data.Length)
+            throw new AvrStackUnderflowException(cpu.Pc, i - (cpu.Pc22Bits ? 3 : 2));
         cpu.Mmio.DataView.SetUint16(93, (ushort)i, true);
         cpu.Pc = (uint)((cpu.Mmio.Data[i - 1] << 8) + cpu.Mmio.Data[i] - 1);
         if (cpu.Pc22Bits)
