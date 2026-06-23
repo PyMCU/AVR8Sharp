@@ -46,7 +46,7 @@ public class AvrIoPort
 		pcie: 2,
 		pcicr: 0x68,
 		pcifr: 0x3b,
-		pcmsk: 0x6c,
+		pcmsk: 0x6d,
 		pinChangeInterrupt: 10,
 		mask: 0xFF,
 		offset: 0

@@ -71,9 +71,10 @@ public sealed class ATtiny85Simulation : AvrTestSimulation
         toie: 2, ociea: 16, ocieb: 8, ociec: 0);
 
     // ── ATtiny85 Timer 1 config ───────────────────────────────────────────────
-    // 8-bit TC1. Single control register TCCR1 at 0x30.
+    // 8-bit TC1. Single control register TCCR1 at I/O 0x30 → data-mem 0x50.
+    // (Mmio.Data is indexed by data-memory address = I/O offset + 0x20.)
     // TCCRA is mapped to address 0x00 (R0 — always 0 in well-behaved code → WGM = Normal mode).
-    // TCCRB is mapped to TCCR1 (0x30) so CS10–CS12 select the prescaler.
+    // TCCRB is mapped to TCCR1 (data-mem 0x50) so CS10–CS12 select the prescaler.
     // Prescalers for CS10:CS12 on ATtiny85 TC1:
     //   1→/1, 2→/2, 3→/4, 4→/8, 5→/16, 6→/32, 7→/64
     // TIFR (0x58) and TIMSK (0x59) are shared with Timer0; MmioController hook-chaining
@@ -89,11 +90,11 @@ public sealed class ATtiny85Simulation : AvrTestSimulation
         comparatorCInterrupt: 0,
         overflowInterrupt:    0x04,  // TIMER1_OVF vector
         tccra: 0x00,  // R0 — always 0 → forces Normal WGM mode
-        tccrb: 0x30,  // TCCR1 — contains CS13:CS10
+        tccrb: 0x50,  // TCCR1 — contains CS13:CS10 (I/O 0x30 → data-mem 0x50)
         tccrc: 0x00,
-        tcnt:  0x2F,  // TCNT1
-        ocra:  0x2E,  // OCR1A
-        ocrb:  0x2B,  // OCR1B
+        tcnt:  0x4F,  // TCNT1 (I/O 0x2F → data-mem 0x4F)
+        ocra:  0x4E,  // OCR1A (I/O 0x2E → data-mem 0x4E)
+        ocrb:  0x4B,  // OCR1B (I/O 0x2B → data-mem 0x4B)
         ocrc:  0,
         icr:   0,
         timsk: 0x59,  // shared TIMSK (Timer0 uses bits 0-2, Timer1 uses bits 4-6)
