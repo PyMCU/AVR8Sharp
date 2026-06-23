@@ -162,9 +162,11 @@ public class Adc : AvrTestBase
 
         Assert.Multiple(() =>
         {
-            // Check ADIF is set (conversion complete), ADSC is clear
+            // ADIF set on completion. In free-running mode the next conversion starts
+            // immediately, so ADSC reads 1 again (a conversion is in progress), per the
+            // datasheet ("ADSC reads as one as long as a conversion is in progress").
             Assert.That(Cpu.Mmio.Data[ADCSRA] & ADIF, Is.EqualTo(ADIF), "ADIF should be set after first conversion");
-            Assert.That(Cpu.Mmio.Data[ADCSRA] & ADSC, Is.EqualTo(0), "ADSC should be clear after conversion completes");
+            Assert.That(Cpu.Mmio.Data[ADCSRA] & ADSC, Is.EqualTo(ADSC), "ADSC stays set: free-running immediately starts the next conversion");
         });
 
         // In free-running mode, a second conversion should have been queued automatically.
@@ -203,6 +205,33 @@ public class Adc : AvrTestBase
 
 		Assert.That(Cpu.Mmio.Data[ADCSRA] & ADIF, Is.EqualTo(0),
 			"ADIF must NOT fire again when ADATE=0 (single-conversion mode)");
+	}
+
+	[Test(Description = "ADC auto-trigger: Trigger() starts a conversion only for the ADTS-selected source when ADATE=1")]
+	public void AutoTrigger_StartsOnMatchingSource ()
+	{
+		const int ADCSRB = 0x7b;
+		_adc.ChannelValues[0] = 2.56;
+		Cpu.Mmio.Data[ADMUX] = REFS0;
+		Cpu.Mmio.Data[ADCSRB] = 0x03;                            // ADTS = 011 → Timer0 Compare Match A
+		Cpu.WriteData (ADCSRA, ADEN | ADATE | ADPS0 | ADPS1 | ADPS2); // enabled, auto-trigger, NO ADSC
+
+		// Nothing converts until a trigger arrives.
+		Cpu.Cycles += 128 * 25;
+		Cpu.Tick();
+		Assert.That (Cpu.Mmio.Data[ADCSRA] & ADIF, Is.EqualTo(0), "no conversion before any trigger");
+
+		// A source that does not match ADTS is ignored.
+		_adc.Trigger (AdcTriggerSource.Timer1Overflow);
+		Assert.That (Cpu.Mmio.Data[ADCSRA] & ADSC, Is.EqualTo(0), "non-matching source must not start a conversion");
+
+		// The matching source starts a conversion (ADSC goes high).
+		_adc.Trigger (AdcTriggerSource.Timer0CompareMatchA);
+		Assert.That (Cpu.Mmio.Data[ADCSRA] & ADSC, Is.EqualTo(ADSC), "matching source must start a conversion");
+
+		Cpu.Cycles += 128 * 25;
+		Cpu.Tick();
+		Assert.That (Cpu.Mmio.Data[ADCSRA] & ADIF, Is.EqualTo(ADIF), "ADIF set after the triggered conversion completes");
 	}
 
 	[Test (Description = "AvrAdc.TemperatureVoltage is configurable and affects the ADC result")]
