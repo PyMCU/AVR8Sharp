@@ -25,6 +25,7 @@ public class AvrUsart
     const int UCSRB_CFG_MASK = UCSRB_UCSZ2 | UCSRB_RXEN | UCSRB_TXEN;
     const int UCSRC_UMSEL1 = 0x80; // USART Mode Select 1
     const int UCSRC_UMSEL0 = 0x40; // USART Mode Select 0
+    const int UCSRC_UMSEL_MASK = UCSRC_UMSEL1 | UCSRC_UMSEL0;
     const int UCSRC_UPM1 = 0x20; // Parity Mode 1
     const int UCSRC_UPM0 = 0x10; // Parity Mode 0
     const int UCSRC_USBS = 0x08; // Stop Bit Select
@@ -73,6 +74,8 @@ public class AvrUsart
     private readonly Action _txCompleteAction;
     private readonly Action _rxCompleteAction;
     private ushort _incomingRxBuffer;
+    private bool _incomingFrameError;
+    private bool _incomingParityError;
 
     public Action<byte>? OnByteTransmit { get; set; } = null;
     public Action<string>? OnLineTransmit { get; set; } = null;
@@ -98,9 +101,24 @@ public class AvrUsart
         get { return _cpu.Mmio.Data[_config.UBRRL] | _cpu.Mmio.Data[_config.UBRRH] << 8; }
     }
 
+    /// <summary>
+    /// True when the USART is in synchronous master mode (UMSEL1:0 = 01). In this mode
+    /// the baud divisor is f/(2·(UBRR+1)) and the U2X bit is ignored.
+    /// </summary>
+    public bool SyncMode
+    {
+        get { return (_cpu.Mmio.Data[_config.UCSRC] & UCSRC_UMSEL_MASK) == UCSRC_UMSEL0; }
+    }
+
     public int Multiplier
     {
-        get { return (_cpu.Mmio.Data[_config.UCSRA] & UCSRA_U2X) != 0 ? 8 : 16; }
+        get
+        {
+            // Synchronous mode: fixed divisor of 2 (datasheet §19.3.1). Async normal = 16,
+            // async double-speed (U2X) = 8.
+            if (SyncMode) return 2;
+            return (_cpu.Mmio.Data[_config.UCSRA] & UCSRA_U2X) != 0 ? 8 : 16;
+        }
     }
 
     public bool RxEnable
@@ -196,7 +214,7 @@ public class AvrUsart
         _rxCompleteAction = () =>
         {
             _rxBusyValue = false;
-            WriteByte(_incomingRxBuffer, true);
+            WriteByte(_incomingRxBuffer, true, _incomingFrameError, _incomingParityError);
         };
         
         Reset();
@@ -254,6 +272,10 @@ public class AvrUsart
         {
             var result = _rxBuffer & _cachedRxMask & 0xFF;
             _rxBuffer = 0;
+            // FE/DOR/UPE are tied to the word in the receive buffer; reading UDR consumes
+            // that word, so the error flags are cleared (in a deeper FIFO they would update
+            // to the next word's status — here the single buffered word is now empty).
+            _cpu.Mmio.Data[_config.UCSRA] &= unchecked((byte)~(UCSRA_FE | UCSRA_DOR | UCSRA_UPE));
             _cpu.ClearInterrupt(_rxc);
             return (byte)result;
         });
@@ -316,13 +338,35 @@ public class AvrUsart
         _lineBuffer.Clear();
     }
 
-    public bool WriteByte(ushort value, bool immediate = false)
+    /// <summary>
+    /// Delivers a received byte to the USART. <paramref name="frameError"/> models a stop-bit
+    /// violation (FE) and <paramref name="parityError"/> a parity mismatch (UPE) for the frame.
+    /// If a previously received byte has not yet been read from UDR, the new byte is lost and
+    /// the Data OverRun flag (DOR) is set, per the datasheet.
+    /// </summary>
+    public bool WriteByte(ushort value, bool immediate = false, bool frameError = false, bool parityError = false)
     {
         if (_rxBusyValue || !RxEnable) return false;
 
         if (immediate)
         {
+            // Overrun: a frame completed while the previous one is still unread (RXC set).
+            // The buffered word is kept and the incoming word is discarded; DOR is raised.
+            if ((_cpu.Mmio.Data[_config.UCSRA] & UCSRA_RXC) != 0)
+            {
+                _cpu.Mmio.Data[_config.UCSRA] |= UCSRA_DOR;
+                OnRxComplete?.Invoke();
+                return false;
+            }
+
             _rxBuffer = value;
+
+            // Frame Error / Parity Error accompany this word in the receive buffer and stay
+            // valid until UDR is read. They are read-only to firmware, so set them directly.
+            var ucsra = _cpu.Mmio.Data[_config.UCSRA];
+            ucsra = frameError ? (byte)(ucsra | UCSRA_FE) : (byte)(ucsra & ~UCSRA_FE);
+            ucsra = parityError ? (byte)(ucsra | UCSRA_UPE) : (byte)(ucsra & ~UCSRA_UPE);
+            _cpu.Mmio.Data[_config.UCSRA] = ucsra;
 
             var ucsrb = _cpu.Mmio.Data[_config.UCSRB];
             if ((value & 0x100) != 0)
@@ -342,6 +386,8 @@ public class AvrUsart
         {
             _rxBusyValue = true;
             _incomingRxBuffer = value;
+            _incomingFrameError = frameError;
+            _incomingParityError = parityError;
             _cpu.AddClockEvent(_rxCompleteAction, _cachedCyclesPerChar);
         }
 

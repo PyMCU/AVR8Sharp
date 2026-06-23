@@ -30,6 +30,11 @@ public class Usart : AvrTestBase
 	const int USBS = 0x08;
 	const int UPM0 = 0x10;
 	const int UPM1 = 0x20;
+	const int FE = 0x10;     // Frame Error (UCSRA)
+	const int DOR = 0x08;    // Data OverRun (UCSRA)
+	const int UPE = 0x04;    // Parity Error (UCSRA)
+	const int UMSEL0 = 0x40; // USART Mode Select 0 (UCSRC) — synchronous when set, async clear
+	const int UCSZ_8BIT = 0x06; // UCSZ1|UCSZ0 = 8-bit frame (UCSRC default)
 
 	// Interrupt address
 	const int PC_INT_UDRE = 0x26;
@@ -65,7 +70,22 @@ public class Usart : AvrTestBase
 		
 		Assert.That (_usart.BaudRate, Is.EqualTo(2_400));
 	}
-	
+
+	[Test(Description = "Synchronous master mode (UMSEL=01): baud = f/(2*(UBRR+1)), U2X ignored")]
+	public void BaudRateCalculationSynchronous()
+	{
+		Cpu.WriteData (UCSR0C, UMSEL0 | UCSZ_8BIT); // synchronous master, 8-bit
+		Cpu.WriteData (UBRR0H, 0);
+		Cpu.WriteData (UBRR0L, 3);                  // 16MHz / (2*(3+1)) = 2,000,000
+
+		Assert.Multiple(() =>
+		{
+			Assert.That (_usart.SyncMode, Is.True);
+			Assert.That (_usart.Multiplier, Is.EqualTo(2));
+			Assert.That (_usart.BaudRate, Is.EqualTo(2_000_000));
+		});
+	}
+
 	[Test(Description = "Should call onConfigurationChange when the baudRate changes")]
 	public void ConfigurationChange()
 	{
@@ -411,6 +431,61 @@ public class Usart : AvrTestBase
 			Cpu.Tick();
 			
 			Assert.That (usart.WriteByte(10), Is.False);
+		}
+	}
+
+	[TestFixture]
+	public class ReceiveErrors : AvrTestBase
+	{
+		private AvrUsart _usart;
+
+		protected override void SetupPeripherals()
+		{
+			_usart = new AvrUsart(Cpu, AvrUsart.Usart0Config, FREQ_16MHZ);
+		}
+
+		[Test(Description = "Frame Error (FE) is set for a malformed frame and cleared after UDR is read")]
+		public void FrameError()
+		{
+			Cpu.WriteData (UCSR0B, RXEN);
+			_usart.WriteByte(0x42, immediate: true, frameError: true);
+
+			Assert.Multiple(() =>
+			{
+				Assert.That (Cpu.Mmio.Data[UCSR0A] & FE, Is.EqualTo(FE), "FE must be set");
+				Assert.That (Cpu.Mmio.Data[UCSR0A] & RXC, Is.EqualTo(RXC), "RXC must be set");
+			});
+
+			Cpu.ReadData (UDR0);
+			Assert.That (Cpu.Mmio.Data[UCSR0A] & FE, Is.EqualTo(0), "FE must clear after reading UDR");
+		}
+
+		[Test(Description = "Parity Error (UPE) is set for a frame with bad parity")]
+		public void ParityError()
+		{
+			Cpu.WriteData (UCSR0B, RXEN);
+			_usart.WriteByte(0x42, immediate: true, parityError: true);
+
+			Assert.That (Cpu.Mmio.Data[UCSR0A] & UPE, Is.EqualTo(UPE), "UPE must be set");
+		}
+
+		[Test(Description = "Data OverRun (DOR): a byte arriving before UDR is read is lost and sets DOR")]
+		public void DataOverRun()
+		{
+			Cpu.WriteData (UCSR0B, RXEN);
+			_usart.WriteByte(0x11, immediate: true); // first byte, RXC set
+
+			var second = _usart.WriteByte(0x22, immediate: true); // overrun: not yet read
+
+			Assert.Multiple(() =>
+			{
+				Assert.That (second, Is.False, "overrun byte must be rejected");
+				Assert.That (Cpu.Mmio.Data[UCSR0A] & DOR, Is.EqualTo(DOR), "DOR must be set");
+			});
+
+			// The first byte is preserved; the overrun byte was discarded.
+			Assert.That (Cpu.ReadData (UDR0), Is.EqualTo(0x11), "buffered byte must survive the overrun");
+			Assert.That (Cpu.Mmio.Data[UCSR0A] & DOR, Is.EqualTo(0), "DOR clears after reading UDR");
 		}
 	}
 
