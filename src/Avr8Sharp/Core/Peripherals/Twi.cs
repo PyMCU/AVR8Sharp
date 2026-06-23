@@ -41,6 +41,7 @@ public class AvrTwi
     const int STATUS_SLAVE_GCALL_ACK = 0x70;     // General call received, ACK returned
     const int STATUS_SLAVE_DATA_RX_ACK = 0x80;   // Data byte received, ACK returned
     const int STATUS_SLAVE_DATA_RX_NACK = 0x88;  // Data byte received, NACK returned
+    const int STATUS_SLAVE_STOP = 0xA0;          // STOP or repeated START received while addressed as slave (TW_SR_STOP)
     // Slave transmit states
     const int STATUS_SLAVE_SLAR_ACK = 0xA8;      // SLA+R received, ACK returned
 
@@ -254,6 +255,15 @@ public class AvrTwi
         var ack = (_cpu.Mmio.Data[_config.TWCR] & TWCR_TWEA) != 0;
         UpdateStatus (ack ? STATUS_SLAVE_DATA_RX_ACK : STATUS_SLAVE_DATA_RX_NACK);
     }
+
+    /// <summary>
+    /// Simulate a STOP (or repeated START) condition from the external master while
+    /// this device is addressed as slave. Sets TWSR to 0xA0 (TW_SR_STOP) and raises
+    /// TWINT — this is the status on which the Arduino Wire library's ISR fires the
+    /// user's onReceive callback, so slave-receiver firmware cannot complete a
+    /// transaction without it.
+    /// </summary>
+    public void SimulateIncomingStop () => UpdateStatus (STATUS_SLAVE_STOP);
 
     /// <summary>
     /// Read the byte firmware placed in TWDR for slave-transmit mode.

@@ -614,6 +614,29 @@ public class Twi : AvrTestBase
             });
         }
 
+        [Test(Description = "Slave receive: SimulateIncomingStop sets TWSR=0xA0 (TW_SR_STOP) and raises TWINT")]
+        public void SlaveReceive_StopCompletesTransaction()
+        {
+            const int STATUS_SLAVE_STOP = 0xA0;
+
+            Cpu.Mmio.Data[TWAR] = (byte)(0x48 << 1);
+            Cpu.WriteData((ushort)TWCR, (byte)(TWEN | TWEA | TWINT));
+
+            // SLA+W (0x60) → data (0x80) → STOP (0xA0): the full slave-receiver sequence.
+            _twi.SimulateIncomingAddress(0x48, isWrite: true);
+            Cpu.WriteData((ushort)TWCR, (byte)(TWEN | TWEA | TWINT));
+            _twi.SimulateIncomingData(0x5A);
+            Cpu.WriteData((ushort)TWCR, (byte)(TWEN | TWEA | TWINT));
+            _twi.SimulateIncomingStop();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(Cpu.Mmio.Data[TWSR] & TWSR_TWS_MASK, Is.EqualTo(STATUS_SLAVE_STOP),
+                    "TWSR must be 0xA0 (STOP/repeated START received while addressed as slave)");
+                Assert.That(Cpu.Mmio.Data[TWCR] & TWINT, Is.EqualTo(TWINT), "TWINT must be set");
+            });
+        }
+
         [Test(Description = "General call: TWINT is set and TWSR=0x70 when TWAR bit0=1 and address=0x00")]
         public void GeneralCall_WhenEnabled()
         {
