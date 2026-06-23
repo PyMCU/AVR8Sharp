@@ -162,7 +162,7 @@ public sealed class ArduinoMegaSimulation : AvrTestSimulation
     private static readonly AvrEepromConfig Mega2560EepromConfig = new AvrEepromConfig(
         eepromReadyInterrupt: 0x3C,
         eecr: 0x3F, eedr: 0x40, eearl: 0x41, eearh: 0x42,
-        eraseCycles: 28800, writeCycles: 28800);
+        eraseCycles: 28800, writeCycles: 28800, atomicCycles: 54400);
 
     // ── GPIO ports ────────────────────────────────────────────────────────────
     /// <summary>Port A — digital pins 22–29.</summary>

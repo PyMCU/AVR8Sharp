@@ -118,7 +118,7 @@ public sealed class ATtiny85Simulation : AvrTestSimulation
     private static readonly AvrEepromConfig Tiny85EepromConfig = new AvrEepromConfig(
         eepromReadyInterrupt: 0x06,
         eecr: 0x3C, eedr: 0x3D, eearl: 0x3E, eearh: 0x00,
-        eraseCycles: 28800, writeCycles: 28800);
+        eraseCycles: 28800, writeCycles: 28800, atomicCycles: 54400);
 
     // ── GPIO ──────────────────────────────────────────────────────────────────
     /// <summary>
