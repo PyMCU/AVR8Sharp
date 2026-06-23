@@ -8,12 +8,16 @@ public class AvrClock
 
     public static readonly AvrClockConfig ClockConfig = new AvrClockConfig(0x61);
 
+    // CLKPS3:0 → system clock division factor. Indices 0..8 are the datasheet-defined
+    // factors 1,2,4,…,256 (ATmega328P Table 13-12). Indices 9..15 are marked "Reserved" by
+    // the datasheet — their behaviour is undefined and firmware must not select them. The
+    // values below were measured on real ATmega328P silicon, where the divider follows the
+    // pattern 2^(index-8) (i.e. 2,4,…,128) in that region; they are kept because empirical
+    // hardware behaviour is the closest thing to a source of truth for an undefined region.
     public static readonly int[] Prescalers =
     [
         1, 2, 4, 8, 16, 32, 64, 128, 256,
-
-        // The following values are "reserved" according to the datasheet, so we measured
-        // with a scope to figure them out (on ATmega328p)
+        // Reserved region (empirical ATmega328P measurements — see note above):
         2, 4, 8, 16, 32, 64, 128,
     ];
 
