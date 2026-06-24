@@ -184,6 +184,10 @@ public static class ExpressionEvaluator
 					"LWRD"           => arg.Value & 0xFFFF,
 					"HWRD"           => (arg.Value >> 16) & 0xFFFF,
 					"PM"             => arg.Value >> 1,
+					// gs() yields the word address of a symbol (for function pointers /
+					// far jumps). On <=128KW parts this equals pm(); the >128K stub is
+					// not needed for the simulated devices.
+					"GS"             => arg.Value >> 1,
 					_ => throw new Exception($"Unknown function: {name}")
 				};
 			}

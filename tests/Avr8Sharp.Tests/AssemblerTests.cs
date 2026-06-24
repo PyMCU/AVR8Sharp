@@ -920,6 +920,43 @@ public class Assembler
 		Assert.That (Bytes ("00910001"), Is.EqualTo (lds.Assemble ("lds r16, x\n.data\nx: .byte 1")));
 	}
 
+	[Test(Description = "Immediate instructions defer forward-referenced symbol operands (avr-gcc ldi lo8(sym))")]
+	public void Immediate_ForwardSymbol ()
+	{
+		// buf resolves to 0x100: lo8 = 0x00, hi8 = 0x01
+		var lo = new AvrAssembler ();
+		Assert.That (Bytes ("80e0"), Is.EqualTo (lo.Assemble ("ldi r24, lo8(buf)\n.data\nbuf: .byte 1")));
+		var hi = new AvrAssembler ();
+		Assert.That (Bytes ("91e0"), Is.EqualTo (hi.Assemble ("ldi r25, hi8(buf)\n.data\nbuf: .byte 1")));
+		// subi/sbci/ori/andi/cpi take the same path
+		var subi = new AvrAssembler ();
+		subi.Assemble ("subi r24, lo8(-(buf))\n.data\nbuf: .byte 1");
+		Assert.That (subi.Errors, Is.Empty);
+	}
+
+	[Test(Description = "gs() yields the word address of a symbol (function pointers), matching avr-as")]
+	public void GsFunction ()
+	{
+		var assembler = new AvrAssembler ();
+		// f at byte 8 (word 4): lo8(gs(f)) = 0x04, hi8(gs(f)) = 0x00
+		var result = assembler.Assemble ("ldi r24, lo8(gs(f))\nldi r25, hi8(gs(f))\nnop\nnop\nf: ret");
+
+		Assert.That (assembler.Errors, Is.Empty);
+		Assert.That (Bytes ("84e0" + "90e0" + "0000" + "0000" + "0895"), Is.EqualTo (result));
+	}
+
+	[Test(Description = ".set / .equ accept the GNU comma form (NAME, VALUE)")]
+	public void SymbolDef_CommaForm ()
+	{
+		var s = new AvrAssembler ();
+		Assert.That (Bytes ("0ae2"), Is.EqualTo (s.Assemble (".set foo, 0x2a\nldi r16, foo"))); // ldi r16,0x2a
+		var e = new AvrAssembler ();
+		Assert.That (Bytes ("05e5"), Is.EqualTo (e.Assemble (".equ bar, 0x55\nldi r16, bar"))); // ldi r16,0x55
+		// the Atmel '=' form still works
+		var eq = new AvrAssembler ();
+		Assert.That (Bytes ("00e1"), Is.EqualTo (eq.Assemble (".equ baz = 0x10\nldi r16, baz")));
+	}
+
 	// -----------------------------------------------------------------------
 	// avr-gcc / avr-as front-end compatibility
 	// -----------------------------------------------------------------------

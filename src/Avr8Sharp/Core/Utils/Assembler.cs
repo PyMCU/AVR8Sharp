@@ -34,7 +34,9 @@ public partial class AvrAssembler
 			var r = 0x2000 | DestRIndex(a) | SrcRIndex(b);
 			return ZeroPad (r);
 		} },
-		{ "ANDI", (a, b, _, _) => {
+		{ "ANDI", (a, b, byteLoc, labels) => {
+			if (ConstOrLabel(b, labels) == int.MinValue)
+				return new Func<Dictionary<string, int>, string> ((l) => OpTable?["ANDI"](a, b, byteLoc, l) as string ?? string.Empty);
 			var r = 0x7000 | (DestRIndex(a, 16, 31) & 0xf0);
 			var k = ConstValue(b);
 			r |= ((k & 0xf0) << 4) | (k & 0xf);
@@ -198,7 +200,9 @@ public partial class AvrAssembler
 			var r = 0x0400 | DestRIndex(a) | SrcRIndex(b);
 			return ZeroPad (r);
 		}},
-		{ "CPI", (a, b, _, _) => {
+		{ "CPI", (a, b, byteLoc, labels) => {
+			if (ConstOrLabel(b, labels) == int.MinValue)
+				return new Func<Dictionary<string, int>, string> ((l) => OpTable?["CPI"](a, b, byteLoc, l) as string ?? string.Empty);
 			var r = 0x3000 | (DestRIndex(a, 16, 31) & 0xf0);
 			var k = ConstValue(b);
 			r |= ((k & 0xf0) << 4) | (k & 0xf);
@@ -312,7 +316,9 @@ public partial class AvrAssembler
 			var r = DestRIndex(a) | StldYzQ(b);
 			return ZeroPad (r);
 		}},
-		{ "LDI", (a, b, _, _) => {
+		{ "LDI", (a, b, byteLoc, labels) => {
+			if (ConstOrLabel(b, labels) == int.MinValue)
+				return new Func<Dictionary<string, int>, string> ((l) => OpTable?["LDI"](a, b, byteLoc, l) as string ?? string.Empty);
 			var r = 0xe000 | (DestRIndex(a, 16, 31) & 0xf0);
 			var k = ConstValue(b);
 			r |= ((k & 0xf0) << 4) | (k & 0xf);
@@ -382,7 +388,9 @@ public partial class AvrAssembler
 			var r = 0x2800 | DestRIndex(a) | SrcRIndex(b);
 			return ZeroPad (r);
 		}},
-		{ "ORI", (a, b, _, _) => {
+		{ "ORI", (a, b, byteLoc, labels) => {
+			if (ConstOrLabel(b, labels) == int.MinValue)
+				return new Func<Dictionary<string, int>, string> ((l) => OpTable?["ORI"](a, b, byteLoc, l) as string ?? string.Empty);
 			var r = 0x6000 | (DestRIndex(a, 16, 31) & 0xf0);
 			var k = ConstValue(b);
 			r |= ((k & 0xf0) << 4) | (k & 0xf);
@@ -435,7 +443,9 @@ public partial class AvrAssembler
 			var r = 0x0800 | DestRIndex(a) | SrcRIndex(b);
 			return ZeroPad (r);
 		}},
-		{ "SBCI", (a, b, _, _) => {
+		{ "SBCI", (a, b, byteLoc, labels) => {
+			if (ConstOrLabel(b, labels) == int.MinValue)
+				return new Func<Dictionary<string, int>, string> ((l) => OpTable?["SBCI"](a, b, byteLoc, l) as string ?? string.Empty);
 			var r = 0x4000 | (DestRIndex(a, 16, 31) & 0xf0);
 			var k = ConstValue(b);
 			r |= ((k & 0xf0) << 4) | (k & 0xf);
@@ -540,7 +550,9 @@ public partial class AvrAssembler
 			var r = 0x1800 | DestRIndex(a) | SrcRIndex(b);
 			return ZeroPad (r);
 		}},
-		{ "SUBI", (a, b, _, _) => {
+		{ "SUBI", (a, b, byteLoc, labels) => {
+			if (ConstOrLabel(b, labels) == int.MinValue)
+				return new Func<Dictionary<string, int>, string> ((l) => OpTable?["SUBI"](a, b, byteLoc, l) as string ?? string.Empty);
 			var r = 0x5000 | (DestRIndex(a, 16, 31) & 0xf0);
 			var k = ConstValue(b);
 			r |= ((k & 0xf0) << 4) | (k & 0xf);
@@ -1241,7 +1253,8 @@ public partial class AvrAssembler
 	// -----------------------------------------------------------------------
 	private void ProcessSymbolDef(string args, int lineIdx, int byteOffset, bool isImmutable)
 	{
-		var parts = args.Split('=', 2);
+		// Accept both Atmel `NAME = VALUE` and GNU `NAME, VALUE` forms.
+		var parts = args.Contains('=') ? args.Split('=', 2) : args.Split(new[] { ',' }, 2);
 		if (parts.Length != 2) { _errors.Add($"Line {lineIdx + 1}: .equ/.set requires NAME = VALUE"); return; }
 		var name = parts[0].Trim();
 		var valStr = parts[1].Trim();
