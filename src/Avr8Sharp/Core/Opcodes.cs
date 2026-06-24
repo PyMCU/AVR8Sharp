@@ -848,13 +848,14 @@ public static class Opcodes
         var l = (opcode & 0xf) | ((opcode & 0xc0) >> 2);
         var R = a - l;
         cpu.Mmio.DataView.SetUint16((ushort)i, (ushort)R, true);
-        var sreg = 0;
+        // SBIW does not affect the H flag (AVR Instruction Set Manual: S V N Z C only),
+        // so preserve the existing H bit (0x20) rather than computing it.
+        var sreg = cpu._sregArith & 0x20;
         sreg |= R == 0 ? 2 : 0;
         sreg |= (0x8000 & R) != 0 ? 4 : 0;
         sreg |= (a & ~R & 0x8000) != 0 ? 8 : 0;
         sreg |= (((sreg >> 2) & 1) ^ ((sreg >> 3) & 1)) != 0 ? 0x10 : 0;
         sreg |= l > a ? 1 : 0;
-        sreg |= (8 & ((~a & l) | (l & R) | (R & ~a))) != 0 ? 0x20 : 0;
         cpu._sregArith = (byte)sreg;
         cpu.Cycles++;
     }

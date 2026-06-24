@@ -193,15 +193,7 @@ public class AvrAdc
                     return true;
                 }
 
-                var channel = cpu.Mmio.Data[config.ADMUX] & MUX_MASK;
-                if ((cpu.Mmio.Data[config.ADCSRB] & MUX5) != 0)
-                {
-                    channel |= 0x20;
-                }
-
-                var muxInput = _muxArray[channel & 0x1F];
-                _converting = true;
-                OnADCRead(muxInput);
+                StartConversion();
                 return true;
             }
 
@@ -209,6 +201,43 @@ public class AvrAdc
         });
 
         UpdateCaches();
+    }
+
+    /// <summary>
+    /// Begins a conversion on the channel currently selected by ADMUX/MUX5, marking ADSC and
+    /// the internal converting state. Shared by the firmware-initiated path, free-running
+    /// auto-restart, and external auto-triggers.
+    /// </summary>
+    private void StartConversion()
+    {
+        _converting = true;
+        _cpu.Mmio.Data[_config.ADCSRA] |= ADSC;
+        var channel = _cpu.Mmio.Data[_config.ADMUX] & MUX_MASK;
+        if ((_cpu.Mmio.Data[_config.ADCSRB] & MUX5) != 0)
+        {
+            channel |= 0x20;
+        }
+
+        OnADCRead(_muxArray[channel & 0x1F]);
+    }
+
+    /// <summary>
+    /// Notifies the ADC that an auto-trigger event fired. When ADATE=1, the ADC is enabled,
+    /// no conversion is in progress, and <paramref name="source"/> matches the ADTS2:0 bits in
+    /// ADCSRB, a new conversion starts on the rising edge of the trigger (the call itself is the
+    /// edge). Free-running (ADTS=000) self-triggers via <see cref="CompleteAdcRead"/> and is not
+    /// driven here. Boards wire the relevant timer/comparator/external-interrupt event to this.
+    /// </summary>
+    public void Trigger(AdcTriggerSource source)
+    {
+        if (source == AdcTriggerSource.FreeRunning) return;
+
+        var adcsra = _cpu.Mmio.Data[_config.ADCSRA];
+        if ((adcsra & ADEN) == 0 || (adcsra & ADATE) == 0 || _converting) return;
+
+        if ((_cpu.Mmio.Data[_config.ADCSRB] & ADTS_MASK) != (int)source) return;
+
+        StartConversion();
     }
 
     public void OnADCRead(AdcMuxInput input)
@@ -251,18 +280,13 @@ public class AvrAdc
         _cpu.Mmio.Data[adcsra] &= ~ADSC & 0xff;
         _cpu.SetInterruptFlag(_adc);
 
-        // Auto-trigger: free-running mode (ADATE=1, ADTS=000 in ADCSRB)
+        // Auto-trigger: only free-running mode (ADATE=1, ADTS=000) restarts itself. Other
+        // trigger sources are edge-driven externally through Trigger().
         if ((_cpu.Mmio.Data[adcsra] & ADEN) != 0 &&
             (_cpu.Mmio.Data[adcsra] & ADATE) != 0 &&
             (_cpu.Mmio.Data[_config.ADCSRB] & ADTS_MASK) == 0)
         {
-            _converting = true;
-            var channel = _cpu.Mmio.Data[_config.ADMUX] & MUX_MASK;
-            if ((_cpu.Mmio.Data[_config.ADCSRB] & MUX5) != 0)
-            {
-                channel |= 0x20;
-            }
-            OnADCRead(_muxArray[channel & 0x1F]);
+            StartConversion();
         }
     }
 
@@ -307,6 +331,21 @@ public enum AdcMuxInputType
     Differential = 1,
     Constant = 2,
     Temperature = 3,
+}
+
+/// <summary>
+/// ADC auto-trigger sources, encoded as the ADTS2:0 bits in ADCSRB (ATmega328P §24.9.4).
+/// </summary>
+public enum AdcTriggerSource
+{
+    FreeRunning = 0,
+    AnalogComparator = 1,
+    ExternalInterrupt0 = 2,
+    Timer0CompareMatchA = 3,
+    Timer0Overflow = 4,
+    Timer1CompareMatchB = 5,
+    Timer1Overflow = 6,
+    Timer1CaptureEvent = 7,
 }
 
 public class AdcMuxInput(

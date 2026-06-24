@@ -113,6 +113,32 @@ public class Eeprom : AvrTestBase
 			});
 		}
 		
+		[Test (Description = "Atomic erase+write (EEPM=00) completes in 3.4ms (54400 cy), not 1.8+1.8=3.6ms (57600 cy)")]
+		public void AtomicWriteTiming ()
+		{
+			Cpu.WriteData (EEDR, 0x55);
+			Cpu.WriteData (EEARL, 15);
+			Cpu.WriteData (EEARH, 0);
+			Cpu.WriteData (EECR, EEMPE);
+			Cpu.WriteData (EECR, EEPE); // EEPM=00 → atomic erase+write
+			Cpu.Tick ();
+
+			// At 54002 cycles the write is still in progress (true for both 3.4ms and 3.6ms).
+			Cpu.Cycles += 54000;
+			Cpu.Tick ();
+			Assert.That (Cpu.Mmio.Data[EECR] & EEPE, Is.EqualTo(EEPE), "still writing just before 3.4ms");
+
+			// At 55002 cycles it must be complete (3.4ms=54400). With the old 3.6ms (57600)
+			// it would still be writing here, so this pins the atomic timing to 3.4ms.
+			Cpu.Cycles += 1000;
+			Cpu.Tick ();
+			Assert.Multiple(() =>
+			{
+				Assert.That (_backend.ReadMemory (15), Is.EqualTo(0x55), "atomic write done by 3.4ms");
+				Assert.That (Cpu.Mmio.Data[EECR] & EEPE, Is.EqualTo(0), "EEPE cleared on completion");
+			});
+		}
+
 		[Test (Description = "Should not erase the memory when writing if EEPM1 is high")]
 		public void NoErase ()
 		{

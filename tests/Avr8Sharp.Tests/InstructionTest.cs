@@ -1182,18 +1182,22 @@ public class Instruction : AvrTestBase
 		});
 	}
 
-	[Test (Description = "SBIW: half-carry set on nibble borrow (regression: 1& vs 8&)")]
-	public void SBIW_HalfCarry ()
+	[Test (Description = "SBIW: does NOT affect the H flag (manual: only S,V,N,Z,C) and preserves a pre-set H")]
+	public void SBIW_DoesNotAffectHalfCarry ()
 	{
+		// AVR Instruction Set Manual, SBIW: the H flag is unchanged. 0x0010 - 8 = 0x0008
+		// (positive, non-zero, no borrow, no overflow) → S,V,N,Z,C all clear. H must keep
+		// whatever value it had; here we pre-set H to prove SBIW leaves it untouched.
 		LoadProgram ([ "sbiw r24, 8" ]);
 		Cpu.Mmio.Data[R24] = 0x10;
-		Cpu.Mmio.Data[R25] = 0x00;   // r25:r24 = 0x0010; 0x0010 - 8 = 0x0008, borrow at bit 3 → H=1
+		Cpu.Mmio.Data[R25] = 0x00;   // r25:r24 = 0x0010
+		Cpu.WriteData (95, SREG_H);   // pre-set H via SREG hook; SBIW must not clear it
 		decoder.Decode(Cpu);
 		Assert.Multiple(() =>
 		{
 			Assert.That (Cpu.Mmio.Data[R24], Is.EqualTo (0x08));
 			Assert.That (Cpu.Mmio.Data[R25], Is.EqualTo (0x00));
-			Assert.That (Cpu.Sreg, Is.EqualTo (SREG_H));
+			Assert.That (Cpu.Sreg, Is.EqualTo (SREG_H), "SBIW must leave H untouched and set no other flag");
 		});
 	}
 

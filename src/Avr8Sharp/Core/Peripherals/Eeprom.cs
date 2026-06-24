@@ -18,8 +18,9 @@ public class AvrEeprom
         eedr: 0x40,
         eearl: 0x41,
         eearh: 0x42,
-        eraseCycles: 28800,
-        writeCycles: 28800
+        eraseCycles: 28800,   // 1.8 ms at 16 MHz (erase-only)
+        writeCycles: 28800,   // 1.8 ms at 16 MHz (write-only)
+        atomicCycles: 54400   // 3.4 ms at 16 MHz (atomic erase+write, datasheet Table 7-1)
     );
 
     private ulong _writeEnabledCycles = 0;
@@ -91,18 +92,28 @@ public class AvrEeprom
                 var capturedAddr = (ushort)((cpu.Mmio.Data[_config.EEARH] << 8) | cpu.Mmio.Data[_config.EEARL]);
                 var capturedData = cpu.Mmio.Data[_config.EEDR];
 
-                var duration = 0;
                 var doErase = (eecr & EEPM1) == 0;
                 var doWrite = (eecr & EEPM0) == 0;
-
-                if (doErase) duration += (int)_config.EraseCycles;
-                if (doWrite) duration += (int)_config.WriteCycles;
 
                 // EEPM=11 is reserved/undefined per ATmega datasheet — treat as no-op
                 if (!doErase && !doWrite)
                 {
                     cpu.Mmio.Data[_config.EECR] &= ~EEPE & 0xFF;
                     return true;
+                }
+
+                int duration;
+                if (doErase && doWrite && _config.AtomicCycles > 0)
+                {
+                    // Atomic erase+write completes faster than the two operations run back to
+                    // back (3.4 ms vs 1.8 + 1.8 = 3.6 ms) because the hardware overlaps them.
+                    duration = (int)_config.AtomicCycles;
+                }
+                else
+                {
+                    duration = 0;
+                    if (doErase) duration += (int)_config.EraseCycles;
+                    if (doWrite) duration += (int)_config.WriteCycles;
                 }
 
                 _writeCompleteCycles = cpu.Cycles + (ulong)duration;
@@ -181,7 +192,8 @@ public class AvrEepromConfig(
     byte eearl = 0,
     byte eearh = 0,
     uint eraseCycles = 0,
-    uint writeCycles = 0)
+    uint writeCycles = 0,
+    uint atomicCycles = 0)
 {
     public readonly byte EepromReadyInterrupt = eepromReadyInterrupt;
 
@@ -192,4 +204,10 @@ public class AvrEepromConfig(
 
     public readonly uint EraseCycles = eraseCycles;
     public readonly uint WriteCycles = writeCycles;
+
+    /// <summary>
+    /// Duration of an atomic erase+write (EEPM=00). When 0, the atomic time falls back to
+    /// <see cref="EraseCycles"/> + <see cref="WriteCycles"/>.
+    /// </summary>
+    public readonly uint AtomicCycles = atomicCycles;
 }

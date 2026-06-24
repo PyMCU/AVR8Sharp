@@ -157,11 +157,12 @@ public sealed class ArduinoMegaSimulation : AvrTestSimulation
     };
 
     // EEPROM — same I/O register addresses as ATmega328P; interrupt vector differs
-    // ATmega2560 EE_RDY: vector 30, byte addr 0x74, word addr 0x3A
+    // ATmega2560 EE_READY: avr-libc vect_num 30 → word addr 30×2 = 0x3C (byte 0x78).
+    // (0x3A is the ADC vector, vect_num 29 — do not confuse the two.)
     private static readonly AvrEepromConfig Mega2560EepromConfig = new AvrEepromConfig(
-        eepromReadyInterrupt: 0x3A,
+        eepromReadyInterrupt: 0x3C,
         eecr: 0x3F, eedr: 0x40, eearl: 0x41, eearh: 0x42,
-        eraseCycles: 28800, writeCycles: 28800);
+        eraseCycles: 28800, writeCycles: 28800, atomicCycles: 54400);
 
     // ── GPIO ports ────────────────────────────────────────────────────────────
     /// <summary>Port A — digital pins 22–29.</summary>

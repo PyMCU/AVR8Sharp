@@ -55,6 +55,25 @@ public class Clock : AvrTestBase
 		});
 	}
 	
+	[Test (Description = "Reserved CLKPS values (9-15) follow the empirical 328P pattern 2^(index-8)")]
+	public void ReservedPrescalerValues ()
+	{
+		// Index 9 is datasheet-reserved; on real 328P silicon it divides by 2. This locks in
+		// the documented empirical behaviour for the undefined region.
+		Cpu.WriteData (CLKPC, CLKPCE);
+		Cpu.WriteData (CLKPC, 9);
+		Assert.Multiple(() =>
+		{
+			Assert.That(_clock.Prescaler, Is.EqualTo(2));
+			Assert.That(_clock.Frequency, Is.EqualTo(8_000_000)); // 16MHz / 2
+		});
+
+		// Index 15 divides by 128 (2^(15-8)).
+		Cpu.WriteData (CLKPC, CLKPCE);
+		Cpu.WriteData (CLKPC, 15);
+		Assert.That(_clock.Prescaler, Is.EqualTo(128));
+	}
+
 	[Test (Description = "Should return the current prescaler value")]
 	public void PrescalerValue ()
 	{
