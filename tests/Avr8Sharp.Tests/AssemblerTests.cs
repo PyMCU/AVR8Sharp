@@ -877,6 +877,49 @@ public class Assembler
 		Assert.That (assembler.Errors[0], Does.Contain (".endr without .rept"));
 	}
 
+	[Test(Description = "Data-segment labels get sequential SRAM addresses (lds/sts resolve)")]
+	public void DataSegment_Labels ()
+	{
+		var assembler = new AvrAssembler ();
+		// buf=0x100, flag=0x101; lds r16,buf / lds r17,flag
+		var result = assembler.Assemble (".data\nbuf: .byte 1\nflag: .byte 1\n.text\nlds r16, buf\nlds r17, flag");
+
+		Assert.That (assembler.Errors, Is.Empty);
+		Assert.That (Bytes ("00910001" + "10910101"), Is.EqualTo (result));
+	}
+
+	[Test(Description = ".lcomm reserves SRAM and forward-referenced data symbols resolve in lds/sts")]
+	public void DataSegment_LcommAndForwardRef ()
+	{
+		var assembler = new AvrAssembler ();
+		// data segment placed after code (avr-gcc style); counter resolves to 0x100
+		var result = assembler.Assemble ("lds r16, counter\nsts counter, r16\n.data\ncounter: .byte 1");
+
+		Assert.That (assembler.Errors, Is.Empty);
+		Assert.That (Bytes ("00910001" + "00930001"), Is.EqualTo (result));
+	}
+
+	[Test(Description = "Forward-referenced address expression (sym+1) resolves in lds/sts (pass two)")]
+	public void DataSegment_ForwardExpression ()
+	{
+		var assembler = new AvrAssembler ();
+		// p = 0x100 via .comm placed after use; p+1 must resolve to 0x101
+		var result = assembler.Assemble ("lds r17, p+1\n.comm p, 2");
+
+		Assert.That (assembler.Errors, Is.Empty);
+		Assert.That (Bytes ("10910101"), Is.EqualTo (result)); // LDS r17, 0x101
+	}
+
+	[Test(Description = "A deferred 4-byte instruction as the last line resolves correctly")]
+	public void Deferred4ByteAsLastLine ()
+	{
+		// Regression: ElementSize concatenated the resolved pair into a 2-byte string.
+		var call = new AvrAssembler ();
+		Assert.That (Bytes ("0e940300" + "0000"), Is.EqualTo (call.Assemble ("call end\nnop\nend:")));
+		var lds = new AvrAssembler ();
+		Assert.That (Bytes ("00910001"), Is.EqualTo (lds.Assemble ("lds r16, x\n.data\nx: .byte 1")));
+	}
+
 	// -----------------------------------------------------------------------
 	// avr-gcc / avr-as front-end compatibility
 	// -----------------------------------------------------------------------
