@@ -847,6 +847,36 @@ public class Assembler
 		Assert.That (Bytes ("0000" + "02d0"), Is.EqualTo (new AvrAssembler ().Assemble ("nop\nrcall .+4")));
 	}
 
+	[Test(Description = ".rept N / .endr repeats the block N times (matches avr-as)")]
+	public void ReptBlock ()
+	{
+		var assembler = new AvrAssembler ();
+		var result = assembler.Assemble (".rept 3\n nop\n.endr");
+
+		Assert.That (assembler.Errors, Is.Empty);
+		Assert.That (Bytes ("000000000000"), Is.EqualTo (result)); // 3 NOPs (2 bytes each)
+	}
+
+	[Test(Description = ".rept composes with a \\name-parameterised macro")]
+	public void ReptWithMacro ()
+	{
+		var assembler = new AvrAssembler ();
+		var result = assembler.Assemble (".macro twice reg\n inc \\reg\n inc \\reg\n.endm\n.rept 2\n twice r16\n.endr");
+
+		Assert.That (assembler.Errors, Is.Empty);
+		Assert.That (Bytes ("03950395" + "03950395"), Is.EqualTo (result)); // 4x INC r16
+	}
+
+	[Test(Description = ".endr without .rept is an error")]
+	public void OrphanEndr ()
+	{
+		var assembler = new AvrAssembler ();
+		assembler.Assemble ("nop\n.endr");
+
+		Assert.That (assembler.Errors, Has.Count.EqualTo (1));
+		Assert.That (assembler.Errors[0], Does.Contain (".endr without .rept"));
+	}
+
 	// -----------------------------------------------------------------------
 	// avr-gcc / avr-as front-end compatibility
 	// -----------------------------------------------------------------------

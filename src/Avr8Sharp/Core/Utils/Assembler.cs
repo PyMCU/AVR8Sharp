@@ -777,6 +777,10 @@ public partial class AvrAssembler
 		List<string>? macroParams = null;
 		List<string>? macroBody = null;
 
+		// .rept block recording state
+		List<string>? reptBody = null;
+		int reptCount = 0;
+
 		// Use a list + index so we can inject macro-expanded lines
 		var lineList = allLines;
 		int lineCount = lineList.Count;
@@ -809,6 +813,28 @@ public partial class AvrAssembler
 				else
 				{
 					macroBody!.Add(LineParser.StripComments(rawLine.Trim()));
+				}
+				continue;
+			}
+
+			// ----------------------------------------------------------------
+			// .rept block recording: collect the body, then inject it reptCount
+			// times after .endr (GNU repeat blocks).
+			// ----------------------------------------------------------------
+			if (reptBody != null)
+			{
+				if (keyword is "ENDR" or "ENDREPT")
+				{
+					var injected = new List<string>(reptBody.Count * Math.Max(reptCount, 0));
+					for (int r = 0; r < reptCount; r++) injected.AddRange(reptBody);
+					lineList = lineList.Take(idx + 1).Concat(injected).Concat(lineList.Skip(idx + 1)).ToList();
+					lineCount = lineList.Count;
+					reptBody = null;
+					reptCount = 0;
+				}
+				else
+				{
+					reptBody.Add(rawLine);
 				}
 				continue;
 			}
@@ -871,6 +897,21 @@ public partial class AvrAssembler
 				if (dirName == "ENDMACRO" || dirName == "ENDM")
 				{
 					_errors.Add($"Line {idx + 1}: .endm without .macro");
+					continue;
+				}
+
+				// Repeat block start: .rept <count> ... .endr
+				if (dirName == "REPT")
+				{
+					int? n = ExpressionEvaluator.TryEvaluate(dirArgs, _symbolTable, byteOffset);
+					if (n == null) { _errors.Add($"Line {idx + 1}: Cannot evaluate .rept count"); continue; }
+					reptCount = Math.Max(n.Value, 0);
+					reptBody = new List<string>();
+					continue;
+				}
+				if (dirName == "ENDR" || dirName == "ENDREPT")
+				{
+					_errors.Add($"Line {idx + 1}: .endr without .rept");
 					continue;
 				}
 
