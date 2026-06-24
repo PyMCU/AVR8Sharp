@@ -422,6 +422,46 @@ Assert.That(asm.Errors, Is.Empty);
 Assert.That(result, Is.EqualTo(Bytes("05b9")));
 }
 
+[Test]
+public void Device_ATmega2560_ExtendedIO_Usart3()
+{
+// UDR3 = data-space 0x136 (extended I/O) — verified against avr-as -mmcu=atmega2560
+var asm = new AvrAssembler(deviceName: "ATmega2560");
+var result = asm.Assemble("sts UDR3, r16");
+Assert.That(asm.Errors, Is.Empty);
+Assert.That(result, Is.EqualTo(Bytes("00933601"))); // STS 0x136, r16
+}
+
+[Test]
+public void Device_ATmega2560_PortL()
+{
+// PORTL = data-space 0x10B (port H-L block) — verified against avr-as
+var asm = new AvrAssembler(deviceName: "ATmega2560");
+var result = asm.Assemble("sts PORTL, r16");
+Assert.That(asm.Errors, Is.Empty);
+Assert.That(result, Is.EqualTo(Bytes("00930b01"))); // STS 0x10B, r16
+}
+
+[Test]
+public void Device_ATmega2560_Twi_LowIO()
+{
+// TWBR = data-space 0xB8 (extended I/O) — verified against avr-as
+var asm = new AvrAssembler(deviceName: "ATmega2560");
+var result = asm.Assemble("lds r17, TWBR");
+Assert.That(asm.Errors, Is.Empty);
+Assert.That(result, Is.EqualTo(Bytes("1091b800"))); // LDS r17, 0xB8
+}
+
+[Test]
+public void Device_ATmega2560_RAMEND()
+{
+// RAMEND = 0x21FF (8 KB SRAM); lo8 = 0xFF
+var asm = new AvrAssembler(deviceName: "ATmega2560");
+var result = asm.Assemble("ldi r16, lo8(RAMEND)");
+Assert.That(asm.Errors, Is.Empty);
+Assert.That(result, Is.EqualTo(Bytes("0fef"))); // LDI r16, 0xFF
+}
+
 // --- Multi-file assembly (P2) ---
 [Test]
 public void Global_Extern_DirectivesAccepted()
