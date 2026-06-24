@@ -1,5 +1,4 @@
 #nullable enable
-using System.Text.RegularExpressions;
 using LabelTable = System.Collections.Generic.Dictionary<string, int>;
 using OpCodeHandler = System.Func<string, string, int, System.Collections.Generic.Dictionary<string, int>, object>;
 
@@ -21,12 +20,11 @@ public partial class AvrAssembler
 		} },
 		{ "ADIW", (a, b, _, _) => {
 			var r = 0x9600;
-			var dm = RrIndexRegex?.Match(a);
-			if (!dm.Success) {
+			int regNum = Encoders.EncoderHelpers.TryParseRegister(a.AsSpan());
+			if (regNum < 0 || (regNum != 24 && regNum != 26 && regNum != 28 && regNum != 30)) {
 				throw new Exception("Rd must be 24, 26, 28, or 30");
 			}
-			var d = int.Parse(dm.Groups[1].Value);
-			d = (d - 24) / 2;
+			var d = (regNum - 24) / 2;
 			r |= (d & 0x3) << 4;
 			var k = ConstValue(b, 0, 63);
 			r |= ((k & 0x30) << 2) | (k & 0x0f);
@@ -171,7 +169,7 @@ public partial class AvrAssembler
 			return "94f8";
 		}},
 		{ "CLN", (_, _, _, _) => {
-			return "94f8";
+			return "94a8";
 		}},
 		{ "CLR", (a, _, byteLoc, l) => {
 			return OpTable?["EOR"](a, a, byteLoc, l) ?? string.Empty;
@@ -453,12 +451,11 @@ public partial class AvrAssembler
 		}},
 		{ "SBIW", (a, b, _, _) => {
 			var r = 0x9700;
-			var dm = RrIndexRegex.Match(a);
-			if (!dm.Success) {
+			int regNum = Encoders.EncoderHelpers.TryParseRegister(a.AsSpan());
+			if (regNum < 0 || (regNum != 24 && regNum != 26 && regNum != 28 && regNum != 30)) {
 				throw new Exception("Rd must be 24, 26, 28, or 30");
 			}
-			var d = int.Parse(dm.Groups[1].Value);
-			d = (d - 24) / 2;
+			var d = (regNum - 24) / 2;
 			r |= (d & 0x3) << 4;
 			var k = ConstValue(b, 0, 63);
 			r |= ((k & 0x30) << 2) | (k & 0x0f);
@@ -504,7 +501,7 @@ public partial class AvrAssembler
 			return SEFlag (3);
 		}},
 		{ "SEZ", (_, _, _, _) => {
-			return SEFlag (6);
+			return SEFlag (1);
 		}},
 		{ "SLEEP", (_, _, _, _) => {
 			return "9588";
@@ -560,17 +557,34 @@ public partial class AvrAssembler
 		}}
 	};
 	
-	static readonly System.Text.RegularExpressions.Regex RIndexRegex = new System.Text.RegularExpressions.Regex(@"[Rr](\d{1,2})", RegexOptions.CultureInvariant, TimeSpan.FromSeconds (1));
-	static readonly System.Text.RegularExpressions.Regex RrIndexRegex = new System.Text.RegularExpressions.Regex(@"[Rr](24|26|28|30)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds (1));
-	static readonly System.Text.RegularExpressions.Regex YzQRegex = new System.Text.RegularExpressions.Regex(@"([YZ])\+(\d+)", RegexOptions.CultureInvariant, TimeSpan.FromSeconds (1));
-	static readonly System.Text.RegularExpressions.Regex CommentsRegex = new System.Text.RegularExpressions.Regex("[#;].*$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds (1));
-	static readonly System.Text.RegularExpressions.Regex LabelRegex = new System.Text.RegularExpressions.Regex(@"^(\w+):", RegexOptions.CultureInvariant, TimeSpan.FromSeconds (1));
-	static readonly System.Text.RegularExpressions.Regex CodeRegex = new System.Text.RegularExpressions.Regex(@"^\s*(\w+)(?:\s+([^,]+)(?:,\s*(\S+))?)?\s*$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds (1));
-	
+	// Thread-local symbol table used by static helper methods (ConstValue, ConstOrLabel)
+	[ThreadStatic]
+	private static SymbolTable? _currentSymbolTable;
+
 	private readonly LabelTable _labels = new LabelTable();
 	private readonly List<string> _errors = new List<string>();
 	private readonly List<LineTablePassOne> _lines = new List<LineTablePassOne>();
-	
+	private SymbolTable _symbolTable = new SymbolTable();
+	private readonly Func<string, string>? _fileResolver;
+	private readonly string? _deviceName;
+
+	// Macro storage: name → (paramNames, bodyLines)
+	private Dictionary<string, (List<string> Params, List<string> Body)> _macros
+		= new Dictionary<string, (List<string> Params, List<string> Body)>(StringComparer.OrdinalIgnoreCase);
+
+	public AvrAssembler() { }
+
+	/// <summary>
+	/// Creates an assembler with optional file resolver and device name.
+	/// When a device name is specified (e.g. "ATmega328P"), hardware register
+	/// symbols are pre-loaded into the symbol table.
+	/// </summary>
+	public AvrAssembler(Func<string, string>? fileResolver = null, string? deviceName = null)
+	{
+		_fileResolver = fileResolver;
+		_deviceName = deviceName;
+	}
+
 	public LabelTable Labels => _labels;
 	public List<string> Errors => _errors;
 	public List<LineTablePassOne> Lines => _lines;
@@ -581,71 +595,311 @@ public partial class AvrAssembler
 		return _errors.Count > 0 ? [] : PassTwo();
 	}
 
+	/// <summary>
+	/// Assemble multiple source files together.
+	/// Pass 1: Scan all files for .global exports → build combined symbol table.
+	/// Pass 2: Assemble each file sequentially with the combined symbol table.
+	/// This allows cross-file symbol references without a linker.
+	/// </summary>
+	public byte[] AssembleMultiFile(string[] sources)
+	{
+		// ---- Pass 1: collect all .global exported symbols from all files ----
+		var globalSymbols = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+		// First, assemble each file individually to discover symbols
+		foreach (var source in sources)
+		{
+			var scanner = new AvrAssembler(_fileResolver, _deviceName);
+			scanner.Assemble(source);
+			// Collect any labels/symbols from this file
+			foreach (var (name, value) in scanner.Labels)
+			{
+				globalSymbols[name] = value;
+			}
+		}
+
+		// ---- Pass 2: assemble all files concatenated, with combined symbol table ----
+		var combined = string.Join("\n", sources);
+		_labels.Clear();
+		_errors.Clear();
+		_lines.Clear();
+
+		// Pre-seed labels from the global scan
+		foreach (var (name, value) in globalSymbols)
+		{
+			_labels[name] = value;
+		}
+
+		PassOne(combined);
+		return _errors.Count > 0 ? [] : PassTwo();
+	}
+
+	// -----------------------------------------------------------------------
+	// Include expansion: recursively replaces .include lines with file content
+	// -----------------------------------------------------------------------
+	private List<string> ExpandIncludes(IEnumerable<string> rawLines, int depth = 0)
+	{
+		var result = new List<string>();
+		foreach (var line in rawLines)
+		{
+			var trimmed = line.Trim();
+			var stripped = LineParser.StripComments(trimmed).Trim();
+			if (stripped.StartsWith(".include", StringComparison.OrdinalIgnoreCase))
+			{
+				var rest = stripped.Substring(".include".Length).Trim();
+				var filename = rest.Trim('"', '\'');
+				if (_fileResolver == null)
+				{
+					result.Add(line); // can't expand, will error at parse time
+				}
+				else if (depth >= 32)
+				{
+					_errors.Add("Error: .include depth limit exceeded");
+				}
+				else
+				{
+					try
+					{
+						var content = _fileResolver(filename);
+						result.AddRange(ExpandIncludes(content.Split('\n'), depth + 1));
+					}
+					catch (Exception ex)
+					{
+						_errors.Add($"Error: .include '{filename}': {ex.Message}");
+					}
+				}
+			}
+			else
+			{
+				result.Add(line);
+			}
+		}
+		return result;
+	}
+
+	// -----------------------------------------------------------------------
+	// PASS ONE
+	// -----------------------------------------------------------------------
 	private void PassOne (string inputData)
 	{
-		var lines = inputData.Split('\n');
-		LineTablePassOne lt;
-		string res;
-		string instruction;
+		// Expand .include directives first
+		var rawLines = inputData.Split('\n');
+		var allLines = ExpandIncludes(rawLines);
 
 		var replacements = new Dictionary<string, string> ();
-		
+		_symbolTable = new SymbolTable();
+		_macros = new Dictionary<string, (List<string> Params, List<string> Body)>(StringComparer.OrdinalIgnoreCase);
+
+		// Pre-load device definitions if a device was specified
+		if (_deviceName != null)
+			LoadDeviceSymbols(_deviceName);
+
+		// Make symbol table available to static helpers
+		_currentSymbolTable = _symbolTable;
+
 		int byteOffset = 0;
 		_labels.Clear();
 		_errors.Clear();
 		_lines.Clear();
 
-		for (var idx = 0; idx < lines.Length; idx++) {
-			res = lines[idx].Trim();
-			if (string.IsNullOrEmpty(res)) {
+		// Conditional assembly state
+		bool assembling = true;
+		var condStack = new Stack<bool>();
+
+		// Macro recording state
+		string? recordingMacro = null;
+		List<string>? macroParams = null;
+		List<string>? macroBody = null;
+
+		// Use a list + index so we can inject macro-expanded lines
+		var lineList = allLines;
+		int lineCount = lineList.Count;
+
+		for (var idx = 0; idx < lineCount; idx++) {
+			var rawLine = lineList[idx];
+
+			// Parse line using recursive-descent scanner (replaces all regex matching)
+			var parsed = LineParser.Parse(rawLine);
+
+			// Skip empty / comment-only lines (but not label-only lines)
+			if (parsed.IsEmpty && parsed.Label == null)
+				continue;
+
+			// Effective keyword for macro/conditional checks
+			string? keyword = parsed.IsDirective ? parsed.DirectiveName : parsed.Mnemonic;
+
+			// ----------------------------------------------------------------
+			// Macro body recording (must happen before conditional skip)
+			// ----------------------------------------------------------------
+			if (recordingMacro != null)
+			{
+				if (keyword is "ENDMACRO" or "ENDM")
+				{
+					_macros[recordingMacro] = (macroParams!, macroBody!);
+					recordingMacro = null;
+					macroParams = null;
+					macroBody = null;
+				}
+				else
+				{
+					macroBody!.Add(LineParser.StripComments(rawLine.Trim()));
+				}
 				continue;
 			}
-			lt = new LineTablePassOne() {
-				Text = res,
+
+			// ----------------------------------------------------------------
+			// Conditional assembly directives (must process even in false branch)
+			// ----------------------------------------------------------------
+			if (keyword is "IF" or "IFDEF" or "IFNDEF" or "ELSEIF" or "ELSE" or "ENDIF")
+			{
+				string condArgs = parsed.IsDirective ? parsed.DirectiveArgs
+					: CombineOperands(parsed.Operand1, parsed.Operand2);
+				ProcessConditional(keyword, condArgs, byteOffset, ref assembling, condStack);
+				continue;
+			}
+
+			// Skip lines when in a false conditional branch
+			if (!assembling) continue;
+
+			// ----------------------------------------------------------------
+			// Label handling
+			// ----------------------------------------------------------------
+			if (parsed.Label != null)
+			{
+				_labels[parsed.Label] = byteOffset;
+				_symbolTable.Set(parsed.Label, byteOffset);
+			}
+
+			// ----------------------------------------------------------------
+			// Dot-directives (.equ, .org, .byte, .macro, etc.)
+			// ----------------------------------------------------------------
+			if (parsed.IsDirective)
+			{
+				var dirName = parsed.DirectiveName;
+				var dirArgs = parsed.DirectiveArgs;
+
+				// Macro start
+				if (dirName == "MACRO")
+				{
+					var parts = dirArgs.Split(new[] { ' ', '\t', ',' }, StringSplitOptions.RemoveEmptyEntries);
+					recordingMacro = parts.Length > 0 ? parts[0] : "anon";
+					macroParams = parts.Skip(1).Select(p => p.Trim()).ToList();
+					macroBody = new List<string>();
+					continue;
+				}
+				if (dirName == "ENDMACRO" || dirName == "ENDM")
+				{
+					_errors.Add($"Line {idx}: .endm without .macro");
+					continue;
+				}
+
+				// Include (should have been expanded, but handle gracefully)
+				if (dirName == "INCLUDE")
+				{
+					if (_fileResolver == null)
+						_errors.Add($"Line {idx}: .include requires a file resolver");
+					continue;
+				}
+
+				// Segment directives (simple)
+				if (dirName == "CSEG" || dirName == "DSEG" || dirName == "ESEG")
+					continue; // segment switching not fully implemented; cseg is default
+
+				// Symbol definitions
+				if (dirName == "EQU")
+				{
+					ProcessSymbolDef(dirArgs, idx, byteOffset, isImmutable: true);
+					continue;
+				}
+				if (dirName == "SET")
+				{
+					ProcessSymbolDef(dirArgs, idx, byteOffset, isImmutable: false);
+					continue;
+				}
+				if (dirName == "DEF")
+				{
+					ProcessDefDirective(dirArgs, idx);
+					continue;
+				}
+
+				// Location / origin
+				if (dirName == "ORG")
+				{
+					int? orgVal = ExpressionEvaluator.TryEvaluate(dirArgs, _symbolTable, byteOffset);
+					if (orgVal == null) { _errors.Add($"Line {idx}: Cannot evaluate .org expression"); continue; }
+					if ((orgVal.Value & 1) != 0) { _errors.Add($"Line {idx}: .org value must be even"); continue; }
+					byteOffset = orgVal.Value;
+					continue;
+				}
+
+				// Data directives — emit raw bytes into line table
+				if (dirName == "BYTE" || dirName == "DB")
+				{
+					EmitDataBytes(dirArgs, idx, ref byteOffset, rawLine);
+					continue;
+				}
+				if (dirName == "WORD" || dirName == "DW")
+				{
+					EmitDataWords(dirArgs, idx, ref byteOffset, rawLine);
+					continue;
+				}
+				if (dirName == "DWORD")
+				{
+					EmitDataDwords(dirArgs, idx, ref byteOffset, rawLine);
+					continue;
+				}
+				if (dirName == "ASCII")
+				{
+					EmitDataAscii(dirArgs, idx, ref byteOffset, rawLine, nullTerminated: false);
+					continue;
+				}
+				if (dirName == "ASCIZ" || dirName == "STRING")
+				{
+					EmitDataAscii(dirArgs, idx, ref byteOffset, rawLine, nullTerminated: true);
+					continue;
+				}
+
+				// External reference directives (informational only — no linker)
+				if (dirName == "GLOBAL" || dirName == "EXTERN")
+					continue;
+
+				// Device definition loading
+				if (dirName == "DEVICE")
+				{
+					LoadDeviceSymbols(dirArgs.Trim(), idx);
+					continue;
+				}
+
+				// Unknown dot-directive: fall through to error
+				_errors.Add($"Line {idx}: Unknown directive: .{dirName}");
+				continue;
+			}
+
+			// ----------------------------------------------------------------
+			// Label-only line (no instruction after label)
+			// ----------------------------------------------------------------
+			if (parsed.Mnemonic == null)
+				continue;
+
+			// ----------------------------------------------------------------
+			// Instruction / macro invocation
+			// ----------------------------------------------------------------
+			var instruction = parsed.Mnemonic;
+			var lt = new LineTablePassOne() {
+				Text = rawLine.Trim(),
 				Line = idx + 1,
 				BytesOffset = 0
 			};
-			// Replace the comments with the comments regex
-			res = CommentsRegex.Replace(res, string.Empty);
-			if (string.IsNullOrEmpty (res)) {
-				continue;
-			}
-			// Check for a label
-			var match = LabelRegex.Match(res);
-			if (match.Success) {
-				_labels[match.Groups[1].Value] = byteOffset;
-				// Remove the label from the line
-				res = res.Substring(match.Length).Trim();
-			}
-			if (string.IsNullOrEmpty(res)) {
-				continue;
-			}
-			// Check for a mnemonic line
-			match = CodeRegex.Match(res);
-			try {
-				if (!match.Success) {
-					throw new Exception("Invalid instruction");
-				}
 
-				if (!match.Groups[1].Success) {
-					throw new Exception("No instruction found");
-				}
-				
-				// Do Opcode
-				instruction = match.Groups[1].Value.ToUpper();
-				/* This switch is ok for just these three.
-				* If ever to add more, then need to figure out how to merge all of the
-				* mnemonics into the OPTABLE. (or build a seperate internal op table)
-				*/
+			try {
 				switch (instruction) {
 					case "_REPLACE":
-						// Replace the instruction with the replacement
-						if (match.Groups[2].Success) {
-							replacements[match.Groups[2].Value.Trim ()] = match.Groups[3].Value.Trim ();
+						if (!string.IsNullOrEmpty(parsed.Operand1)) {
+							replacements[parsed.Operand1] = parsed.Operand2;
 						}
 						continue;
 					case "_LOC":
-						var num = int.TryParse (match.Groups[2].Value.Trim (), out var n) ? n : int.MinValue;
+						var num = int.TryParse (parsed.Operand1, out var n) ? n : int.MinValue;
 						if (num == int.MinValue) {
 							throw new Exception("Invalid location");
 						}
@@ -655,31 +909,37 @@ public partial class AvrAssembler
 						byteOffset = num;
 						continue;
 					case "_IW":
-						var num2 = int.TryParse (match.Groups[2].Value.Trim (), out var n2) ? n2 : int.MinValue;
+						var num2 = int.TryParse (parsed.Operand1, out var n2) ? n2 : int.MinValue;
 						if (num2 == int.MinValue) {
 							throw new Exception("Invalid word");
 						}
 						lt.Bytes = ZeroPad(num2);
 						lt.BytesOffset = byteOffset;
 						byteOffset += 2;
+						_lines.Add(lt);
 						continue;
 					default:
 						break;
+				}
+
+				// Try macro expansion
+				if (_macros.TryGetValue(instruction, out var macro))
+				{
+					var macroArgs = CombineOperands(parsed.Operand1, parsed.Operand2);
+					var expandedLines = ExpandMacro(instruction, macroArgs, macro);
+					// Insert expanded lines immediately after current position
+					lineList = lineList.Take(idx + 1).Concat(expandedLines).Concat(lineList.Skip(idx + 1)).ToList();
+					lineCount = lineList.Count;
+					continue;
 				}
 
 				if (!OpTable.ContainsKey (instruction)) {
 					throw new Exception("Invalid instruction");
 				}
 				
-				// Do replacements on parameters
-				var resMatch2 = match.Groups[2].Value.Trim ();
-				var resMatch3 = match.Groups[3].Value.Trim ();
-				if (replacements.TryGetValue (resMatch2, out var value)) {
-					resMatch2 = value;
-				}
-				if (replacements.TryGetValue (resMatch3, out var value2)) {
-					resMatch3 = value2;
-				}
+				// Apply replacements and symbol substitution on parameters
+				var resMatch2 = ApplyReplacements(parsed.Operand1, replacements);
+				var resMatch3 = ApplyReplacements(parsed.Operand2, replacements);
 				
 				var bytes = OpTable[instruction](resMatch2, resMatch3, byteOffset, _labels);
 				lt.BytesOffset = byteOffset;
@@ -703,6 +963,255 @@ public partial class AvrAssembler
 				_errors.Add ($"Line {idx}: {e.Message}");
 			}
 		}
+
+		_currentSymbolTable = null;
+	}
+
+	// -----------------------------------------------------------------------
+	// Device definition loading
+	// -----------------------------------------------------------------------
+	private void LoadDeviceSymbols(string deviceName, int lineIdx = -1)
+	{
+		var def = DeviceDefinitions.Get(deviceName);
+		if (def == null)
+		{
+			if (lineIdx >= 0)
+				_errors.Add($"Line {lineIdx}: Unknown device: {deviceName}");
+			return;
+		}
+
+		foreach (var (name, value) in def.Symbols)
+		{
+			_symbolTable.Set(name, value);
+		}
+	}
+
+	// -----------------------------------------------------------------------
+	// Conditional assembly helpers
+	// -----------------------------------------------------------------------
+	private void ProcessConditional(string directive, string args, int byteOffset, ref bool assembling, Stack<bool> condStack)
+	{
+		switch (directive)
+		{
+			case "IF":
+				condStack.Push(assembling);
+				if (assembling)
+				{
+					var val = ExpressionEvaluator.TryEvaluate(args, _symbolTable, byteOffset);
+					assembling = val.HasValue && val.Value != 0;
+				}
+				else assembling = false;
+				break;
+			case "IFDEF":
+				condStack.Push(assembling);
+				assembling = assembling && _symbolTable.ContainsKey(args.Trim());
+				break;
+			case "IFNDEF":
+				condStack.Push(assembling);
+				assembling = assembling && !_symbolTable.ContainsKey(args.Trim());
+				break;
+			case "ELSEIF":
+				if (condStack.Count > 0)
+				{
+					bool parentActive = condStack.Peek();
+					bool wasAssembling = assembling;
+					if (assembling)
+						assembling = false; // was assembling if-branch, now skip
+					else if (parentActive)
+					{
+						var val = ExpressionEvaluator.TryEvaluate(args, _symbolTable, byteOffset);
+						assembling = val.HasValue && val.Value != 0;
+					}
+				}
+				break;
+			case "ELSE":
+				if (condStack.Count > 0)
+				{
+					bool parentActive = condStack.Peek();
+					assembling = parentActive && !assembling;
+				}
+				break;
+			case "ENDIF":
+				if (condStack.Count > 0)
+					assembling = condStack.Pop();
+				break;
+		}
+	}
+
+	// -----------------------------------------------------------------------
+	// Symbol definition helpers
+	// -----------------------------------------------------------------------
+	private void ProcessSymbolDef(string args, int lineIdx, int byteOffset, bool isImmutable)
+	{
+		var parts = args.Split('=', 2);
+		if (parts.Length != 2) { _errors.Add($"Line {lineIdx}: .equ/.set requires NAME = VALUE"); return; }
+		var name = parts[0].Trim();
+		var valStr = parts[1].Trim();
+		var val = ExpressionEvaluator.TryEvaluate(valStr, _symbolTable, byteOffset);
+		if (val == null) { _errors.Add($"Line {lineIdx}: Cannot evaluate expression for '{name}'"); return; }
+		try
+		{
+			if (isImmutable) _symbolTable.DefineConst(name, val.Value);
+			else _symbolTable.DefineVar(name, val.Value);
+		}
+		catch (Exception ex) { _errors.Add($"Line {lineIdx}: {ex.Message}"); }
+	}
+
+	private void ProcessDefDirective(string args, int lineIdx)
+	{
+		var parts = args.Split('=', 2);
+		if (parts.Length != 2) { _errors.Add($"Line {lineIdx}: .def requires ALIAS = rN"); return; }
+		var alias = parts[0].Trim();
+		var regStr = parts[1].Trim();
+		int n = Encoders.EncoderHelpers.TryParseRegister(regStr.AsSpan());
+		if (n < 0) { _errors.Add($"Line {lineIdx}: .def: right side must be a register, got '{regStr}'"); return; }
+		try { _symbolTable.DefineRegisterAlias(alias, n); }
+		catch (Exception ex) { _errors.Add($"Line {lineIdx}: {ex.Message}"); }
+	}
+
+	// -----------------------------------------------------------------------
+	// Data-emission helpers
+	// -----------------------------------------------------------------------
+	private void EmitDataBytes(string args, int lineIdx, ref int byteOffset, string rawLine)
+	{
+		var parts = SplitDirectiveArgs(args);
+		var bytes = new List<byte>();
+		foreach (var part in parts)
+		{
+			var p = part.Trim();
+			if (p.StartsWith('"') || p.StartsWith('\''))
+			{
+				var s = p.Trim('"', '\'');
+				bytes.AddRange(System.Text.Encoding.ASCII.GetBytes(s));
+				continue;
+			}
+			var val = ExpressionEvaluator.TryEvaluate(p, _symbolTable, byteOffset);
+			if (val == null) { _errors.Add($"Line {lineIdx}: Cannot evaluate .byte expression: {p}"); return; }
+			bytes.Add((byte)(val.Value & 0xFF));
+		}
+		if (bytes.Count > 0)
+		{
+			var lt = new LineTablePassOne { Text = rawLine.Trim(), Line = lineIdx + 1, BytesOffset = byteOffset, Bytes = bytes.ToArray() };
+			_lines.Add(lt);
+			byteOffset += bytes.Count;
+		}
+	}
+
+	private void EmitDataWords(string args, int lineIdx, ref int byteOffset, string rawLine)
+	{
+		var parts = SplitDirectiveArgs(args);
+		var wordBytes = new List<byte>();
+		foreach (var part in parts)
+		{
+			var val = ExpressionEvaluator.TryEvaluate(part.Trim(), _symbolTable, byteOffset);
+			if (val == null) { _errors.Add($"Line {lineIdx}: Cannot evaluate .word expression: {part.Trim()}"); return; }
+			wordBytes.Add((byte)(val.Value & 0xFF));
+			wordBytes.Add((byte)((val.Value >> 8) & 0xFF));
+		}
+		if (wordBytes.Count > 0)
+		{
+			var lt = new LineTablePassOne { Text = rawLine.Trim(), Line = lineIdx + 1, BytesOffset = byteOffset, Bytes = wordBytes.ToArray() };
+			_lines.Add(lt);
+			byteOffset += wordBytes.Count;
+		}
+	}
+
+	private void EmitDataDwords(string args, int lineIdx, ref int byteOffset, string rawLine)
+	{
+		var parts = SplitDirectiveArgs(args);
+		var dwordBytes = new List<byte>();
+		foreach (var part in parts)
+		{
+			var val = ExpressionEvaluator.TryEvaluate(part.Trim(), _symbolTable, byteOffset);
+			if (val == null) { _errors.Add($"Line {lineIdx}: Cannot evaluate .dword expression: {part.Trim()}"); return; }
+			dwordBytes.Add((byte)(val.Value & 0xFF));
+			dwordBytes.Add((byte)((val.Value >> 8) & 0xFF));
+			dwordBytes.Add((byte)((val.Value >> 16) & 0xFF));
+			dwordBytes.Add((byte)((val.Value >> 24) & 0xFF));
+		}
+		if (dwordBytes.Count > 0)
+		{
+			var lt = new LineTablePassOne { Text = rawLine.Trim(), Line = lineIdx + 1, BytesOffset = byteOffset, Bytes = dwordBytes.ToArray() };
+			_lines.Add(lt);
+			byteOffset += dwordBytes.Count;
+		}
+	}
+
+	private void EmitDataAscii(string args, int lineIdx, ref int byteOffset, string rawLine, bool nullTerminated)
+	{
+		var s = args.Trim();
+		if (s.StartsWith('"') && s.EndsWith('"') && s.Length >= 2)
+			s = s[1..^1];
+		var rawBytes = System.Text.Encoding.ASCII.GetBytes(s);
+		var bytes = nullTerminated ? rawBytes.Append((byte)0).ToArray() : rawBytes;
+		var lt = new LineTablePassOne { Text = rawLine.Trim(), Line = lineIdx + 1, BytesOffset = byteOffset, Bytes = bytes };
+		_lines.Add(lt);
+		byteOffset += bytes.Length;
+	}
+
+	// -----------------------------------------------------------------------
+	// Macro expansion
+	// -----------------------------------------------------------------------
+	private List<string> ExpandMacro(string name, string args, (List<string> Params, List<string> Body) macro, int depth = 0)
+	{
+		if (depth > 8) throw new Exception($"Macro recursion limit exceeded in '{name}'");
+		var argValues = args.Length == 0
+			? Array.Empty<string>()
+			: args.Split(',').Select(a => a.Trim()).ToArray();
+		var expanded = new List<string>();
+		foreach (var line in macro.Body)
+		{
+			var expLine = line;
+			for (int i = 0; i < macro.Params.Count; i++)
+			{
+				if (i < argValues.Length)
+				{
+					expLine = expLine.Replace(@"\" + macro.Params[i], argValues[i]);
+					expLine = expLine.Replace("@" + i, argValues[i]);
+				}
+			}
+			expanded.Add(expLine);
+		}
+		return expanded;
+	}
+
+	// -----------------------------------------------------------------------
+	// Small string helpers
+	// -----------------------------------------------------------------------
+	private static string CombineOperands(string op1, string op2)
+	{
+		if (string.IsNullOrEmpty(op2)) return op1;
+		return op1 + ", " + op2;
+	}
+
+	private string ApplyReplacements(string value, Dictionary<string, string> replacements)
+	{
+		if (replacements.TryGetValue(value, out var r)) return r;
+		// Substitute .def register aliases so DestRIndex / SrcRIndex can recognise them
+		if (_symbolTable.IsRegisterAlias(value) && _symbolTable.TryGetValue(value, out var regNum))
+			return "r" + regNum;
+		return value;
+	}
+
+	private static List<string> SplitDirectiveArgs(string args)
+	{
+		var parts = new List<string>();
+		bool inStr = false;
+		int depth = 0;
+		var cur = new System.Text.StringBuilder();
+		foreach (char c in args)
+		{
+			if (c == '"') inStr = !inStr;
+			if (!inStr)
+			{
+				if (c == '(') depth++;
+				else if (c == ')') depth--;
+				else if (c == ',' && depth == 0) { parts.Add(cur.ToString()); cur.Clear(); continue; }
+			}
+			cur.Append(c);
+		}
+		if (cur.Length > 0) parts.Add(cur.ToString());
+		return parts;
 	}
 
 	private byte [] PassTwo ()
@@ -722,15 +1231,6 @@ public partial class AvrAssembler
 				if (lt.Bytes is Func<LabelTable, object> f) {
 					lt.Bytes = f(_labels);
 				}
-				// TODO: Port this code
-				// if (
-				//   ltEntry.bytes instanceof Array &&
-				//   ltEntry.bytes.length >= 1 &&
-				//   typeof ltEntry.bytes[0] === 'function'
-				// ) {
-				//   /* a bit gross. FIXME */
-				//   ltEntry.bytes = ltEntry.bytes[0](labels);
-				// }
 				
 				// Copy the bytes out of line table into the result table
 				switch (lt.Bytes) {
@@ -750,6 +1250,9 @@ public partial class AvrAssembler
 							resultTable[bi + 1] = Convert.ToByte(value.Substring(0, 2), 16);
 							resultTable[bi] = Convert.ToByte(value.Substring(2, 2), 16);
 						}
+						break;
+					case byte[] rawBytes:
+						Array.Copy(rawBytes, 0, resultTable, lt.BytesOffset, rawBytes.Length);
 						break;
 					default:
 						throw new Exception("Invalid byte type");
@@ -782,6 +1285,9 @@ public partial class AvrAssembler
 		if (bytes is KeyValuePair<string, string>) {
 			return 4;
 		}
+		if (bytes is byte[] ba) {
+			return ba.Length;
+		}
 		return 2;
 	}
 	
@@ -792,12 +1298,10 @@ public partial class AvrAssembler
 	/// </summary>
 	private static int DestRIndex (string r, int min = 0, int max = 31)
 	{
-		var match = RIndexRegex.Match(r);
-		if (!match.Success) {
+		int dest = Encoders.EncoderHelpers.TryParseRegister(r.AsSpan());
+		if (dest < 0) {
 			throw new Exception($"Not a register: {r}");
 		}
-		
-		var dest = int.Parse(match.Groups[1].Value);
 		if (dest < min || dest > max) {
 			throw new Exception($"Rd out of range: {min}<>{max}");
 		}
@@ -811,11 +1315,10 @@ public partial class AvrAssembler
 	/// </summary>
 	private static int SrcRIndex (string r, int min = 0, int max = 31)
 	{
-		var match = RIndexRegex.Match(r);
-		if (!match.Success) {
+		int dest = Encoders.EncoderHelpers.TryParseRegister(r.AsSpan());
+		if (dest < 0) {
 			throw new Exception($"Not a register: {r}");
 		}
-		var dest = int.Parse(match.Groups[1].Value);
 		if (dest < min || dest > max) {
 			throw new Exception($"Rd out of range: {r}");
 		}
@@ -826,16 +1329,53 @@ public partial class AvrAssembler
 
 	/// <summary>
 	/// Get a constant value and check that it is in range.
+	/// Falls back to ExpressionEvaluator for complex expressions.
 	/// </summary>
 	private static int ConstValue (string value, int min = 0, int max = 255)
 	{
-		var d = value.Length switch
+		int d;
+		// Try simple literal parsing first (fast path)
+		bool parsed = false;
+		if (value.Length > 1 && value[0] == '0' && value[1] == 'x')
 		{
-			> 1 when value[0] == '0' && value[1] == 'x' => (int)uint.Parse(value[2..],
-				System.Globalization.NumberStyles.HexNumber),
-			> 1 when value[0] == '0' && value[1] == 'b' => (int)Convert.ToUInt32(value[2..], 2),
-			_ => int.Parse(value)
-		};
+			d = (int)uint.Parse(value[2..], System.Globalization.NumberStyles.HexNumber);
+			parsed = true;
+		}
+		else if (value.Length > 1 && value[0] == '0' && value[1] == 'b')
+		{
+			d = (int)Convert.ToUInt32(value[2..], 2);
+			parsed = true;
+		}
+		else if (int.TryParse(value, out var parsed_d))
+		{
+			d = parsed_d;
+			parsed = true;
+		}
+		else
+		{
+			// Try expression evaluator (handles lo8(), hi8(), arithmetic, symbols, etc.)
+			var symTable = _currentSymbolTable;
+			if (symTable != null)
+			{
+				var result = ExpressionEvaluator.TryEvaluate(value, symTable);
+				if (result.HasValue)
+				{
+					d = result.Value;
+					parsed = true;
+				}
+				else
+				{
+					throw new Exception($"Cannot evaluate expression: {value}");
+				}
+			}
+			else
+			{
+				throw new Exception($"[Ks] out of range: {min} < {value} < {max}");
+			}
+		}
+
+		if (!parsed)
+			throw new Exception($"[Ks] out of range: {min} < {value} < {max}");
 
 		if (d < min || d > max) {
 			throw new Exception($"[Ks] out of range: {min} < {value} < {max}");
@@ -877,6 +1417,7 @@ public partial class AvrAssembler
 
 	/// <summary>
 	/// Determine if input is an address or label and lookup if required.
+	/// Also checks the thread-local SymbolTable for .equ/.set/.def symbols.
 	/// </summary>
 	private static int ConstOrLabel (object value, LabelTable labels, int offset = 0)
 	{
@@ -885,13 +1426,27 @@ public partial class AvrAssembler
 			return label - offset;
 		}
 
-		return c.Length switch
+		// Check .equ/.set/.def symbols
+		var symTable = _currentSymbolTable;
+		if (symTable != null && symTable.TryGetValue(c, out var symVal)) {
+			return symVal - offset;
+		}
+
+		if (c.Length > 1 && c[0] == '0' && c[1] == 'x')
+			return (int)uint.Parse(c[2..], System.Globalization.NumberStyles.HexNumber);
+		if (c.Length > 1 && c[0] == '0' && c[1] == 'b')
+			return (int)Convert.ToUInt32(c[2..], 2);
+		if (int.TryParse(c, out var d))
+			return d;
+
+		// Try expression evaluator for complex expressions
+		if (symTable != null)
 		{
-			> 1 when c[0] == '0' && c[1] == 'x' => (int)uint.Parse(c[2..],
-				System.Globalization.NumberStyles.HexNumber),
-			> 1 when c[0] == '0' && c[1] == 'b' => (int)Convert.ToUInt32(c[2..], 2),
-			_ => int.TryParse(c, out var d) ? d : int.MinValue
-		};
+			var result = ExpressionEvaluator.TryEvaluate(c, symTable, offset);
+			if (result.HasValue) return result.Value - offset;
+		}
+
+		return int.MinValue;
 	}
 
 	/// <summary>
@@ -945,21 +1500,17 @@ public partial class AvrAssembler
 	/// </summary>
 	private static int StldYzQ (string yzq)
 	{
-		var d = YzQRegex.Match(yzq);
+		var (baseReg, q) = LineParser.ParseYzDisplacement(yzq);
 		var r = 0x8000;
-		if (!d.Success) {
-			throw new Exception("Invalid arguments");
-		}
-		switch (d.Groups[1].Value) {
-			case "Y":
+		switch (baseReg) {
+			case 'Y':
 				r |= 0x8;
 				break;
-			case "Z":
+			case 'Z':
 				break;
 			default:
 				throw new Exception("Not Y or Z with q");
 		}
-		var q = int.Parse(d.Groups[2].Value);
 		if (q < 0 || q > 64) {
 			throw new Exception("q is out of range");
 		}
