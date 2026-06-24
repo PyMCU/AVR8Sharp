@@ -399,7 +399,7 @@ public partial class AvrAssembler
 			return ZeroPad (r);
 		}},
 		{ "RCALL", (a, b, byteLoc, labels) => {
-			var k = ConstOrLabel(a, labels);
+			var k = ConstOrLabel(a, labels, byteLoc + 2);
 			if (k == int.MinValue) {
 				return new Func<Dictionary<string, int>, string> ((l) => OpTable?["RCALL"](a, b, byteLoc, l) as string ?? string.Empty);
 			}
@@ -561,6 +561,11 @@ public partial class AvrAssembler
 	[ThreadStatic]
 	private static SymbolTable? _currentSymbolTable;
 
+	// Thread-local byte offset of the instruction currently being encoded.
+	// Backs the GNU '.' location-counter operand in ConstOrLabel.
+	[ThreadStatic]
+	private static int _currentInstrByteOffset;
+
 	private readonly LabelTable _labels = new LabelTable();
 	private readonly List<string> _errors = new List<string>();
 	private readonly List<LineTablePassOne> _lines = new List<LineTablePassOne>();
@@ -635,6 +640,40 @@ public partial class AvrAssembler
 	}
 
 	// -----------------------------------------------------------------------
+	// Strip C-style /* ... */ block comments (avr-gcc interleaves them).
+	// Newlines inside a block are preserved so reported line numbers stay accurate.
+	// String literals are respected so a "/*" inside a quoted string is left intact.
+	// -----------------------------------------------------------------------
+	private static string StripBlockComments(string input)
+	{
+		if (!input.Contains("/*")) return input;
+		var sb = new System.Text.StringBuilder(input.Length);
+		bool inString = false, inBlock = false, escaped = false;
+		for (int i = 0; i < input.Length; i++)
+		{
+			char c = input[i];
+			if (inBlock)
+			{
+				if (c == '*' && i + 1 < input.Length && input[i + 1] == '/') { inBlock = false; i++; }
+				else if (c == '\n') sb.Append('\n');
+				continue;
+			}
+			if (inString)
+			{
+				sb.Append(c);
+				if (escaped) escaped = false;
+				else if (c == '\\') escaped = true;
+				else if (c == '"') inString = false;
+				continue;
+			}
+			if (c == '"') { inString = true; sb.Append(c); continue; }
+			if (c == '/' && i + 1 < input.Length && input[i + 1] == '*') { inBlock = true; i++; continue; }
+			sb.Append(c);
+		}
+		return sb.ToString();
+	}
+
+	// -----------------------------------------------------------------------
 	// Include expansion: recursively replaces .include lines with file content
 	// -----------------------------------------------------------------------
 	private List<string> ExpandIncludes(IEnumerable<string> rawLines, int depth = 0)
@@ -682,6 +721,9 @@ public partial class AvrAssembler
 	// -----------------------------------------------------------------------
 	private void PassOne (string inputData)
 	{
+		// Strip /* ... */ block comments (avr-gcc interleaves them) before line splitting.
+		inputData = StripBlockComments(inputData);
+
 		// Expand .include directives first
 		var rawLines = inputData.Split('\n');
 		var allLines = ExpandIncludes(rawLines);
@@ -768,6 +810,21 @@ public partial class AvrAssembler
 			{
 				_labels[parsed.Label] = byteOffset;
 				_symbolTable.Set(parsed.Label, byteOffset);
+			}
+
+			// ----------------------------------------------------------------
+			// GNU-style symbol assignment: `name = expr` (no .equ/.set keyword).
+			// avr-gcc emits these for register aliases and helper symbols
+			// (e.g. `__SP_H__ = 0x3e`, `.L__stack_usage = 2`). Treated as a mutable .set.
+			// ----------------------------------------------------------------
+			if (parsed.Label == null)
+			{
+				var assignLine = LineParser.StripComments(rawLine).Trim();
+				if (LineParser.TryParseAssignment(assignLine, out _, out _))
+				{
+					ProcessSymbolDef(assignLine, idx, byteOffset, isImmutable: false);
+					continue;
+				}
 			}
 
 			// ----------------------------------------------------------------
@@ -870,6 +927,15 @@ public partial class AvrAssembler
 					continue;
 				}
 
+				// GNU/avr-gcc metadata directives: accepted as no-ops. AVR8Sharp emits a
+				// flat code image, so section/symbol/debug metadata carries no payload here.
+				// (Section switching is intentionally ignored — single-section output.)
+				if (dirName is "FILE" or "SECTION" or "TEXT" or "DATA" or "TYPE" or "SIZE"
+					or "IDENT" or "WEAK" or "GLOBL" or "LOCAL" or "ALIGN" or "P2ALIGN"
+					or "BALIGN" or "LOC" or "FUNC" or "ENDFUNC"
+					or "CFI_STARTPROC" or "CFI_ENDPROC")
+					continue;
+
 				// Unknown dot-directive: fall through to error
 				_errors.Add($"Line {idx}: Unknown directive: .{dirName}");
 				continue;
@@ -890,6 +956,9 @@ public partial class AvrAssembler
 				Line = idx + 1,
 				BytesOffset = 0
 			};
+
+			// Expose the current instruction address to ConstOrLabel for the GNU '.' operand.
+			_currentInstrByteOffset = byteOffset;
 
 			try {
 				switch (instruction) {
@@ -1296,9 +1365,24 @@ public partial class AvrAssembler
 	/// where it is most commonly found. Also, make sure it is within
 	/// the valid range.
 	/// </summary>
+	/// <summary>
+	/// Resolve a register operand to its number 0..31. Accepts the rN form and,
+	/// as a fallback, a numeric symbol used in register position — e.g. avr-gcc's
+	/// <c>__zero_reg__ = 1</c> / <c>__tmp_reg__ = 0</c>. Returns -1 if not a register.
+	/// </summary>
+	private static int ResolveRegister (string r)
+	{
+		int n = Encoders.EncoderHelpers.TryParseRegister(r.AsSpan());
+		if (n >= 0) return n;
+		var st = _currentSymbolTable;
+		if (st != null && st.TryGetValue(r, out var v) && v >= 0 && v <= 31)
+			return v;
+		return -1;
+	}
+
 	private static int DestRIndex (string r, int min = 0, int max = 31)
 	{
-		int dest = Encoders.EncoderHelpers.TryParseRegister(r.AsSpan());
+		int dest = ResolveRegister(r);
 		if (dest < 0) {
 			throw new Exception($"Not a register: {r}");
 		}
@@ -1315,7 +1399,7 @@ public partial class AvrAssembler
 	/// </summary>
 	private static int SrcRIndex (string r, int min = 0, int max = 31)
 	{
-		int dest = Encoders.EncoderHelpers.TryParseRegister(r.AsSpan());
+		int dest = ResolveRegister(r);
 		if (dest < 0) {
 			throw new Exception($"Not a register: {r}");
 		}
@@ -1377,6 +1461,11 @@ public partial class AvrAssembler
 		if (!parsed)
 			throw new Exception($"[Ks] out of range: {min} < {value} < {max}");
 
+		// Accept the signed spelling of an 8-bit immediate (avr-as allows -128..255 for
+		// LDI/SUBI/SBCI/ANDI/ORI/CPI). The encoder masks with & 0xFF, so -100 -> 0x9C.
+		if (d < 0 && min == 0 && max == 255 && d >= -128)
+			d &= 0xFF;
+
 		if (d < min || d > max) {
 			throw new Exception($"[Ks] out of range: {min} < {value} < {max}");
 		}
@@ -1422,6 +1511,10 @@ public partial class AvrAssembler
 	private static int ConstOrLabel (object value, LabelTable labels, int offset = 0)
 	{
 		if (value is not string c) return (int)value;
+		// GNU '.' location counter. In a relative branch, avr-as resolves '.' to the
+		// address of the *following* instruction (so `rjmp .` / `rcall .` encode offset 0,
+		// the avr-gcc stack-reserve idiom — not a self-loop). Branches here are one word.
+		if (c == ".") return _currentInstrByteOffset + 2 - offset;
 		if (labels.TryGetValue(c, out var label)) {
 			return label - offset;
 		}

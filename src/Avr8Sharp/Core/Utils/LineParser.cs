@@ -65,11 +65,14 @@ public static class LineParser
 			return result;
 		}
 
-		// Try to parse label: identifier followed by ':'
-		if (IsIdentStart(line[pos]))
+		// Try to parse label: [.]identifier followed by ':'
+		// A leading '.' is allowed so GNU/avr-gcc local labels (.L0:, .L2:) are
+		// recognised as labels instead of being mistaken for dot-directives.
+		if (IsIdentStart(line[pos]) || (line[pos] == '.' && pos + 1 < len && IsIdentStart(line[pos + 1])))
 		{
 			int savedPos = pos;
 			int identStart = pos;
+			if (line[pos] == '.') pos++; // consume leading dot for local labels
 			while (pos < len && IsIdentChar(line[pos])) pos++;
 
 			if (pos < len && line[pos] == ':')
@@ -215,6 +218,38 @@ public static class LineParser
 			else if (c == ',' && depth == 0) return i;
 		}
 		return -1;
+	}
+
+	/// <summary>
+	/// Detect a GNU-style symbol assignment line: <c>name = expression</c>
+	/// (e.g. <c>__SP_H__ = 0x3e</c> or <c>.L__stack_usage = 2</c>, as emitted by avr-gcc).
+	/// The name may carry a leading '.' and embedded '.' characters. Returns false for
+	/// instructions, directives and comparisons (a leading <c>==</c> is rejected).
+	/// </summary>
+	public static bool TryParseAssignment(string line, out string name, out string expr)
+	{
+		name = string.Empty;
+		expr = string.Empty;
+		int len = line.Length;
+		int pos = 0;
+		while (pos < len && (line[pos] == ' ' || line[pos] == '\t')) pos++;
+		if (pos >= len) return false;
+
+		// LHS must be a single identifier token (letters/digits/_/.).
+		char first = line[pos];
+		if (!(char.IsLetter(first) || first == '_' || first == '.')) return false;
+		int nameStart = pos;
+		pos++;
+		while (pos < len && (char.IsLetterOrDigit(line[pos]) || line[pos] == '_' || line[pos] == '.')) pos++;
+		int nameEnd = pos;
+
+		while (pos < len && (line[pos] == ' ' || line[pos] == '\t')) pos++;
+		if (pos >= len || line[pos] != '=') return false;
+		if (pos + 1 < len && line[pos + 1] == '=') return false; // '==' is a comparison, not an assignment
+
+		name = line[nameStart..nameEnd];
+		expr = line[(pos + 1)..].Trim();
+		return expr.Length > 0;
 	}
 
 	/// <summary>

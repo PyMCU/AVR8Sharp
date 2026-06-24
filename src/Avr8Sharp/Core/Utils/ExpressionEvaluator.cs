@@ -158,14 +158,17 @@ public static class ExpressionEvaluator
 			return v;
 		}
 
-		// Identifiers: functions or symbols
-		if (tok.Kind == TokenKind.Identifier)
+		// Identifiers: functions or symbols.
+		// A Directive-kind token here is a dotted symbol reference (e.g. a forward
+		// reference to a GNU/avr-gcc local label like .L2) — treat it as a symbol name.
+		if (tok.Kind == TokenKind.Identifier || tok.Kind == TokenKind.Directive)
 		{
 			string name = tok.Raw;
+			bool canBeFunction = tok.Kind == TokenKind.Identifier;
 			pos++;
 
 			// Built-in functions
-			if (pos < t.Count && t[pos].Kind == TokenKind.LParen)
+			if (canBeFunction && pos < t.Count && t[pos].Kind == TokenKind.LParen)
 			{
 				pos++; // consume (
 				var arg = ParseOr(t, ref pos, sym, pc);
