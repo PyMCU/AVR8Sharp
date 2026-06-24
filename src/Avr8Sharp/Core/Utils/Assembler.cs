@@ -601,6 +601,30 @@ public partial class AvrAssembler
 	}
 
 	/// <summary>
+	/// Assemble and report success explicitly. Returns false when any error was
+	/// produced (in which case <paramref name="bytes"/> is empty) and exposes the
+	/// collected messages, so callers cannot mistake an error for empty output.
+	/// </summary>
+	public bool TryAssemble (string input, out byte[] bytes, out IReadOnlyList<string> errors)
+	{
+		bytes = Assemble(input);
+		errors = _errors.AsReadOnly();
+		return _errors.Count == 0;
+	}
+
+	/// <summary>
+	/// Assemble, throwing <see cref="AssemblerException"/> if any error was produced
+	/// instead of silently returning an empty array.
+	/// </summary>
+	public byte[] AssembleOrThrow (string input)
+	{
+		var bytes = Assemble(input);
+		if (_errors.Count > 0)
+			throw new AssemblerException(_errors.ToList());
+		return bytes;
+	}
+
+	/// <summary>
 	/// Assemble multiple source files together.
 	/// Pass 1: Scan all files for .global exports → build combined symbol table.
 	/// Pass 2: Assemble each file sequentially with the combined symbol table.
@@ -846,7 +870,7 @@ public partial class AvrAssembler
 				}
 				if (dirName == "ENDMACRO" || dirName == "ENDM")
 				{
-					_errors.Add($"Line {idx}: .endm without .macro");
+					_errors.Add($"Line {idx + 1}: .endm without .macro");
 					continue;
 				}
 
@@ -854,7 +878,7 @@ public partial class AvrAssembler
 				if (dirName == "INCLUDE")
 				{
 					if (_fileResolver == null)
-						_errors.Add($"Line {idx}: .include requires a file resolver");
+						_errors.Add($"Line {idx + 1}: .include requires a file resolver");
 					continue;
 				}
 
@@ -883,8 +907,8 @@ public partial class AvrAssembler
 				if (dirName == "ORG")
 				{
 					int? orgVal = ExpressionEvaluator.TryEvaluate(dirArgs, _symbolTable, byteOffset);
-					if (orgVal == null) { _errors.Add($"Line {idx}: Cannot evaluate .org expression"); continue; }
-					if ((orgVal.Value & 1) != 0) { _errors.Add($"Line {idx}: .org value must be even"); continue; }
+					if (orgVal == null) { _errors.Add($"Line {idx + 1}: Cannot evaluate .org expression"); continue; }
+					if ((orgVal.Value & 1) != 0) { _errors.Add($"Line {idx + 1}: .org value must be even"); continue; }
 					byteOffset = orgVal.Value;
 					continue;
 				}
@@ -937,7 +961,7 @@ public partial class AvrAssembler
 					continue;
 
 				// Unknown dot-directive: fall through to error
-				_errors.Add($"Line {idx}: Unknown directive: .{dirName}");
+				_errors.Add($"Line {idx + 1}: Unknown directive: .{dirName}");
 				continue;
 			}
 
@@ -1029,7 +1053,7 @@ public partial class AvrAssembler
 				_lines.Add(lt);
 			}
 			catch (Exception e) {
-				_errors.Add ($"Line {idx}: {e.Message}");
+				_errors.Add ($"Line {idx + 1}: {e.Message}");
 			}
 		}
 
@@ -1045,7 +1069,7 @@ public partial class AvrAssembler
 		if (def == null)
 		{
 			if (lineIdx >= 0)
-				_errors.Add($"Line {lineIdx}: Unknown device: {deviceName}");
+				_errors.Add($"Line {lineIdx + 1}: Unknown device: {deviceName}");
 			return;
 		}
 
@@ -1113,29 +1137,29 @@ public partial class AvrAssembler
 	private void ProcessSymbolDef(string args, int lineIdx, int byteOffset, bool isImmutable)
 	{
 		var parts = args.Split('=', 2);
-		if (parts.Length != 2) { _errors.Add($"Line {lineIdx}: .equ/.set requires NAME = VALUE"); return; }
+		if (parts.Length != 2) { _errors.Add($"Line {lineIdx + 1}: .equ/.set requires NAME = VALUE"); return; }
 		var name = parts[0].Trim();
 		var valStr = parts[1].Trim();
 		var val = ExpressionEvaluator.TryEvaluate(valStr, _symbolTable, byteOffset);
-		if (val == null) { _errors.Add($"Line {lineIdx}: Cannot evaluate expression for '{name}'"); return; }
+		if (val == null) { _errors.Add($"Line {lineIdx + 1}: Cannot evaluate expression for '{name}'"); return; }
 		try
 		{
 			if (isImmutable) _symbolTable.DefineConst(name, val.Value);
 			else _symbolTable.DefineVar(name, val.Value);
 		}
-		catch (Exception ex) { _errors.Add($"Line {lineIdx}: {ex.Message}"); }
+		catch (Exception ex) { _errors.Add($"Line {lineIdx + 1}: {ex.Message}"); }
 	}
 
 	private void ProcessDefDirective(string args, int lineIdx)
 	{
 		var parts = args.Split('=', 2);
-		if (parts.Length != 2) { _errors.Add($"Line {lineIdx}: .def requires ALIAS = rN"); return; }
+		if (parts.Length != 2) { _errors.Add($"Line {lineIdx + 1}: .def requires ALIAS = rN"); return; }
 		var alias = parts[0].Trim();
 		var regStr = parts[1].Trim();
 		int n = Encoders.EncoderHelpers.TryParseRegister(regStr.AsSpan());
-		if (n < 0) { _errors.Add($"Line {lineIdx}: .def: right side must be a register, got '{regStr}'"); return; }
+		if (n < 0) { _errors.Add($"Line {lineIdx + 1}: .def: right side must be a register, got '{regStr}'"); return; }
 		try { _symbolTable.DefineRegisterAlias(alias, n); }
-		catch (Exception ex) { _errors.Add($"Line {lineIdx}: {ex.Message}"); }
+		catch (Exception ex) { _errors.Add($"Line {lineIdx + 1}: {ex.Message}"); }
 	}
 
 	// -----------------------------------------------------------------------
@@ -1155,7 +1179,7 @@ public partial class AvrAssembler
 				continue;
 			}
 			var val = ExpressionEvaluator.TryEvaluate(p, _symbolTable, byteOffset);
-			if (val == null) { _errors.Add($"Line {lineIdx}: Cannot evaluate .byte expression: {p}"); return; }
+			if (val == null) { _errors.Add($"Line {lineIdx + 1}: Cannot evaluate .byte expression: {p}"); return; }
 			bytes.Add((byte)(val.Value & 0xFF));
 		}
 		if (bytes.Count > 0)
@@ -1173,7 +1197,7 @@ public partial class AvrAssembler
 		foreach (var part in parts)
 		{
 			var val = ExpressionEvaluator.TryEvaluate(part.Trim(), _symbolTable, byteOffset);
-			if (val == null) { _errors.Add($"Line {lineIdx}: Cannot evaluate .word expression: {part.Trim()}"); return; }
+			if (val == null) { _errors.Add($"Line {lineIdx + 1}: Cannot evaluate .word expression: {part.Trim()}"); return; }
 			wordBytes.Add((byte)(val.Value & 0xFF));
 			wordBytes.Add((byte)((val.Value >> 8) & 0xFF));
 		}
@@ -1192,7 +1216,7 @@ public partial class AvrAssembler
 		foreach (var part in parts)
 		{
 			var val = ExpressionEvaluator.TryEvaluate(part.Trim(), _symbolTable, byteOffset);
-			if (val == null) { _errors.Add($"Line {lineIdx}: Cannot evaluate .dword expression: {part.Trim()}"); return; }
+			if (val == null) { _errors.Add($"Line {lineIdx + 1}: Cannot evaluate .dword expression: {part.Trim()}"); return; }
 			dwordBytes.Add((byte)(val.Value & 0xFF));
 			dwordBytes.Add((byte)((val.Value >> 8) & 0xFF));
 			dwordBytes.Add((byte)((val.Value >> 16) & 0xFF));
@@ -1628,4 +1652,19 @@ public class LineTablePassOne
 public class LineTable : LineTablePassOne
 {
 	public new string Bytes { get; set; }
+}
+
+/// <summary>
+/// Thrown by <see cref="AvrAssembler.AssembleOrThrow"/> when assembly produced errors.
+/// </summary>
+public class AssemblerException : Exception
+{
+	/// <summary>The individual assembler error messages.</summary>
+	public IReadOnlyList<string> Errors { get; }
+
+	public AssemblerException(IReadOnlyList<string> errors)
+		: base($"Assembly failed with {errors.Count} error(s):\n  " + string.Join("\n  ", errors))
+	{
+		Errors = errors;
+	}
 }

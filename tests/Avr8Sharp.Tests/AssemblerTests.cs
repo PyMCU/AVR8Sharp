@@ -73,7 +73,7 @@ public class Assembler
 			Assert.That(result, Is.Empty);
 			
 			Assert.That(assembler.Errors, Has.Count.EqualTo(1));
-			Assert.That(assembler.Errors[0], Is.EqualTo("Line 0: Rd out of range: 16<>31"));
+			Assert.That(assembler.Errors[0], Is.EqualTo("Line 1: Rd out of range: 16<>31"));
 			
 			Assert.That(assembler.Lines, Is.Empty);
 			Assert.That(assembler.Labels, Is.Empty);
@@ -918,6 +918,47 @@ public class Assembler
 		assembler.Assemble (".frobnicate 1");
 
 		Assert.That (assembler.Errors, Is.Not.Empty);
+	}
+
+	[Test(Description = "Error messages report 1-based line numbers")]
+	public void ErrorLineNumbersAreOneBased ()
+	{
+		var assembler = new AvrAssembler ();
+		assembler.Assemble ("nop\nnop\n.frobnicate 1");
+
+		Assert.That (assembler.Errors, Has.Count.EqualTo (1));
+		Assert.That (assembler.Errors[0], Does.StartWith ("Line 3:"));
+	}
+
+	[Test(Description = "TryAssemble returns false and surfaces errors on failure")]
+	public void TryAssemble_Failure ()
+	{
+		var assembler = new AvrAssembler ();
+		var ok = assembler.TryAssemble (".frobnicate 1", out var bytes, out var errors);
+
+		Assert.That (ok, Is.False);
+		Assert.That (bytes, Is.Empty);
+		Assert.That (errors, Is.Not.Empty);
+	}
+
+	[Test(Description = "TryAssemble returns true with bytes on success")]
+	public void TryAssemble_Success ()
+	{
+		var assembler = new AvrAssembler ();
+		var ok = assembler.TryAssemble ("ADD r16, r11", out var bytes, out var errors);
+
+		Assert.That (ok, Is.True);
+		Assert.That (errors, Is.Empty);
+		Assert.That (Bytes ("0b0d"), Is.EqualTo (bytes));
+	}
+
+	[Test(Description = "AssembleOrThrow throws AssemblerException carrying the errors")]
+	public void AssembleOrThrow_Throws ()
+	{
+		var assembler = new AvrAssembler ();
+		var ex = Assert.Throws<AssemblerException> (() => assembler.AssembleOrThrow (".frobnicate 1"));
+
+		Assert.That (ex!.Errors, Is.Not.Empty);
 	}
 
 	private byte[] Bytes (string hex)
