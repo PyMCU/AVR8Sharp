@@ -839,6 +839,14 @@ public class Assembler
 		Assert.That (Bytes ("00c0"), Is.EqualTo (assembler.Assemble ("rjmp .")));
 	}
 
+	[Test(Description = "'.' location-counter arithmetic (.+N / .-N) matches avr-as")]
+	public void DotArithmetic ()
+	{
+		Assert.That (Bytes ("0000" + "01c0"), Is.EqualTo (new AvrAssembler ().Assemble ("nop\nrjmp .+2")));
+		Assert.That (Bytes ("0000" + "ffcf"), Is.EqualTo (new AvrAssembler ().Assemble ("nop\nrjmp .-2")));
+		Assert.That (Bytes ("0000" + "02d0"), Is.EqualTo (new AvrAssembler ().Assemble ("nop\nrcall .+4")));
+	}
+
 	// -----------------------------------------------------------------------
 	// avr-gcc / avr-as front-end compatibility
 	// -----------------------------------------------------------------------
