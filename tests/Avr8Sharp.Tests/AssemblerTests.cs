@@ -73,7 +73,7 @@ public class Assembler
 			Assert.That(result, Is.Empty);
 			
 			Assert.That(assembler.Errors, Has.Count.EqualTo(1));
-			Assert.That(assembler.Errors[0], Is.EqualTo("Line 0: Rd out of range: 16<>31"));
+			Assert.That(assembler.Errors[0], Is.EqualTo("Line 1: Rd out of range: 16<>31"));
 			
 			Assert.That(assembler.Lines, Is.Empty);
 			Assert.That(assembler.Labels, Is.Empty);
@@ -839,6 +839,87 @@ public class Assembler
 		Assert.That (Bytes ("00c0"), Is.EqualTo (assembler.Assemble ("rjmp .")));
 	}
 
+	[Test(Description = "'.' location-counter arithmetic (.+N / .-N) matches avr-as")]
+	public void DotArithmetic ()
+	{
+		Assert.That (Bytes ("0000" + "01c0"), Is.EqualTo (new AvrAssembler ().Assemble ("nop\nrjmp .+2")));
+		Assert.That (Bytes ("0000" + "ffcf"), Is.EqualTo (new AvrAssembler ().Assemble ("nop\nrjmp .-2")));
+		Assert.That (Bytes ("0000" + "02d0"), Is.EqualTo (new AvrAssembler ().Assemble ("nop\nrcall .+4")));
+	}
+
+	[Test(Description = ".rept N / .endr repeats the block N times (matches avr-as)")]
+	public void ReptBlock ()
+	{
+		var assembler = new AvrAssembler ();
+		var result = assembler.Assemble (".rept 3\n nop\n.endr");
+
+		Assert.That (assembler.Errors, Is.Empty);
+		Assert.That (Bytes ("000000000000"), Is.EqualTo (result)); // 3 NOPs (2 bytes each)
+	}
+
+	[Test(Description = ".rept composes with a \\name-parameterised macro")]
+	public void ReptWithMacro ()
+	{
+		var assembler = new AvrAssembler ();
+		var result = assembler.Assemble (".macro twice reg\n inc \\reg\n inc \\reg\n.endm\n.rept 2\n twice r16\n.endr");
+
+		Assert.That (assembler.Errors, Is.Empty);
+		Assert.That (Bytes ("03950395" + "03950395"), Is.EqualTo (result)); // 4x INC r16
+	}
+
+	[Test(Description = ".endr without .rept is an error")]
+	public void OrphanEndr ()
+	{
+		var assembler = new AvrAssembler ();
+		assembler.Assemble ("nop\n.endr");
+
+		Assert.That (assembler.Errors, Has.Count.EqualTo (1));
+		Assert.That (assembler.Errors[0], Does.Contain (".endr without .rept"));
+	}
+
+	[Test(Description = "Data-segment labels get sequential SRAM addresses (lds/sts resolve)")]
+	public void DataSegment_Labels ()
+	{
+		var assembler = new AvrAssembler ();
+		// buf=0x100, flag=0x101; lds r16,buf / lds r17,flag
+		var result = assembler.Assemble (".data\nbuf: .byte 1\nflag: .byte 1\n.text\nlds r16, buf\nlds r17, flag");
+
+		Assert.That (assembler.Errors, Is.Empty);
+		Assert.That (Bytes ("00910001" + "10910101"), Is.EqualTo (result));
+	}
+
+	[Test(Description = ".lcomm reserves SRAM and forward-referenced data symbols resolve in lds/sts")]
+	public void DataSegment_LcommAndForwardRef ()
+	{
+		var assembler = new AvrAssembler ();
+		// data segment placed after code (avr-gcc style); counter resolves to 0x100
+		var result = assembler.Assemble ("lds r16, counter\nsts counter, r16\n.data\ncounter: .byte 1");
+
+		Assert.That (assembler.Errors, Is.Empty);
+		Assert.That (Bytes ("00910001" + "00930001"), Is.EqualTo (result));
+	}
+
+	[Test(Description = "Forward-referenced address expression (sym+1) resolves in lds/sts (pass two)")]
+	public void DataSegment_ForwardExpression ()
+	{
+		var assembler = new AvrAssembler ();
+		// p = 0x100 via .comm placed after use; p+1 must resolve to 0x101
+		var result = assembler.Assemble ("lds r17, p+1\n.comm p, 2");
+
+		Assert.That (assembler.Errors, Is.Empty);
+		Assert.That (Bytes ("10910101"), Is.EqualTo (result)); // LDS r17, 0x101
+	}
+
+	[Test(Description = "A deferred 4-byte instruction as the last line resolves correctly")]
+	public void Deferred4ByteAsLastLine ()
+	{
+		// Regression: ElementSize concatenated the resolved pair into a 2-byte string.
+		var call = new AvrAssembler ();
+		Assert.That (Bytes ("0e940300" + "0000"), Is.EqualTo (call.Assemble ("call end\nnop\nend:")));
+		var lds = new AvrAssembler ();
+		Assert.That (Bytes ("00910001"), Is.EqualTo (lds.Assemble ("lds r16, x\n.data\nx: .byte 1")));
+	}
+
 	// -----------------------------------------------------------------------
 	// avr-gcc / avr-as front-end compatibility
 	// -----------------------------------------------------------------------
@@ -918,6 +999,47 @@ public class Assembler
 		assembler.Assemble (".frobnicate 1");
 
 		Assert.That (assembler.Errors, Is.Not.Empty);
+	}
+
+	[Test(Description = "Error messages report 1-based line numbers")]
+	public void ErrorLineNumbersAreOneBased ()
+	{
+		var assembler = new AvrAssembler ();
+		assembler.Assemble ("nop\nnop\n.frobnicate 1");
+
+		Assert.That (assembler.Errors, Has.Count.EqualTo (1));
+		Assert.That (assembler.Errors[0], Does.StartWith ("Line 3:"));
+	}
+
+	[Test(Description = "TryAssemble returns false and surfaces errors on failure")]
+	public void TryAssemble_Failure ()
+	{
+		var assembler = new AvrAssembler ();
+		var ok = assembler.TryAssemble (".frobnicate 1", out var bytes, out var errors);
+
+		Assert.That (ok, Is.False);
+		Assert.That (bytes, Is.Empty);
+		Assert.That (errors, Is.Not.Empty);
+	}
+
+	[Test(Description = "TryAssemble returns true with bytes on success")]
+	public void TryAssemble_Success ()
+	{
+		var assembler = new AvrAssembler ();
+		var ok = assembler.TryAssemble ("ADD r16, r11", out var bytes, out var errors);
+
+		Assert.That (ok, Is.True);
+		Assert.That (errors, Is.Empty);
+		Assert.That (Bytes ("0b0d"), Is.EqualTo (bytes));
+	}
+
+	[Test(Description = "AssembleOrThrow throws AssemblerException carrying the errors")]
+	public void AssembleOrThrow_Throws ()
+	{
+		var assembler = new AvrAssembler ();
+		var ex = Assert.Throws<AssemblerException> (() => assembler.AssembleOrThrow (".frobnicate 1"));
+
+		Assert.That (ex!.Errors, Is.Not.Empty);
 	}
 
 	private byte[] Bytes (string hex)

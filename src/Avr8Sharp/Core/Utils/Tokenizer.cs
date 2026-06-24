@@ -152,6 +152,15 @@ public static class Tokenizer
 				continue;
 			}
 
+			// Bare '.' = current location counter (used in expressions like ".+4").
+			// Reuses the Dollar token kind, which the evaluator resolves to the current PC.
+			if (c == '.')
+			{
+				tokens.Add(new Token(TokenKind.Dollar, ".", col));
+				i++;
+				continue;
+			}
+
 			// Identifiers, mnemonics, registers
 			if (char.IsLetter(c) || c == '_')
 			{

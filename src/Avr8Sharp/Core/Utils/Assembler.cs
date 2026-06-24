@@ -318,8 +318,12 @@ public partial class AvrAssembler
 			r |= ((k & 0xf0) << 4) | (k & 0xf);
 			return ZeroPad (r);
 		}},
-		{ "LDS", (a, b, _, _) => {
-			var k = ConstValue(b, 0, 65535);
+		{ "LDS", (a, b, byteLoc, labels) => {
+			var k = ConstOrLabel(b, labels);
+			if (k == int.MinValue) {
+				return new Func<Dictionary<string, int>, object> ((l) => OpTable?["LDS"](a, b, byteLoc, l) ?? new KeyValuePair<string, string>(string.Empty, string.Empty));
+			}
+			k = ConstValue(k, 0, 65535);
 			var r = 0x9000 | DestRIndex(a);
 			return new KeyValuePair<string, string>(ZeroPad(r), ZeroPad(k));
 		}},
@@ -523,8 +527,12 @@ public partial class AvrAssembler
 			var r = 0x0200 | DestRIndex(b) | StldYzQ(a);
 			return ZeroPad (r);
 		}},
-		{ "STS", (a, b, _, _) => {
-			var k = ConstValue(a, 0, 65535);
+		{ "STS", (a, b, byteLoc, labels) => {
+			var k = ConstOrLabel(a, labels);
+			if (k == int.MinValue) {
+				return new Func<Dictionary<string, int>, object> ((l) => OpTable?["STS"](a, b, byteLoc, l) ?? new KeyValuePair<string, string>(string.Empty, string.Empty));
+			}
+			k = ConstValue(k, 0, 65535);
 			var r = 0x9200 | DestRIndex(b);
 			return new KeyValuePair<string, string>(ZeroPad(r), ZeroPad(k));
 		}},
@@ -598,6 +606,30 @@ public partial class AvrAssembler
 	{
 		PassOne(input);
 		return _errors.Count > 0 ? [] : PassTwo();
+	}
+
+	/// <summary>
+	/// Assemble and report success explicitly. Returns false when any error was
+	/// produced (in which case <paramref name="bytes"/> is empty) and exposes the
+	/// collected messages, so callers cannot mistake an error for empty output.
+	/// </summary>
+	public bool TryAssemble (string input, out byte[] bytes, out IReadOnlyList<string> errors)
+	{
+		bytes = Assemble(input);
+		errors = _errors.AsReadOnly();
+		return _errors.Count == 0;
+	}
+
+	/// <summary>
+	/// Assemble, throwing <see cref="AssemblerException"/> if any error was produced
+	/// instead of silently returning an empty array.
+	/// </summary>
+	public byte[] AssembleOrThrow (string input)
+	{
+		var bytes = Assemble(input);
+		if (_errors.Count > 0)
+			throw new AssemblerException(_errors.ToList());
+		return bytes;
 	}
 
 	/// <summary>
@@ -740,6 +772,15 @@ public partial class AvrAssembler
 		_currentSymbolTable = _symbolTable;
 
 		int byteOffset = 0;
+
+		// Data segment (.data/.bss/.dseg) state. Symbols defined here are assigned
+		// sequential SRAM addresses by a simple allocator (no linker), starting at
+		// 0x100 — the SRAM base of the ATmega family. This lets lds/sts reference
+		// data symbols; the addresses are self-consistent but are NOT avr-gcc's
+		// linker-assigned addresses.
+		bool inDataSegment = false;
+		int dataOffset = 0x100;
+
 		_labels.Clear();
 		_errors.Clear();
 		_lines.Clear();
@@ -752,6 +793,10 @@ public partial class AvrAssembler
 		string? recordingMacro = null;
 		List<string>? macroParams = null;
 		List<string>? macroBody = null;
+
+		// .rept block recording state
+		List<string>? reptBody = null;
+		int reptCount = 0;
 
 		// Use a list + index so we can inject macro-expanded lines
 		var lineList = allLines;
@@ -790,6 +835,28 @@ public partial class AvrAssembler
 			}
 
 			// ----------------------------------------------------------------
+			// .rept block recording: collect the body, then inject it reptCount
+			// times after .endr (GNU repeat blocks).
+			// ----------------------------------------------------------------
+			if (reptBody != null)
+			{
+				if (keyword is "ENDR" or "ENDREPT")
+				{
+					var injected = new List<string>(reptBody.Count * Math.Max(reptCount, 0));
+					for (int r = 0; r < reptCount; r++) injected.AddRange(reptBody);
+					lineList = lineList.Take(idx + 1).Concat(injected).Concat(lineList.Skip(idx + 1)).ToList();
+					lineCount = lineList.Count;
+					reptBody = null;
+					reptCount = 0;
+				}
+				else
+				{
+					reptBody.Add(rawLine);
+				}
+				continue;
+			}
+
+			// ----------------------------------------------------------------
 			// Conditional assembly directives (must process even in false branch)
 			// ----------------------------------------------------------------
 			if (keyword is "IF" or "IFDEF" or "IFNDEF" or "ELSEIF" or "ELSE" or "ENDIF")
@@ -808,8 +875,9 @@ public partial class AvrAssembler
 			// ----------------------------------------------------------------
 			if (parsed.Label != null)
 			{
-				_labels[parsed.Label] = byteOffset;
-				_symbolTable.Set(parsed.Label, byteOffset);
+				int labelAddr = inDataSegment ? dataOffset : byteOffset;
+				_labels[parsed.Label] = labelAddr;
+				_symbolTable.Set(parsed.Label, labelAddr);
 			}
 
 			// ----------------------------------------------------------------
@@ -846,7 +914,22 @@ public partial class AvrAssembler
 				}
 				if (dirName == "ENDMACRO" || dirName == "ENDM")
 				{
-					_errors.Add($"Line {idx}: .endm without .macro");
+					_errors.Add($"Line {idx + 1}: .endm without .macro");
+					continue;
+				}
+
+				// Repeat block start: .rept <count> ... .endr
+				if (dirName == "REPT")
+				{
+					int? n = ExpressionEvaluator.TryEvaluate(dirArgs, _symbolTable, byteOffset);
+					if (n == null) { _errors.Add($"Line {idx + 1}: Cannot evaluate .rept count"); continue; }
+					reptCount = Math.Max(n.Value, 0);
+					reptBody = new List<string>();
+					continue;
+				}
+				if (dirName == "ENDR" || dirName == "ENDREPT")
+				{
+					_errors.Add($"Line {idx + 1}: .endr without .rept");
 					continue;
 				}
 
@@ -854,13 +937,50 @@ public partial class AvrAssembler
 				if (dirName == "INCLUDE")
 				{
 					if (_fileResolver == null)
-						_errors.Add($"Line {idx}: .include requires a file resolver");
+						_errors.Add($"Line {idx + 1}: .include requires a file resolver");
 					continue;
 				}
 
-				// Segment directives (simple)
-				if (dirName == "CSEG" || dirName == "DSEG" || dirName == "ESEG")
-					continue; // segment switching not fully implemented; cseg is default
+				// Segment switching. .dseg/.data/.bss select the data segment (SRAM
+				// allocator); .cseg/.text return to code. .section picks by its argument.
+				if (dirName == "DSEG" || dirName == "DATA" || dirName == "BSS")
+				{
+					inDataSegment = true;
+					continue;
+				}
+				if (dirName == "CSEG" || dirName == "TEXT" || dirName == "ESEG")
+				{
+					inDataSegment = false; // eseg (EEPROM) is not modelled; treat as code-ish no-op
+					continue;
+				}
+				if (dirName == "SECTION")
+				{
+					var sec = dirArgs.TrimStart().Split(new[] { ' ', '\t', ',' }, 2)[0];
+					inDataSegment = sec.StartsWith(".data", StringComparison.OrdinalIgnoreCase)
+						|| sec.StartsWith(".bss", StringComparison.OrdinalIgnoreCase);
+					continue;
+				}
+
+				// Reserve space: .comm/.lcomm NAME,SIZE and .skip/.space/.zero SIZE.
+				if (dirName == "COMM" || dirName == "LCOMM")
+				{
+					var parts = dirArgs.Split(',');
+					if (parts.Length < 2) { _errors.Add($"Line {idx + 1}: .{dirName.ToLowerInvariant()} requires NAME, SIZE"); continue; }
+					var symName = parts[0].Trim();
+					int? size = ExpressionEvaluator.TryEvaluate(parts[1], _symbolTable, dataOffset);
+					if (size == null) { _errors.Add($"Line {idx + 1}: Cannot evaluate .{dirName.ToLowerInvariant()} size"); continue; }
+					_symbolTable.Set(symName, dataOffset);
+					_labels[symName] = dataOffset;
+					dataOffset += Math.Max(size.Value, 0);
+					continue;
+				}
+				if (inDataSegment && (dirName == "SKIP" || dirName == "SPACE" || dirName == "ZERO"))
+				{
+					int? size = ExpressionEvaluator.TryEvaluate(dirArgs.Split(',')[0], _symbolTable, dataOffset);
+					if (size == null) { _errors.Add($"Line {idx + 1}: Cannot evaluate .{dirName.ToLowerInvariant()} size"); continue; }
+					dataOffset += Math.Max(size.Value, 0);
+					continue;
+				}
 
 				// Symbol definitions
 				if (dirName == "EQU")
@@ -883,9 +1003,18 @@ public partial class AvrAssembler
 				if (dirName == "ORG")
 				{
 					int? orgVal = ExpressionEvaluator.TryEvaluate(dirArgs, _symbolTable, byteOffset);
-					if (orgVal == null) { _errors.Add($"Line {idx}: Cannot evaluate .org expression"); continue; }
-					if ((orgVal.Value & 1) != 0) { _errors.Add($"Line {idx}: .org value must be even"); continue; }
+					if (orgVal == null) { _errors.Add($"Line {idx + 1}: Cannot evaluate .org expression"); continue; }
+					if ((orgVal.Value & 1) != 0) { _errors.Add($"Line {idx + 1}: .org value must be even"); continue; }
 					byteOffset = orgVal.Value;
+					continue;
+				}
+
+				// In the data segment, data directives only reserve address space
+				// (advance the SRAM allocator) — no bytes are emitted into the code image.
+				if (inDataSegment && dirName is "BYTE" or "DB" or "WORD" or "DW" or "DWORD"
+					or "ASCII" or "ASCIZ" or "STRING")
+				{
+					dataOffset += DataReserveSize(dirName, dirArgs);
 					continue;
 				}
 
@@ -930,14 +1059,14 @@ public partial class AvrAssembler
 				// GNU/avr-gcc metadata directives: accepted as no-ops. AVR8Sharp emits a
 				// flat code image, so section/symbol/debug metadata carries no payload here.
 				// (Section switching is intentionally ignored — single-section output.)
-				if (dirName is "FILE" or "SECTION" or "TEXT" or "DATA" or "TYPE" or "SIZE"
+				if (dirName is "FILE" or "TYPE" or "SIZE"
 					or "IDENT" or "WEAK" or "GLOBL" or "LOCAL" or "ALIGN" or "P2ALIGN"
 					or "BALIGN" or "LOC" or "FUNC" or "ENDFUNC"
 					or "CFI_STARTPROC" or "CFI_ENDPROC")
 					continue;
 
 				// Unknown dot-directive: fall through to error
-				_errors.Add($"Line {idx}: Unknown directive: .{dirName}");
+				_errors.Add($"Line {idx + 1}: Unknown directive: .{dirName}");
 				continue;
 			}
 
@@ -1029,7 +1158,7 @@ public partial class AvrAssembler
 				_lines.Add(lt);
 			}
 			catch (Exception e) {
-				_errors.Add ($"Line {idx}: {e.Message}");
+				_errors.Add ($"Line {idx + 1}: {e.Message}");
 			}
 		}
 
@@ -1045,7 +1174,7 @@ public partial class AvrAssembler
 		if (def == null)
 		{
 			if (lineIdx >= 0)
-				_errors.Add($"Line {lineIdx}: Unknown device: {deviceName}");
+				_errors.Add($"Line {lineIdx + 1}: Unknown device: {deviceName}");
 			return;
 		}
 
@@ -1113,29 +1242,48 @@ public partial class AvrAssembler
 	private void ProcessSymbolDef(string args, int lineIdx, int byteOffset, bool isImmutable)
 	{
 		var parts = args.Split('=', 2);
-		if (parts.Length != 2) { _errors.Add($"Line {lineIdx}: .equ/.set requires NAME = VALUE"); return; }
+		if (parts.Length != 2) { _errors.Add($"Line {lineIdx + 1}: .equ/.set requires NAME = VALUE"); return; }
 		var name = parts[0].Trim();
 		var valStr = parts[1].Trim();
 		var val = ExpressionEvaluator.TryEvaluate(valStr, _symbolTable, byteOffset);
-		if (val == null) { _errors.Add($"Line {lineIdx}: Cannot evaluate expression for '{name}'"); return; }
+		if (val == null) { _errors.Add($"Line {lineIdx + 1}: Cannot evaluate expression for '{name}'"); return; }
 		try
 		{
 			if (isImmutable) _symbolTable.DefineConst(name, val.Value);
 			else _symbolTable.DefineVar(name, val.Value);
 		}
-		catch (Exception ex) { _errors.Add($"Line {lineIdx}: {ex.Message}"); }
+		catch (Exception ex) { _errors.Add($"Line {lineIdx + 1}: {ex.Message}"); }
 	}
 
 	private void ProcessDefDirective(string args, int lineIdx)
 	{
 		var parts = args.Split('=', 2);
-		if (parts.Length != 2) { _errors.Add($"Line {lineIdx}: .def requires ALIAS = rN"); return; }
+		if (parts.Length != 2) { _errors.Add($"Line {lineIdx + 1}: .def requires ALIAS = rN"); return; }
 		var alias = parts[0].Trim();
 		var regStr = parts[1].Trim();
 		int n = Encoders.EncoderHelpers.TryParseRegister(regStr.AsSpan());
-		if (n < 0) { _errors.Add($"Line {lineIdx}: .def: right side must be a register, got '{regStr}'"); return; }
+		if (n < 0) { _errors.Add($"Line {lineIdx + 1}: .def: right side must be a register, got '{regStr}'"); return; }
 		try { _symbolTable.DefineRegisterAlias(alias, n); }
-		catch (Exception ex) { _errors.Add($"Line {lineIdx}: {ex.Message}"); }
+		catch (Exception ex) { _errors.Add($"Line {lineIdx + 1}: {ex.Message}"); }
+	}
+
+	// -----------------------------------------------------------------------
+	// Number of bytes a data directive reserves (used in the data segment, where
+	// the directive advances the SRAM allocator without emitting code bytes).
+	// String length is approximate for escape sequences — adequate for reservation.
+	// -----------------------------------------------------------------------
+	private int DataReserveSize(string dirName, string args)
+	{
+		var parts = SplitDirectiveArgs(args);
+		if (dirName is "ASCII" or "ASCIZ" or "STRING")
+		{
+			int n = 0;
+			foreach (var p in parts)
+				n += p.Trim().Trim('"', '\'').Length;
+			return dirName == "ASCII" ? n : n + parts.Count; // one NUL per string for asciz/string
+		}
+		int unit = dirName is "WORD" or "DW" ? 2 : dirName == "DWORD" ? 4 : 1;
+		return parts.Count * unit;
 	}
 
 	// -----------------------------------------------------------------------
@@ -1155,7 +1303,7 @@ public partial class AvrAssembler
 				continue;
 			}
 			var val = ExpressionEvaluator.TryEvaluate(p, _symbolTable, byteOffset);
-			if (val == null) { _errors.Add($"Line {lineIdx}: Cannot evaluate .byte expression: {p}"); return; }
+			if (val == null) { _errors.Add($"Line {lineIdx + 1}: Cannot evaluate .byte expression: {p}"); return; }
 			bytes.Add((byte)(val.Value & 0xFF));
 		}
 		if (bytes.Count > 0)
@@ -1173,7 +1321,7 @@ public partial class AvrAssembler
 		foreach (var part in parts)
 		{
 			var val = ExpressionEvaluator.TryEvaluate(part.Trim(), _symbolTable, byteOffset);
-			if (val == null) { _errors.Add($"Line {lineIdx}: Cannot evaluate .word expression: {part.Trim()}"); return; }
+			if (val == null) { _errors.Add($"Line {lineIdx + 1}: Cannot evaluate .word expression: {part.Trim()}"); return; }
 			wordBytes.Add((byte)(val.Value & 0xFF));
 			wordBytes.Add((byte)((val.Value >> 8) & 0xFF));
 		}
@@ -1192,7 +1340,7 @@ public partial class AvrAssembler
 		foreach (var part in parts)
 		{
 			var val = ExpressionEvaluator.TryEvaluate(part.Trim(), _symbolTable, byteOffset);
-			if (val == null) { _errors.Add($"Line {lineIdx}: Cannot evaluate .dword expression: {part.Trim()}"); return; }
+			if (val == null) { _errors.Add($"Line {lineIdx + 1}: Cannot evaluate .dword expression: {part.Trim()}"); return; }
 			dwordBytes.Add((byte)(val.Value & 0xFF));
 			dwordBytes.Add((byte)((val.Value >> 8) & 0xFF));
 			dwordBytes.Add((byte)((val.Value >> 16) & 0xFF));
@@ -1286,8 +1434,13 @@ public partial class AvrAssembler
 	private byte [] PassTwo ()
 	{
 		_errors.Clear();
-		
-		if (_lines.Count == 0) 
+
+		// Restore the symbol table for deferred closures: forward-referenced
+		// expressions (e.g. `lds rN, sym+1`) resolve through ConstOrLabel's
+		// expression evaluator, which reads _currentSymbolTable here in pass two.
+		_currentSymbolTable = _symbolTable;
+
+		if (_lines.Count == 0)
 			return [];
 		
 		var lastElement = _lines[_lines.Count - 1];
@@ -1347,7 +1500,7 @@ public partial class AvrAssembler
 				return s2.Length / 2;
 			}
 			if (res is KeyValuePair<string, string> p) {
-				lt.Bytes = p.Key + p.Value;
+				lt.Bytes = p; // keep the 4-byte pair; concatenating would be misread as a 2-byte string
 				return 4;
 			}
 		}
@@ -1628,4 +1781,19 @@ public class LineTablePassOne
 public class LineTable : LineTablePassOne
 {
 	public new string Bytes { get; set; }
+}
+
+/// <summary>
+/// Thrown by <see cref="AvrAssembler.AssembleOrThrow"/> when assembly produced errors.
+/// </summary>
+public class AssemblerException : Exception
+{
+	/// <summary>The individual assembler error messages.</summary>
+	public IReadOnlyList<string> Errors { get; }
+
+	public AssemblerException(IReadOnlyList<string> errors)
+		: base($"Assembly failed with {errors.Count} error(s):\n  " + string.Join("\n  ", errors))
+	{
+		Errors = errors;
+	}
 }
