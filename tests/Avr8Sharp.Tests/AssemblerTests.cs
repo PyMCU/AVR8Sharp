@@ -957,6 +957,32 @@ public class Assembler
 		Assert.That (Bytes ("00e1"), Is.EqualTo (eq.Assemble (".equ baz = 0x10\nldi r16, baz")));
 	}
 
+	[Test(Description = ".byte/.word with a forward-referenced symbol expression defers to pass two")]
+	public void DataDirective_ForwardSymbol ()
+	{
+		// x at byte 2: lo8(x)=0x02, hi8(x)=0x00; then a NOP
+		var b = new AvrAssembler ();
+		var rb = b.Assemble (".byte lo8(x), hi8(x)\nx: nop");
+		Assert.That (b.Errors, Is.Empty);
+		Assert.That (Bytes ("0200" + "0000"), Is.EqualTo (rb));
+
+		// jump-table style: .word of forward labels (a=byte4, b=byte6) then two NOPs
+		var w = new AvrAssembler ();
+		var rw = w.Assemble (".word a, b\na: nop\nb: nop");
+		Assert.That (w.Errors, Is.Empty);
+		Assert.That (Bytes ("0400" + "0600" + "0000" + "0000"), Is.EqualTo (rw));
+	}
+
+	[Test(Description = "__gcc_isr gives an actionable error pointing to -mno-gas-isr-prologues")]
+	public void GccIsr_ActionableError ()
+	{
+		var assembler = new AvrAssembler ();
+		assembler.Assemble ("__vector_1:\n__gcc_isr 1\nreti");
+
+		Assert.That (assembler.Errors, Is.Not.Empty);
+		Assert.That (assembler.Errors[0], Does.Contain ("-mno-gas-isr-prologues"));
+	}
+
 	// -----------------------------------------------------------------------
 	// avr-gcc / avr-as front-end compatibility
 	// -----------------------------------------------------------------------
