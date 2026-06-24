@@ -34,7 +34,9 @@ public partial class AvrAssembler
 			var r = 0x2000 | DestRIndex(a) | SrcRIndex(b);
 			return ZeroPad (r);
 		} },
-		{ "ANDI", (a, b, _, _) => {
+		{ "ANDI", (a, b, byteLoc, labels) => {
+			if (ConstOrLabel(b, labels) == int.MinValue)
+				return new Func<Dictionary<string, int>, string> ((l) => OpTable?["ANDI"](a, b, byteLoc, l) as string ?? string.Empty);
 			var r = 0x7000 | (DestRIndex(a, 16, 31) & 0xf0);
 			var k = ConstValue(b);
 			r |= ((k & 0xf0) << 4) | (k & 0xf);
@@ -198,7 +200,9 @@ public partial class AvrAssembler
 			var r = 0x0400 | DestRIndex(a) | SrcRIndex(b);
 			return ZeroPad (r);
 		}},
-		{ "CPI", (a, b, _, _) => {
+		{ "CPI", (a, b, byteLoc, labels) => {
+			if (ConstOrLabel(b, labels) == int.MinValue)
+				return new Func<Dictionary<string, int>, string> ((l) => OpTable?["CPI"](a, b, byteLoc, l) as string ?? string.Empty);
 			var r = 0x3000 | (DestRIndex(a, 16, 31) & 0xf0);
 			var k = ConstValue(b);
 			r |= ((k & 0xf0) << 4) | (k & 0xf);
@@ -312,7 +316,9 @@ public partial class AvrAssembler
 			var r = DestRIndex(a) | StldYzQ(b);
 			return ZeroPad (r);
 		}},
-		{ "LDI", (a, b, _, _) => {
+		{ "LDI", (a, b, byteLoc, labels) => {
+			if (ConstOrLabel(b, labels) == int.MinValue)
+				return new Func<Dictionary<string, int>, string> ((l) => OpTable?["LDI"](a, b, byteLoc, l) as string ?? string.Empty);
 			var r = 0xe000 | (DestRIndex(a, 16, 31) & 0xf0);
 			var k = ConstValue(b);
 			r |= ((k & 0xf0) << 4) | (k & 0xf);
@@ -382,7 +388,9 @@ public partial class AvrAssembler
 			var r = 0x2800 | DestRIndex(a) | SrcRIndex(b);
 			return ZeroPad (r);
 		}},
-		{ "ORI", (a, b, _, _) => {
+		{ "ORI", (a, b, byteLoc, labels) => {
+			if (ConstOrLabel(b, labels) == int.MinValue)
+				return new Func<Dictionary<string, int>, string> ((l) => OpTable?["ORI"](a, b, byteLoc, l) as string ?? string.Empty);
 			var r = 0x6000 | (DestRIndex(a, 16, 31) & 0xf0);
 			var k = ConstValue(b);
 			r |= ((k & 0xf0) << 4) | (k & 0xf);
@@ -435,7 +443,9 @@ public partial class AvrAssembler
 			var r = 0x0800 | DestRIndex(a) | SrcRIndex(b);
 			return ZeroPad (r);
 		}},
-		{ "SBCI", (a, b, _, _) => {
+		{ "SBCI", (a, b, byteLoc, labels) => {
+			if (ConstOrLabel(b, labels) == int.MinValue)
+				return new Func<Dictionary<string, int>, string> ((l) => OpTable?["SBCI"](a, b, byteLoc, l) as string ?? string.Empty);
 			var r = 0x4000 | (DestRIndex(a, 16, 31) & 0xf0);
 			var k = ConstValue(b);
 			r |= ((k & 0xf0) << 4) | (k & 0xf);
@@ -540,7 +550,9 @@ public partial class AvrAssembler
 			var r = 0x1800 | DestRIndex(a) | SrcRIndex(b);
 			return ZeroPad (r);
 		}},
-		{ "SUBI", (a, b, _, _) => {
+		{ "SUBI", (a, b, byteLoc, labels) => {
+			if (ConstOrLabel(b, labels) == int.MinValue)
+				return new Func<Dictionary<string, int>, string> ((l) => OpTable?["SUBI"](a, b, byteLoc, l) as string ?? string.Empty);
 			var r = 0x5000 | (DestRIndex(a, 16, 31) & 0xf0);
 			var k = ConstValue(b);
 			r |= ((k & 0xf0) << 4) | (k & 0xf);
@@ -1132,7 +1144,9 @@ public partial class AvrAssembler
 				}
 
 				if (!OpTable.ContainsKey (instruction)) {
-					throw new Exception("Invalid instruction");
+					if (instruction == "__GCC_ISR")
+						throw new Exception("__gcc_isr is an avr-as ISR-prologue pseudo-op; recompile with -mno-gas-isr-prologues to get explicit push/pop prologues");
+					throw new Exception($"Invalid instruction: {instruction}");
 				}
 				
 				// Apply replacements and symbol substitution on parameters
@@ -1241,7 +1255,8 @@ public partial class AvrAssembler
 	// -----------------------------------------------------------------------
 	private void ProcessSymbolDef(string args, int lineIdx, int byteOffset, bool isImmutable)
 	{
-		var parts = args.Split('=', 2);
+		// Accept both Atmel `NAME = VALUE` and GNU `NAME, VALUE` forms.
+		var parts = args.Contains('=') ? args.Split('=', 2) : args.Split(new[] { ',' }, 2);
 		if (parts.Length != 2) { _errors.Add($"Line {lineIdx + 1}: .equ/.set requires NAME = VALUE"); return; }
 		var name = parts[0].Trim();
 		var valStr = parts[1].Trim();
@@ -1290,68 +1305,74 @@ public partial class AvrAssembler
 	// Data-emission helpers
 	// -----------------------------------------------------------------------
 	private void EmitDataBytes(string args, int lineIdx, ref int byteOffset, string rawLine)
+		=> EmitData(args, lineIdx, ref byteOffset, rawLine, unit: 1);
+
+	private void EmitDataWords(string args, int lineIdx, ref int byteOffset, string rawLine)
+		=> EmitData(args, lineIdx, ref byteOffset, rawLine, unit: 2);
+
+	private void EmitDataDwords(string args, int lineIdx, ref int byteOffset, string rawLine)
+		=> EmitData(args, lineIdx, ref byteOffset, rawLine, unit: 4);
+
+	// Emit .byte/.word/.dword data. The byte count is always known up front, so
+	// byteOffset advances deterministically; if any element is a forward-referenced
+	// symbol expression, the actual bytes are produced by a deferred closure that
+	// re-evaluates in pass two (mirrors how instructions defer label resolution).
+	private void EmitData(string args, int lineIdx, ref int byteOffset, string rawLine, int unit)
 	{
 		var parts = SplitDirectiveArgs(args);
+
+		// Byte count and whether any element needs deferral.
+		int count = 0;
+		bool deferred = false;
+		foreach (var part in parts)
+		{
+			var p = part.Trim();
+			if (unit == 1 && (p.StartsWith('"') || p.StartsWith('\'')))
+			{
+				count += p.Trim('"', '\'').Length;
+				continue;
+			}
+			count += unit;
+			if (ExpressionEvaluator.TryEvaluate(p, _symbolTable, byteOffset) == null)
+				deferred = true;
+		}
+		if (count == 0) return;
+
+		int pc = byteOffset;
+		object bytes;
+		if (deferred)
+		{
+			bytes = new Func<LabelTable, object>(_ => BuildDataBytes(parts, unit, pc));
+		}
+		else
+		{
+			try { bytes = BuildDataBytes(parts, unit, pc); }
+			catch (Exception ex) { _errors.Add($"Line {lineIdx + 1}: {ex.Message}"); return; }
+		}
+
+		_lines.Add(new LineTablePassOne { Text = rawLine.Trim(), Line = lineIdx + 1, BytesOffset = byteOffset, Bytes = bytes });
+		byteOffset += count;
+	}
+
+	// Build the raw bytes for a .byte/.word/.dword directive. Throws if a symbol is
+	// still unresolved (caught by the caller / pass-two loop and reported as an error).
+	private byte[] BuildDataBytes(List<string> parts, int unit, int pc)
+	{
 		var bytes = new List<byte>();
 		foreach (var part in parts)
 		{
 			var p = part.Trim();
-			if (p.StartsWith('"') || p.StartsWith('\''))
+			if (unit == 1 && (p.StartsWith('"') || p.StartsWith('\'')))
 			{
-				var s = p.Trim('"', '\'');
-				bytes.AddRange(System.Text.Encoding.ASCII.GetBytes(s));
+				bytes.AddRange(System.Text.Encoding.ASCII.GetBytes(p.Trim('"', '\'')));
 				continue;
 			}
-			var val = ExpressionEvaluator.TryEvaluate(p, _symbolTable, byteOffset);
-			if (val == null) { _errors.Add($"Line {lineIdx + 1}: Cannot evaluate .byte expression: {p}"); return; }
-			bytes.Add((byte)(val.Value & 0xFF));
+			var val = ExpressionEvaluator.TryEvaluate(p, _currentSymbolTable ?? _symbolTable, pc)
+				?? throw new Exception($"Cannot evaluate data expression: {p}");
+			for (int i = 0; i < unit; i++)
+				bytes.Add((byte)((val >> (8 * i)) & 0xFF));
 		}
-		if (bytes.Count > 0)
-		{
-			var lt = new LineTablePassOne { Text = rawLine.Trim(), Line = lineIdx + 1, BytesOffset = byteOffset, Bytes = bytes.ToArray() };
-			_lines.Add(lt);
-			byteOffset += bytes.Count;
-		}
-	}
-
-	private void EmitDataWords(string args, int lineIdx, ref int byteOffset, string rawLine)
-	{
-		var parts = SplitDirectiveArgs(args);
-		var wordBytes = new List<byte>();
-		foreach (var part in parts)
-		{
-			var val = ExpressionEvaluator.TryEvaluate(part.Trim(), _symbolTable, byteOffset);
-			if (val == null) { _errors.Add($"Line {lineIdx + 1}: Cannot evaluate .word expression: {part.Trim()}"); return; }
-			wordBytes.Add((byte)(val.Value & 0xFF));
-			wordBytes.Add((byte)((val.Value >> 8) & 0xFF));
-		}
-		if (wordBytes.Count > 0)
-		{
-			var lt = new LineTablePassOne { Text = rawLine.Trim(), Line = lineIdx + 1, BytesOffset = byteOffset, Bytes = wordBytes.ToArray() };
-			_lines.Add(lt);
-			byteOffset += wordBytes.Count;
-		}
-	}
-
-	private void EmitDataDwords(string args, int lineIdx, ref int byteOffset, string rawLine)
-	{
-		var parts = SplitDirectiveArgs(args);
-		var dwordBytes = new List<byte>();
-		foreach (var part in parts)
-		{
-			var val = ExpressionEvaluator.TryEvaluate(part.Trim(), _symbolTable, byteOffset);
-			if (val == null) { _errors.Add($"Line {lineIdx + 1}: Cannot evaluate .dword expression: {part.Trim()}"); return; }
-			dwordBytes.Add((byte)(val.Value & 0xFF));
-			dwordBytes.Add((byte)((val.Value >> 8) & 0xFF));
-			dwordBytes.Add((byte)((val.Value >> 16) & 0xFF));
-			dwordBytes.Add((byte)((val.Value >> 24) & 0xFF));
-		}
-		if (dwordBytes.Count > 0)
-		{
-			var lt = new LineTablePassOne { Text = rawLine.Trim(), Line = lineIdx + 1, BytesOffset = byteOffset, Bytes = dwordBytes.ToArray() };
-			_lines.Add(lt);
-			byteOffset += dwordBytes.Count;
-		}
+		return bytes.ToArray();
 	}
 
 	private void EmitDataAscii(string args, int lineIdx, ref int byteOffset, string rawLine, bool nullTerminated)
