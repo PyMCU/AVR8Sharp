@@ -800,6 +800,126 @@ public class Assembler
 		Assert.That (Bytes ("1894"), Is.EqualTo (result));
 	}
 	
+	// -----------------------------------------------------------------------
+	// Regression: RCALL with a label operand computed the PC-relative offset
+	// from the current instruction instead of the next one (verified against
+	// avr-as: `loop: rcall loop` => ffdf, `rcall fwd; nop; fwd:` => 01d0).
+	// -----------------------------------------------------------------------
+	[Test(Description = "RCALL to a backward label encodes a -1 word offset (self-call)")]
+	public void RCALL_BackwardLabel ()
+	{
+		var assembler = new AvrAssembler ();
+		var result = assembler.Assemble ("start: rcall start");
+
+		Assert.That (assembler.Errors, Is.Empty);
+		Assert.That (Bytes ("ffdf"), Is.EqualTo (result));
+	}
+
+	[Test(Description = "RCALL to a forward label encodes the offset to the next instruction")]
+	public void RCALL_ForwardLabel ()
+	{
+		var assembler = new AvrAssembler ();
+		var result = assembler.Assemble ("rcall fwd\nnop\nfwd:");
+
+		Assert.That (assembler.Errors, Is.Empty);
+		Assert.That (Bytes ("01d00000"), Is.EqualTo (result));
+	}
+
+	[Test(Description = "RCALL . (GNU stack-reserve idiom) encodes offset 0")]
+	public void RCALL_Dot ()
+	{
+		var assembler = new AvrAssembler ();
+		Assert.That (Bytes ("00d0"), Is.EqualTo (assembler.Assemble ("rcall .")));
+	}
+
+	[Test(Description = "RJMP . encodes offset 0 (next instruction), matching avr-as")]
+	public void RJMP_Dot ()
+	{
+		var assembler = new AvrAssembler ();
+		Assert.That (Bytes ("00c0"), Is.EqualTo (assembler.Assemble ("rjmp .")));
+	}
+
+	// -----------------------------------------------------------------------
+	// avr-gcc / avr-as front-end compatibility
+	// -----------------------------------------------------------------------
+	[Test(Description = "GNU local labels (.L0:) are treated as labels, not directives")]
+	public void DotLocalLabel ()
+	{
+		var assembler = new AvrAssembler ();
+		var result = assembler.Assemble (".L0: rjmp .L0");
+
+		Assert.That (assembler.Errors, Is.Empty);
+		Assert.That (Bytes ("ffcf"), Is.EqualTo (result));
+	}
+
+	[Test(Description = "Forward reference to a GNU local label resolves in pass two")]
+	public void DotLocalLabel_ForwardRef ()
+	{
+		var assembler = new AvrAssembler ();
+		var result = assembler.Assemble ("breq .L1\nnop\n.L1:");
+
+		Assert.That (assembler.Errors, Is.Empty);
+		Assert.That (Bytes ("09f00000"), Is.EqualTo (result));
+	}
+
+	[Test(Description = "GNU `name = value` assignment (no .equ) defines a symbol")]
+	public void GnuSymbolAssignment ()
+	{
+		var assembler = new AvrAssembler ();
+		var result = assembler.Assemble ("x = 0x3e\nout x, r16");
+
+		Assert.That (assembler.Errors, Is.Empty);
+		Assert.That (Bytes ("0ebf"), Is.EqualTo (result));
+	}
+
+	[Test(Description = "A numeric symbol used in register position resolves to that register (avr-gcc __zero_reg__)")]
+	public void NumericSymbolAsRegister ()
+	{
+		var assembler = new AvrAssembler ();
+		var result = assembler.Assemble ("__zero_reg__ = 1\nstd Y+1, __zero_reg__");
+
+		Assert.That (assembler.Errors, Is.Empty);
+		Assert.That (Bytes ("1982"), Is.EqualTo (result));
+	}
+
+	[Test(Description = "Negative 8-bit immediates are accepted via two's complement (avr-as: ldi r16,-1 => 0fef)")]
+	public void NegativeImmediate ()
+	{
+		var assembler = new AvrAssembler ();
+		Assert.That (Bytes ("0fef"), Is.EqualTo (assembler.Assemble ("ldi r16, -1")));
+		var sbci = new AvrAssembler ();
+		Assert.That (Bytes ("9c49"), Is.EqualTo (sbci.Assemble ("sbci r25, -100")));
+	}
+
+	[Test(Description = "C-style /* */ block comments are stripped")]
+	public void BlockComment ()
+	{
+		var assembler = new AvrAssembler ();
+		var result = assembler.Assemble ("/* set r16 */ ldi r16, 5");
+
+		Assert.That (assembler.Errors, Is.Empty);
+		Assert.That (Bytes ("05e0"), Is.EqualTo (result));
+	}
+
+	[Test(Description = "avr-gcc metadata directives (.section/.size/...) are accepted as no-ops")]
+	public void MetadataDirectivesNoOp ()
+	{
+		var assembler = new AvrAssembler ();
+		var result = assembler.Assemble (".section .text\nnop\n.size main, 2");
+
+		Assert.That (assembler.Errors, Is.Empty);
+		Assert.That (Bytes ("0000"), Is.EqualTo (result));
+	}
+
+	[Test(Description = "An unknown directive is still reported as an error")]
+	public void UnknownDirectiveStillErrors ()
+	{
+		var assembler = new AvrAssembler ();
+		assembler.Assemble (".frobnicate 1");
+
+		Assert.That (assembler.Errors, Is.Not.Empty);
+	}
+
 	private byte[] Bytes (string hex)
 	{
 		var result = new byte[hex.Length / 2];
