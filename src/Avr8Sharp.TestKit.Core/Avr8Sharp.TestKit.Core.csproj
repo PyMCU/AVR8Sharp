@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <LangVersion>default</LangVersion>
+
+        <!-- AOT-friendly: no FluentAssertions. Shared by Avr8Sharp.TestKit (C# assertions)
+             and Avr8Sharp.Native (the ctypes/Python C-ABI layer). -->
+        <IsAotCompatible>true</IsAotCompatible>
+
+        <!-- NuGet package metadata -->
+        <PackageId>Avr8Sharp.TestKit.Core</PackageId>
+        <Title>AVR-8 Simulator Test Kit (Core)</Title>
+        <Authors>Iván Montiel</Authors>
+        <Description>Assertion-agnostic simulation harness (run loop, probes, board presets) for integration-testing compiled AVR programs. Shared by Avr8Sharp.TestKit and the Python bindings.</Description>
+        <Copyright>Copyright (c) Iván Montiel</Copyright>
+        <RepositoryUrl>https://github.com/begeistert/avr8sharp</RepositoryUrl>
+        <PackageTags>Arduino;AVR;Simulator;Testing</PackageTags>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <Version>1.1.0-beta4</Version>
+        <PackageProjectUrl>https://github.com/begeistert/avr8sharp</PackageProjectUrl>
+        <Company>Iván Montiel</Company>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="..\..\README.md" Pack="true" PackagePath="\"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Avr8Sharp\Avr8Sharp.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- The FluentAssertions layer and the C-ABI/Python layer need access to internal
+             members (e.g. AvrMemoryView.Data) of the shared harness. -->
+        <InternalsVisibleTo Include="Avr8Sharp.TestKit" />
+        <InternalsVisibleTo Include="Avr8Sharp.Native" />
+    </ItemGroup>
+
+</Project>

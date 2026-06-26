@@ -1,0 +1,15 @@
+# Python build artifacts
+dist/
+build/
+*.egg-info/
+__pycache__/
+*.py[cod]
+
+# Native libraries copied in by hatch_build.py at build time
+src/avr8sharp/*.dylib
+src/avr8sharp/*.so
+src/avr8sharp/*.dll
+
+# Virtualenvs
+.venv/
+venv/
