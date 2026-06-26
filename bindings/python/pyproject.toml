@@ -1,0 +1,54 @@
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "avr8sharp"
+version = "1.1.0b1"
+description = "Fast AVR-8 emulator with a pytest-friendly test harness (Python bindings over the C# Avr8Sharp engine, compiled to a self-contained Native AOT library)."
+readme = "README.md"
+authors = [
+    { name = "Iván Montiel Cardona", email = "ivan.montiel.c@gmail.com" },
+]
+requires-python = ">=3.11"
+license = { text = "BUSL-1.1" }
+keywords = ["AVR", "Arduino", "emulator", "simulator", "ATmega", "testing", "firmware"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Embedded Systems",
+    "Topic :: System :: Emulators",
+]
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+
+[project.urls]
+Homepage = "https://github.com/begeistert/avr8sharp"
+Repository = "https://github.com/begeistert/avr8sharp"
+"Bug Tracker" = "https://github.com/begeistert/avr8sharp/issues"
+
+[tool.hatch.build.hooks.custom]
+path = "hatch_build.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/avr8sharp"]
+# Ship the MIT third-party notices inside the wheel (license compliance for the bundled core).
+force-include = { "THIRD_PARTY_NOTICES" = "avr8sharp/THIRD_PARTY_NOTICES" }
+# The native library is dropped next to the package by hatch_build.py.
+artifacts = [
+    "src/avr8sharp/libavr8sharp.dylib",
+    "src/avr8sharp/libavr8sharp.so",
+    "src/avr8sharp/avr8sharp.dll",
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/avr8sharp",
+    "hatch_build.py",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES",
+]

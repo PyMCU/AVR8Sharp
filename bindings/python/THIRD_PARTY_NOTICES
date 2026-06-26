@@ -1,0 +1,48 @@
+THIRD-PARTY NOTICES
+===================
+
+The avr8sharp wheel bundles a self-contained Native AOT shared library
+(libavr8sharp.{dylib,so} / avr8sharp.dll). That binary statically links the
+following third-party components, whose licenses and notices are reproduced
+below. The avr8sharp Python code and the Avr8Sharp.Native / Avr8Sharp.TestKit
+layers themselves are licensed under the Business Source License 1.1 (see
+LICENSE); the components below are NOT — they retain their own permissive
+licenses.
+
+-----------------------------------------------------------------------------
+1. Avr8Sharp emulator core (derived from avr8js)
+-----------------------------------------------------------------------------
+
+The MIT License (MIT)
+
+Copyright (c) 2019-2023 Uri Shaked
+Copyright (c) 2025-present Iván Montiel Cardona
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+-----------------------------------------------------------------------------
+2. .NET runtime and base class libraries (Native AOT)
+-----------------------------------------------------------------------------
+
+Copyright (c) .NET Foundation and Contributors
+
+Licensed under the MIT License. The .NET runtime libraries statically linked
+into the native binary by Native AOT are distributed by Microsoft and the
+.NET Foundation under the MIT License:
+https://github.com/dotnet/runtime/blob/main/LICENSE.TXT

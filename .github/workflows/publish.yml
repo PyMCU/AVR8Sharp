@@ -21,6 +21,12 @@ jobs:
   publish:
     runs-on: ubuntu-latest
 
+    # Trusted Publishing (OIDC): exchange a short-lived GitHub token for a NuGet
+    # API key — no long-lived NUGET_API_KEY secret. Requires id-token: write.
+    permissions:
+      id-token: write
+      contents: read
+
     steps:
       # ── Checkout ────────────────────────────────────────────────────────────
       - name: Checkout
@@ -75,6 +81,13 @@ jobs:
           --no-build
           --output ./nupkgs
           ${{ steps.versioning.outputs.full_version != '' && format('/p:Version={0}', steps.versioning.outputs.full_version) || (steps.versioning.outputs.suffix != '' && format('--version-suffix {0}', steps.versioning.outputs.suffix) || '') }}
+      - name: Pack Avr8Sharp.TestKit.Core
+        run: >
+          dotnet pack src/Avr8Sharp.TestKit.Core/Avr8Sharp.TestKit.Core.csproj
+          -c Release
+          --no-build
+          --output ./nupkgs
+          ${{ steps.versioning.outputs.full_version != '' && format('/p:Version={0}', steps.versioning.outputs.full_version) || (steps.versioning.outputs.suffix != '' && format('--version-suffix {0}', steps.versioning.outputs.suffix) || '') }}
       - name: Pack Avr8Sharp.TestKit
         run: >
           dotnet pack src/Avr8Sharp.TestKit/Avr8Sharp.TestKit.csproj
@@ -83,19 +96,30 @@ jobs:
           --output ./nupkgs
           ${{ steps.versioning.outputs.full_version != '' && format('/p:Version={0}', steps.versioning.outputs.full_version) || (steps.versioning.outputs.suffix != '' && format('--version-suffix {0}', steps.versioning.outputs.suffix) || '') }}
 
-      # ── Push to nuget.org (optional) ─────────────────────────────────────────
-      - name: Push to nuget.org
-        env:
-          API_KEY: ${{ secrets.NUGET_API_KEY }}
+      # ── NuGet Trusted Publishing login (OIDC) ────────────────────────────────
+      # Exchanges the workflow's OIDC token for a short-lived nuget.org API key.
+      # The trusted-publishing policy (owner + repo + workflow) must exist on
+      # nuget.org, and the account username is provided via the NUGET_USER var.
+      - name: NuGet login (Trusted Publishing)
+        id: nuget_login
         if: >
           ${{ github.server_url == 'https://github.com' &&
-              env.API_KEY != '' &&
+              (startsWith(github.ref, 'refs/tags/v') ||
+              github.event.inputs.push_public == 'true') }}
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      # ── Push to nuget.org ────────────────────────────────────────────────────
+      - name: Push to nuget.org
+        if: >
+          ${{ github.server_url == 'https://github.com' &&
               (startsWith(github.ref, 'refs/tags/v') ||
               github.event.inputs.push_public == 'true') }}
         run: >
           dotnet nuget push "./nupkgs/*.nupkg"
           --source https://api.nuget.org/v3/index.json
-          --api-key "${{ secrets.NUGET_API_KEY }}"
+          --api-key "${{ steps.nuget_login.outputs.NUGET_API_KEY }}"
           --skip-duplicate
 
       - name: Upload NuGet Packages
