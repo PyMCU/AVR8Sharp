@@ -8,27 +8,31 @@ Licensed Work:        AVR8Sharp BUSL-1.1 components — Avr8Sharp.TestKit and
                       (The Avr8Sharp simulator core is licensed separately under
                       MIT; it is a port of the avr8js library, © Uri Shaked.)
                       The Licensed Work is © 2025-2026 Iván Montiel Cardona.
-Additional Use Grant: You may copy, modify, redistribute, and make production use of
-                      the Licensed Work free of charge for any purpose that is not a
-                      Commercial Use.
+Additional Use Grant: You may copy, modify, create derivative works of, redistribute,
+                      and make production use of the Licensed Work free of charge for
+                      any use that is not a Commercial Use, as defined below.
 
-                      "Commercial Use" means either:
-                        (a) using the Licensed Work in an automated build, test,
+                      A "Commercial Use" is any of the following:
+                        (a) use of the Licensed Work in an automated build, test,
                             continuous-integration, or continuous-delivery (CI/CD)
-                            system that is operated by or on behalf of a for-profit
-                            organization; or
-                        (b) using or incorporating the Licensed Work in the
-                            development, testing, distribution, or operation of any
-                            product or service that generates, or is intended to
-                            generate, commercial revenue.
+                            pipeline operated by or on behalf of a for-profit entity;
+                        (b) distribution, sale, sublicensing, hosting, or provision,
+                            for a fee or other commercial consideration, of the Licensed
+                            Work (in whole or in part, modified or unmodified) or of any
+                            product or service that embeds, bundles, or depends on it; or
+                        (c) internal use of the Licensed Work by, or on behalf of, a
+                            for-profit entity to develop, test, or operate a product or
+                            service that generates, or is intended to generate, revenue.
 
-                      Use by individuals, and use for personal, hobby, educational,
-                      academic-research, evaluation, or open-source purposes, is never
-                      a Commercial Use and is always permitted free of charge.
+                      For the avoidance of doubt, the following are NOT a Commercial Use
+                      and are always permitted free of charge, provided they do not fall
+                      within (a), (b), or (c) above: use by a natural person acting in a
+                      personal capacity, and use for personal, hobby, educational,
+                      academic-research, evaluation, or open-source purposes.
 
-                      Commercial Use requires a separate commercial license from the
-                      Licensor.
-Change Date:          2030-07-08
+                      Any Commercial Use requires a separate commercial license from the
+                      Licensor; contact the Licensor to arrange one.
+Change Date:          2030-07-11
 Change License:       MIT
 
 For information about alternative licensing arrangements for the Licensed Work,
