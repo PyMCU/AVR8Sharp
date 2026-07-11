@@ -73,6 +73,22 @@ jobs:
           --no-build
           --logger "console;verbosity=normal"
 
+      # ── Rolling BUSL Change Date: stamp each packed license file with
+      #    (release date + 4 years) so every published version gets a full
+      #    4-year BUSL window before it converts to the Change License (MIT). ──
+      - name: Stamp BUSL Change Date (release + 4 years)
+        run: |
+          CHANGE_DATE=$(date -u -d "+4 years" +%Y-%m-%d)
+          stamped=0
+          for f in LICENSE-BUSL.txt LICENSE; do
+            if [ -f "$f" ] && grep -qE '^Change Date:' "$f"; then
+              sed -i -E "s|^(Change Date: +).*|\1$CHANGE_DATE|" "$f"
+              echo "$f -> Change Date $CHANGE_DATE"
+              stamped=1
+            fi
+          done
+          [ "$stamped" = 1 ] || { echo "::error::no BUSL license file with a Change Date found"; exit 1; }
+
       # ── Pack ─────────────────────────────────────────────────────────────────
       - name: Pack Avr8Sharp
         run: >
