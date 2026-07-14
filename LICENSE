@@ -1,4 +1,18 @@
-The MIT License (MIT)
+AVR8Sharp is licensed under the Business Source License 1.1 (BUSL-1.1).
+
+The full license text and parameters are in LICENSE-BUSL.txt. In summary: the
+entire project is initially BUSL-1.1 and automatically converts to the MIT
+License (the Change License) on the Change Date. Non-commercial, personal,
+hobby, educational, academic, evaluation and open-source use is free of charge;
+Commercial Use requires a separate commercial license (see LICENSE-BUSL.txt).
+
+The simulator core is a port of avr8js (https://github.com/wokwi/avr8js) by
+Uri Shaked, originally distributed under the MIT License. That original MIT
+copyright and permission notice is retained below and continues to apply to the
+ported portions.
+
+===============================================================================
+MIT License (applies to the avr8js-derived portions of the simulator core)
 
 Copyright (c) 2019-2023 Uri Shaked
 Copyright (c) 2025-present, Iván Montiel

@@ -3,11 +3,15 @@ Business Source License 1.1
 Parameters
 
 Licensor:             Iván Montiel Cardona
-Licensed Work:        AVR8Sharp BUSL-1.1 components — Avr8Sharp.TestKit and
-                      Avr8Sharp.TestKit.Core.
-                      (The Avr8Sharp simulator core is licensed separately under
-                      MIT; it is a port of the avr8js library, © Uri Shaked.)
+Licensed Work:        AVR8Sharp — the complete AVR-8 simulator: the simulator core
+                      (Avr8Sharp) and every package (Avr8Sharp.TestKit,
+                      Avr8Sharp.TestKit.Core).
                       The Licensed Work is © 2025-2026 Iván Montiel Cardona.
+
+                      The simulator core is a port of the avr8js library
+                      (© Uri Shaked), originally under the MIT License; that MIT
+                      copyright and permission notice is retained in the LICENSE file
+                      and continues to apply to the ported portions.
 Additional Use Grant: You may copy, modify, create derivative works of, redistribute,
                       and make production use of the Licensed Work free of charge for
                       any use that is not a Commercial Use, as defined below.

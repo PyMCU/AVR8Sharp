@@ -14,8 +14,11 @@
         <Copyright>Copyright (c) Iván Montiel</Copyright>
         <RepositoryUrl>https://github.com/begeistert/avr8sharp</RepositoryUrl>
         <PackageTags>Arduino;AVR;Simulator</PackageTags>
-        <PackageLicenseExpression>MIT</PackageLicenseExpression>
-        <Version>1.1.0-beta6</Version>
+        <!-- The whole project is BUSL-1.1 (converts to MIT on the Change Date).
+             nuget.org rejects BUSL-1.1 as an SPDX expression, so we ship it as a *file*. -->
+        <PackageLicenseExpression></PackageLicenseExpression>
+        <PackageLicenseFile>LICENSE-BUSL.txt</PackageLicenseFile>
+        <Version>1.1.0-beta7</Version>
         <PackageProjectUrl>https://github.com/begeistert/avr8sharp</PackageProjectUrl>
         <Company>Iván Montiel</Company>
         <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -24,6 +27,7 @@
 
     <ItemGroup>
         <None Include="..\..\README.md" Pack="true" PackagePath="\"/>
+        <None Include="..\..\LICENSE-BUSL.txt" Pack="true" PackagePath="" Visible="false" />
     </ItemGroup>
 
 </Project>
