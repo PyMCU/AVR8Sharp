@@ -35,8 +35,9 @@ path = "hatch_build.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/avr8sharp"]
-# Ship the MIT third-party notices inside the wheel (license compliance for the bundled core).
-force-include = { "THIRD_PARTY_NOTICES" = "avr8sharp/THIRD_PARTY_NOTICES" }
+# Ship the license and the third-party notices inside the wheel: the BUSL must be displayed on
+# every copy, and the retained avr8js MIT notice must travel with the bundled core.
+force-include = { "THIRD_PARTY_NOTICES" = "avr8sharp/THIRD_PARTY_NOTICES", "LICENSE" = "avr8sharp/LICENSE", "../../NOTICE.txt" = "avr8sharp/NOTICE.txt" }
 # The native library is dropped next to the package by hatch_build.py.
 artifacts = [
     "src/avr8sharp/libavr8sharp.dylib",
@@ -52,3 +53,4 @@ include = [
     "LICENSE",
     "THIRD_PARTY_NOTICES",
 ]
+force-include = { "../../NOTICE.txt" = "NOTICE.txt" }

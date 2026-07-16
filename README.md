@@ -2,7 +2,7 @@
 
 ![Build Status](https://github.com/PyMCU/avr8sharp/actions/workflows/ci.yml/badge.svg)
 [![NuGet](https://img.shields.io/nuget/v/Avr8Sharp.svg)](https://www.nuget.org/packages/Avr8Sharp)
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![License](https://img.shields.io/badge/license-BUSL--1.1-blue.svg)
 ![.NET Version](https://img.shields.io/badge/.NET-10.0-purple)
 
 **Avr8Sharp** is a high-performance emulator for the **AVR 8-bit microcontroller** family,
@@ -161,7 +161,21 @@ public void Firmware_output_matches_expected()
 
 ## License
 
-MIT License — see [LICENSE](LICENSE).
+The entire project — the simulator core included — is licensed under the
+**Business Source License 1.1 (BUSL-1.1)**; see [LICENSE](LICENSE) and
+[LICENSE-BUSL.txt](LICENSE-BUSL.txt) for the full text and parameters.
 
-Based on the original work from [avr8js](https://github.com/wokwi/avr8js) © 2019–present Uri Shaked.  
+Non-commercial, personal, hobby, educational, academic, evaluation and open-source
+use is free of charge. Commercial Use requires a separate commercial license — see
+the Additional Use Grant in [LICENSE-BUSL.txt](LICENSE-BUSL.txt) for what counts as
+Commercial Use.
+
+On the Change Date (**2030-07-11**), the project converts automatically to the
+**MIT License** (the Change License). Each published version gets its own Change
+Date, four years after its release.
+
+Based on the original work from [avr8js](https://github.com/wokwi/avr8js) © 2019–present Uri Shaked,
+distributed under the MIT License; that notice is retained in [LICENSE](LICENSE) and
+[NOTICE.txt](NOTICE.txt), which lists the third-party attribution that must accompany
+every redistribution.  
 C# Port © 2025–present Iván Montiel Cardona.

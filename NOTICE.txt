@@ -1,0 +1,64 @@
+THIRD-PARTY NOTICES
+===================
+
+This file lists the third-party components incorporated into AVR8Sharp, together
+with their copyright notices and the full text of their licenses.
+
+AVR8Sharp as a whole is licensed under the Business Source License 1.1; see
+LICENSE and LICENSE-BUSL.txt. The components listed below are NOT covered by
+that license — they retain their own permissive licenses, and their notices must
+be reproduced with every redistribution of AVR8Sharp, in source or binary form
+(including any product that bundles or embeds it).
+
+-----------------------------------------------------------------------------
+1. avr8js
+-----------------------------------------------------------------------------
+
+Component:  avr8js — an AVR-8 simulator written in TypeScript.
+Upstream:   https://github.com/wokwi/avr8js
+Author:     Uri Shaked
+License:    MIT License
+
+Scope: the AVR8Sharp simulator core (src/Avr8Sharp) is a hand-written C# port of
+avr8js. The MIT copyright and permission notice below applies to the ported
+portions and is retained here as required by the MIT License.
+
+Retaining that notice is what the MIT License requires of us; it does not
+license AVR8Sharp to you under the MIT License. The work distributed here — the
+simulator core included — is BUSL-1.1, and the MIT License applies to it only
+from the Change Date onwards, as the Change License (see LICENSE-BUSL.txt). If
+you want avr8js itself under the MIT License, it remains MIT for everyone,
+independently of this project, at the upstream URL above.
+
+Copyright and license text, reproduced verbatim from the upstream LICENSE file:
+
+    The MIT License (MIT)
+
+    Copyright (c) 2019-2025 Uri Shaked
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+    THE SOFTWARE.
+
+-----------------------------------------------------------------------------
+
+AVR8Sharp embeds no chip ROM images or other third-party binaries, and the NuGet
+packages have no third-party package dependencies to attribute.
+
+The .NET runtime statically linked into the Python bindings' Native AOT library
+is attributed separately in bindings/python/THIRD_PARTY_NOTICES, which ships
+with the Python wheel.
