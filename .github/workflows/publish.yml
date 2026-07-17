@@ -116,6 +116,14 @@ jobs:
       # Exchanges the workflow's OIDC token for a short-lived nuget.org API key.
       # The trusted-publishing policy (owner + repo + workflow) must exist on
       # nuget.org, and the account username is provided via the NUGET_USER var.
+      # ── Licensing guard ─────────────────────────────────────────────────────
+      #    Nine published versions declared the SPDX expression "MIT", which packs
+      #    no licence file at all — so Uri Shaked's copyright notice, which the MIT
+      #    licence of avr8js requires us to pass on, reached nobody. The repo's
+      #    LICENSE was correct the whole time. Check the artifact, before the push.
+      - name: Verify every package carries its licence and NOTICE
+        run: python3 tools/verify_packages.py ./nupkgs/*.nupkg
+
       - name: NuGet login (Trusted Publishing)
         id: nuget_login
         if: >
