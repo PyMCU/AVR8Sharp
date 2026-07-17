@@ -8,17 +8,43 @@ License text copyright (c) 2017 MariaDB Corporation Ab, All Rights Reserved.
 Parameters
 
 Licensor:             Iván Montiel Cardona
-Licensed Work:        avr8sharp (the Python bindings and the Avr8Sharp.Native
-                      and Avr8Sharp.TestKit(.Core) layers of the avr8sharp
-                      repository). The Licensed Work is (c) 2025-present
-                      Iván Montiel Cardona.
-Additional Use Grant: You may make production use of the Licensed Work,
-                      provided such use does not include offering the Licensed
-                      Work to third parties as a hosted or managed service whose
-                      primary value is the AVR emulation or test-harness
-                      functionality of the Licensed Work.
-Change Date:          2029-06-24
-Change License:       Apache License, Version 2.0
+Licensed Work:        avr8sharp — the Python bindings and every layer of the
+                      avr8sharp repository they bundle, including the simulator
+                      core (Avr8Sharp), Avr8Sharp.Native and
+                      Avr8Sharp.TestKit(.Core).
+                      The Licensed Work is © 2025-2026 Iván Montiel Cardona.
+
+                      The simulator core is a port of the avr8js library
+                      (© Uri Shaked), originally under the MIT License; that MIT
+                      copyright and permission notice is retained in the
+                      THIRD_PARTY_NOTICES file and continues to apply to the
+                      ported portions.
+Additional Use Grant: You may copy, modify, create derivative works of, redistribute,
+                      and make production use of the Licensed Work free of charge for
+                      any use that is not a Commercial Use, as defined below.
+
+                      A "Commercial Use" is any of the following:
+                        (a) use of the Licensed Work in an automated build, test,
+                            continuous-integration, or continuous-delivery (CI/CD)
+                            pipeline operated by or on behalf of a for-profit entity;
+                        (b) distribution, sale, sublicensing, hosting, or provision,
+                            for a fee or other commercial consideration, of the Licensed
+                            Work (in whole or in part, modified or unmodified) or of any
+                            product or service that embeds, bundles, or depends on it; or
+                        (c) internal use of the Licensed Work by, or on behalf of, a
+                            for-profit entity to develop, test, or operate a product or
+                            service that generates, or is intended to generate, revenue.
+
+                      For the avoidance of doubt, the following are NOT a Commercial Use
+                      and are always permitted free of charge, provided they do not fall
+                      within (a), (b), or (c) above: use by a natural person acting in a
+                      personal capacity, and use for personal, hobby, educational,
+                      academic-research, evaluation, or open-source purposes.
+
+                      Any Commercial Use requires a separate commercial license from the
+                      Licensor; contact the Licensor to arrange one.
+Change Date:          2030-07-11
+Change License:       MIT
 
 -----------------------------------------------------------------------------
 
@@ -76,5 +102,6 @@ For more information on the use of the Business Source License for the
 avr8sharp project, and on how to use it for your own works, see the README and
 THIRD_PARTY_NOTICES files distributed with the Licensed Work.
 
-The third-party AVR emulation core (derived from avr8js) bundled in this
-package remains under the MIT License; see THIRD_PARTY_NOTICES.
+The AVR emulation core bundled in this package is a port of avr8js, originally
+under the MIT License. The retained MIT copyright and permission notice for the
+ported portions is reproduced in THIRD_PARTY_NOTICES.

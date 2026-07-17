@@ -2,21 +2,35 @@ THIRD-PARTY NOTICES
 ===================
 
 The avr8sharp wheel bundles a self-contained Native AOT shared library
-(libavr8sharp.{dylib,so} / avr8sharp.dll). That binary statically links the
-following third-party components, whose licenses and notices are reproduced
-below. The avr8sharp Python code and the Avr8Sharp.Native / Avr8Sharp.TestKit
-layers themselves are licensed under the Business Source License 1.1 (see
-LICENSE); the components below are NOT — they retain their own permissive
-licenses.
+(libavr8sharp.{dylib,so} / avr8sharp.dll). This file reproduces the copyright
+notices and licenses of the third-party components incorporated into it.
+
+avr8sharp itself — the Python code and every layer of the C# engine it bundles,
+the emulator core included — is licensed under the Business Source License 1.1
+(see LICENSE), and converts to the MIT License on the Change Date. The notice in
+section 1 below is the upstream attribution the MIT License requires us to
+retain for the ported portions; it does not place those portions under the MIT
+License before the Change Date. The .NET runtime in section 2 is a genuine
+third-party component and retains its own MIT License.
 
 -----------------------------------------------------------------------------
-1. Avr8Sharp emulator core (derived from avr8js)
+1. Avr8Sharp emulator core — retained avr8js attribution
 -----------------------------------------------------------------------------
+
+The Avr8Sharp emulator core is a port of avr8js (https://github.com/wokwi/avr8js)
+by Uri Shaked, originally distributed under the MIT License. That original
+copyright and permission notice is retained below, verbatim from upstream.
+
+Retaining that notice is what the MIT License requires of us; it does not
+license avr8sharp to you under the MIT License. The work distributed here — the
+emulator core included — is BUSL-1.1, and the MIT License applies to it only
+from the Change Date onwards, as the Change License (see LICENSE). If you want
+avr8js itself under the MIT License, it remains MIT for everyone, independently
+of this project, at the upstream URL above.
 
 The MIT License (MIT)
 
-Copyright (c) 2019-2023 Uri Shaked
-Copyright (c) 2025-present Iván Montiel Cardona
+Copyright (c) 2019-2025 Uri Shaked
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
