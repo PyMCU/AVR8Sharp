@@ -4,6 +4,76 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [v2.0.0-beta1] — unreleased
+
+### Renamed: the TestKit is now `SiliconTwin.AVR`
+
+The TestKits across the portfolio were named three different ways — `RP2040Sharp.TestKit`,
+`RP2350.TestKit`, `Avr8Sharp.TestKit`. They now share one prefix:
+
+| Old | New |
+|---|---|
+| `Avr8Sharp.TestKit` | `SiliconTwin.AVR` |
+| `Avr8Sharp.TestKit.Core` | `SiliconTwin.AVR.Core` |
+
+The old ids are unlisted. Update the `PackageReference`.
+
+`Avr8Sharp` — the emulator core — is *not* renamed. It is what embedders integrate, and it
+carries no entitlement check.
+
+For the whole portfolio in one dependency, there is now a `SiliconTwin` metapackage.
+
+### Breaking: the TestKit checks entitlement in CI
+
+Building a simulation now calls `SiliconTwin.Licensing.Entitlement.Require("avr")`.
+This is what the BUSL-1.1 licence has said since the relicensing; it is now enforced
+rather than only written down.
+
+Who is affected:
+
+- **Local development — nothing changes.** No CI environment detected means free, always.
+  An expired or missing licence never stops anyone debugging on their own machine.
+- **Public repositories — nothing changes.** Free, and verified against the
+  `repository_visibility` claim of a GitHub-signed OIDC token, so nothing has to be
+  taken on trust and nothing is sent anywhere.
+- **Private CI — needs a licence.** Put the key in the `SILICONTWIN_LICENSE` secret, or
+  at `~/.silicontwin/license.key` on a self-hosted runner.
+  See <https://silicontwin.co/licensing>.
+
+Every 1.x release stays on NuGet, unchanged and unlisted by nobody. Staying on 1.x is a
+supported choice.
+
+Verification is entirely local: an RSA signature check plus GitHub's public keys. Firmware,
+test data and results never leave the runner, and air-gapped runners work.
+
+On GitHub Actions the job needs an identity token, since a licence that is bound to no
+organisation would work in any of them:
+
+```yaml
+permissions:
+  contents: read
+  id-token: write
+```
+
+### Bug Fixes
+
+Two timing divergences found by putting the emulator and an Arduino Uno on the same
+oscilloscope, 2026-09-14. Both change what a cycle-accurate or waveform test reads, so a
+suite that pinned the old numbers will need updating.
+
+- **Fast PWM pulse width** (#17) — the compare output was held for `OCRnx` counts; the chip
+  holds it for `OCRnx + 1`, because the waveform generator updates `OCnx` on the timer clock
+  after the match. `OCR0A = 128` at 16 MHz now reads 129 of 256 counts, as the scope does.
+  Both extremes the datasheet names come out right too: `OCRnx` at BOTTOM is a one-count
+  spike per period rather than a constant high, and `OCRnx` at MAX is constantly high. The
+  compare interrupt flag still fires on the match itself, and phase correct PWM, which was
+  already correct, is unchanged.
+- **CBI cycle cost** (#18) — `CBI` was charged one cycle, the reduced-core timing. On the
+  classic AVR core it takes two, like `SBI`. Tight bit-banging loops ran fast by the
+  difference; an `SBI`/`CBI`/`RJMP` toggle loop now takes the 6 cycles the board takes.
+
+---
+
 ## [v1.1.0-beta3] — 2026-06-10
 
 ### Performance
