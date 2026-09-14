@@ -303,7 +303,7 @@ public class Instruction : AvrTestBase
 		Assert.Multiple (() =>
 		{
 			Assert.That (Cpu.Pc, Is.EqualTo (1));
-			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
 			Assert.That (Cpu.Mmio.Data[0x2c], Is.EqualTo (0b11011111));
 		});
 	}

@@ -175,6 +175,9 @@ public static class Opcodes
         var R = cpu.ReadData((ushort)((A >> 3) + 32));
         var mask = (byte)(1 << b);
         cpu.WriteData((ushort)((A >> 3) + 32), (byte)(R & ~mask), mask);
+        // 2 cycles on the classic AVR core (AVRe/AVRe+), like its sibling SBI.
+        // The single-cycle timing belongs to the reduced core (AVRrc) and AVRxt.
+        cpu.Cycles++;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
