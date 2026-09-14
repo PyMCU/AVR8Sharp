@@ -638,14 +638,14 @@ public class Timer : AvrTestBase
 			_timer2 = new AvrTimer (Cpu, AvrTimer.Timer2Config);
 		}
 
-		[Test (Description = "Should set OC0A on Compare Match, clear on Bottom (issue #78)")]
+		[Test (Description = "Should set OC0A one count after the Compare Match, clear on Bottom (issues #78, #17)")]
 		public void Timer0FastPwmMode1 ()
 		{
 			var program = new AsmProgram (@"
         LDI r16, 0xfc   ; TCNT0 = 0xfc;
         OUT 0x26, r16
         LDI r16, 0xfe   ; OCR0A = 0xfe;
-        OUT 0x27, r16  
+        OUT 0x27, r16
         ; WGM: Fast PWM, enable OC0A mode 3 (set on Compare Match, clear on Bottom)
         LDI r16, 0xc3   ; TCCR0A = (1 << COM0A1) | (1 << COM0A0) | (1 << WGM01) | (1 << WGM00);
         OUT 0x24, r16
@@ -653,18 +653,18 @@ public class Timer : AvrTestBase
         OUT 0x25, r16
 
         NOP             ; TCNT is now 0xfd
-      beforeMatch: 
+      beforeMatch:
         NOP             ; TCNT is now 0xfe (Compare Match)
       afterMatch:
-        NOP             ; TCNT is now 0xff
-      beforeBottom:     
+        NOP             ; TCNT is now 0xff (the match reaches the pin)
+      beforeBottom:
         NOP             ; TCNT is now 0x00 (BOTTOM)
       afterBottom:
         NOP
 ").Compile();
-			
+
 			Cpu.LoadProgram(program.Program);
-			
+
 			// Listen to Port D's internal callback
 			var portD = new AvrIoPort(Cpu, AvrIoPort.PortDConfig) {
 				TimerOverridePin = (pin, mode) => {
@@ -675,12 +675,21 @@ public class Timer : AvrTestBase
                     });
                 }
 			};
-			
+
 			var runner = new TestProgramRunner (Cpu);
-			
+
 			runner.RunToAddress (program.Labels["beforeMatch"]);
 			Assert.That(Cpu.ReadData(TCNT0), Is.EqualTo(0xfd));
-			
+
+			// The waveform generator updates OC0A on the timer clock after the match,
+			// so the count the comparator fires on leaves the pin alone.
+			portD.TimerOverridePin = (pin, mode) => {
+				Assert.Fail("Should not set OC0A on the Compare Match count itself");
+			};
+
+			runner.RunToAddress (program.Labels["afterMatch"]);
+			Assert.That(Cpu.ReadData(TCNT0), Is.EqualTo(0xfe));
+
 			portD.TimerOverridePin = (pin, mode) => {
 				Assert.Multiple(() =>
 				{
@@ -688,17 +697,10 @@ public class Timer : AvrTestBase
 					Assert.That(mode, Is.EqualTo(PinOverrideMode.Set));
 				});
 			};
-			
-			runner.RunToAddress (program.Labels["afterMatch"]);
-			Assert.That(Cpu.ReadData(TCNT0), Is.EqualTo(0xfe));
-			
-			portD.TimerOverridePin = (pin, mode) => {
-				Assert.Fail("Should not set OC0A on BOTTOM");
-			};
-			
+
 			runner.RunToAddress (program.Labels["beforeBottom"]);
 			Assert.That(Cpu.ReadData(TCNT0), Is.EqualTo(0xff));
-			
+
 			portD.TimerOverridePin = (pin, mode) => {
 				Assert.Multiple(() =>
 				{
@@ -706,7 +708,7 @@ public class Timer : AvrTestBase
 					Assert.That(mode, Is.EqualTo(PinOverrideMode.Clear));
 				});
 			};
-			
+
 			runner.RunToAddress (program.Labels["afterBottom"]);
 			Assert.That(Cpu.ReadData(TCNT0), Is.Zero);
 		}

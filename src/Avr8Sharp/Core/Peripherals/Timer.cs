@@ -910,33 +910,73 @@ public class AvrTimer
 
     private void TimerUpdated(int value, int prevNumber)
     {
-        var overflow = prevNumber > value;
-        if ((prevNumber < _ocrA || overflow) && value >= _ocrA || prevNumber < _ocrA && overflow)
+        // The interrupt flag is raised on the match itself, the pin follows one timer
+        // clock later in fast PWM. See PinCompareValue.
+        if (CompareReached(value, prevNumber, _ocrA))
         {
             _cpu.SetInterruptFlag(_ocfa);
-            if (_compA != 0)
-            {
-                UpdateCompPin(_compA, 'A');
-            }
         }
 
-        if ((prevNumber < _ocrB || overflow) && value >= _ocrB || prevNumber < _ocrB && overflow)
+        if (_compA != 0 && CompareReached(value, prevNumber, PinCompareValue(_ocrA, _compA)))
+        {
+            UpdateCompPin(_compA, 'A');
+        }
+
+        if (CompareReached(value, prevNumber, _ocrB))
         {
             _cpu.SetInterruptFlag(_ocfb);
-            if (_compB != 0)
-            {
-                UpdateCompPin(_compB, 'B');
-            }
         }
 
-        if (_hasOcrC && ((prevNumber < _ocrC || overflow) && value >= _ocrC || prevNumber < _ocrC && overflow))
+        if (_compB != 0 && CompareReached(value, prevNumber, PinCompareValue(_ocrB, _compB)))
+        {
+            UpdateCompPin(_compB, 'B');
+        }
+
+        if (!_hasOcrC) return;
+
+        if (CompareReached(value, prevNumber, _ocrC))
         {
             _cpu.SetInterruptFlag(_ocfc);
-            if (_compC != 0)
-            {
-                UpdateCompPin(_compC, 'C');
-            }
         }
+
+        if (_compC != 0 && CompareReached(value, prevNumber, PinCompareValue(_ocrC, _compC)))
+        {
+            UpdateCompPin(_compC, 'C');
+        }
+    }
+
+    /// <summary>
+    /// Whether the counter passed <paramref name="compare"/> on its way from
+    /// <paramref name="prevNumber"/> to <paramref name="value"/>, wrap included.
+    /// A negative <paramref name="compare"/> is never reached.
+    /// </summary>
+    private static bool CompareReached(int value, int prevNumber, int compare)
+    {
+        if (compare < 0) return false;
+        var overflow = prevNumber > value;
+        return (prevNumber < compare || overflow) && value >= compare || prevNumber < compare && overflow;
+    }
+
+    /// <summary>
+    /// The counter value at which a compare match reaches the output pin.
+    /// <para>
+    /// In fast PWM the waveform generator updates OCnx on the timer clock that follows
+    /// the match, so the pulse is OCRnx + 1 counts wide. The ATmega328P datasheet spells
+    /// out both ends of that: OCRnx at BOTTOM gives a narrow spike once per period, and
+    /// OCRnx at MAX a constant level. Past TOP there is no match left to reach the pin,
+    /// which this reports as -1, and the level written at BOTTOM stands for the whole
+    /// period.
+    /// </para>
+    /// <para>
+    /// Toggle mode (COMnx = 1) and the non-PWM modes keep the match value: flipping the
+    /// pin a clock later only shifts the phase, and in fast PWM mode 7 OCRnA is TOP, so
+    /// clamping would leave nothing to toggle on.
+    /// </para>
+    /// </summary>
+    private int PinCompareValue(int ocr, byte compValue)
+    {
+        if (_timerMode != TimerMode.FastPWM || compValue == 1) return ocr;
+        return ocr + 1 > _cachedTop ? -1 : ocr + 1;
     }
 
     private void CheckForceCompare(int value)
