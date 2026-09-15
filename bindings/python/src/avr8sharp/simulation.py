@@ -93,6 +93,20 @@ class Port:
     def pin_low(self, pin: int) -> bool:
         return self.state(pin) == PinState.LOW
 
+    def set(self, pin: int, value: bool) -> None:
+        """Drives `pin` from the outside world: the level the firmware reads back from the PIN
+        register while it has configured that pin as an input (a button, a sensor's response, a
+        bit-banged line). No effect on a pin the firmware drives as an output, same as real
+        hardware where an external driver is not fighting the output latch."""
+        lib = self._sim._lib
+        _check(lib, self._sim._h, lib.a8s_gpio_set_pin(self._sim._h, self._index, pin, 1 if value else 0), "gpio_set_pin")
+
+    def set_high(self, pin: int) -> None:
+        self.set(pin, True)
+
+    def set_low(self, pin: int) -> None:
+        self.set(pin, False)
+
 
 def _read_buffer(fn, sim: "Simulation", *args) -> bytes:
     """Two-pass read of a native length-prefixed byte buffer (call with cap, then size exactly)."""
@@ -193,6 +207,16 @@ class Serial:
         lib = self._sim._lib
         _check(lib, self._sim._h, lib.a8s_serial_inject(self._sim._h, self._index, value & 0xFF), "serial_inject")
 
+    def inject_bytes(self, data: bytes) -> None:
+        """Injects `data` into the USART receiver back to back. No simulated time passes between
+        calls, and a byte injected while the receiver is still mid-frame on a previous one is
+        silently dropped (matching real UART overrun behaviour, not a partial write) -- run
+        :meth:`Simulation.run_us`/`run_ms` between bytes for reliable multi-byte delivery (e.g.
+        one byte, then ``sim.run_us(1e6 / (baud / 10))``, for the next)."""
+        lib = self._sim._lib
+        rc = lib.a8s_serial_inject_bytes(self._sim._h, self._index, data, len(data))
+        _check(lib, self._sim._h, rc, "serial_inject_bytes")
+
 
 class Simulation:
     """Base fluent simulation handle. Use a board subclass (:class:`ArduinoUno`, etc.) for the
@@ -239,6 +263,13 @@ class Simulation:
 
     def run_ms(self, ms: float) -> "Simulation":
         _check(self._lib, self._h, self._lib.a8s_run_ms(self._h, ms), "run_ms")
+        return self
+
+    def run_us(self, us: float) -> "Simulation":
+        """Runs `us` simulated microseconds. Fine-grained sibling of :meth:`run_ms`, for driving
+        external stimuli with microsecond timing (a pin pulse, a sensor's response delay) between
+        steps -- e.g. ``port.set_high(2); sim.run_us(10); port.set_low(2)``."""
+        _check(self._lib, self._h, self._lib.a8s_run_us(self._h, us), "run_us")
         return self
 
     def run_instructions(self, count: int) -> "Simulation":

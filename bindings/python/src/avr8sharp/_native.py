@@ -46,6 +46,7 @@ _SIGNATURES: dict[str, tuple[list, object]] = {
     # execution
     "a8s_run_cycles": ([c_void_p, c_long], c_int),
     "a8s_run_ms": ([c_void_p, c_double], c_int),
+    "a8s_run_us": ([c_void_p, c_double], c_int),
     "a8s_run_instructions": ([c_void_p, c_int], c_int),
     "a8s_run_to_break": ([c_void_p, c_int], c_int),
     "a8s_run_until_serial": ([c_void_p, c_int, c_char_p, c_int, c_double], c_int),
@@ -55,8 +56,10 @@ _SIGNATURES: dict[str, tuple[list, object]] = {
     "a8s_serial_byte_count": ([c_void_p, c_int], c_int),
     "a8s_serial_clear": ([c_void_p, c_int], c_int),
     "a8s_serial_inject": ([c_void_p, c_int, c_byte], c_int),
-    # gpio observation
+    "a8s_serial_inject_bytes": ([c_void_p, c_int, c_char_p, c_int], c_int),
+    # gpio observation and injection
     "a8s_gpio_pin": ([c_void_p, c_int, c_int], c_int),
+    "a8s_gpio_set_pin": ([c_void_p, c_int, c_int, c_int], c_int),
     # analog / bus peripherals (ATmega328P-family sessions)
     "a8s_adc_set_channel": ([c_void_p, c_int, c_double], c_int),
     "a8s_spi_queue_response": ([c_void_p, c_byte], c_int),
