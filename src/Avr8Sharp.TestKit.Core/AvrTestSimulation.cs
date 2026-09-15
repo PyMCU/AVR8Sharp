@@ -222,6 +222,15 @@ public class AvrTestSimulation
         => RunCycles((long)(ms / 1000.0 * Runner.Speed));
 
     /// <summary>
+    /// Runs the simulation for <paramref name="us"/> simulated microseconds at the configured
+    /// frequency. Fine-grained sibling of <see cref="RunMilliseconds"/>, for driving external
+    /// stimuli with microsecond timing (a pin pulse, a sensor's response delay) between steps.
+    /// Returns <c>this</c> for chaining.
+    /// </summary>
+    public AvrTestSimulation RunMicroseconds(double us)
+        => RunCycles((long)(us / 1_000_000.0 * Runner.Speed));
+
+    /// <summary>
     /// Executes exactly <paramref name="count"/> instructions.
     /// Returns <c>this</c> for chaining.
     /// </summary>

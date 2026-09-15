@@ -97,6 +97,56 @@ public class LowLevelSamples
         sim.Cpu.Should().HaveRegister(16, 2);
     }
 
+    // ── RunMicroseconds ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// <see cref="AvrTestSimulation.RunMicroseconds"/> advances exactly
+    /// <c>us / 1e6 * frequency</c> cycles, the fine-grained sibling of
+    /// <see cref="AvrTestSimulation.RunMilliseconds"/> used to time an external stimulus
+    /// (a pin pulse, a sensor's response delay) between writes.
+    /// </summary>
+    [Test]
+    public void RunMicroseconds_AdvancesExactCycleCount()
+    {
+        var sim = AvrTestSimulation.Create().WithFrequency(16_000_000);
+
+        sim.RunMicroseconds(10);
+
+        Assert.That(sim.Cpu.Cycles, Is.EqualTo(160)); // 10 us * 16 cycles/us @ 16 MHz
+    }
+
+    /// <summary>
+    /// Runnable example: drive a pin the firmware has configured as an input from the outside
+    /// world, timing the pulse with <see cref="AvrTestSimulation.RunMicroseconds"/> — the pattern
+    /// an external stimulus test (a button, an echo pin, a bit-banged sensor reply) is built
+    /// from. Mirrors what a real firmware's <c>pulseio.PulseIn</c> would capture on the pin.
+    /// <para>
+    /// <see cref="AvrIoPort.GetPinState"/> reports what the chip itself is driving (its DDR/PORT
+    /// configuration), not an externally injected level, so reading the pulse back — the way
+    /// firmware reads its own PIN register — goes through <see cref="Cpu.ReadData"/> instead.
+    /// </para>
+    /// </summary>
+    [Test]
+    public void SetPinValue_DrivesAnInputPinForATimedPulse()
+    {
+        const int Pind = 0x29;
+        const int Pd2Mask = 1 << 2;
+
+        var sim = AvrTestSimulation.Create()
+            .WithFrequency(16_000_000)
+            .AddGpio(AvrIoPort.PortDConfig, out var portD);
+
+        // PD2 stays at its reset default (input, no pull-up): driving it is uncontested.
+        portD.SetPinValue(2, true);
+        Assert.That(sim.Cpu.ReadData(Pind) & Pd2Mask, Is.Not.Zero, "the pulse starts high");
+
+        sim.RunMicroseconds(500);
+        portD.SetPinValue(2, false);
+
+        Assert.That(sim.Cpu.ReadData(Pind) & Pd2Mask, Is.Zero, "the pulse ends low");
+        Assert.That(sim.Cpu.Cycles, Is.EqualTo(8000)); // 500 us * 16 cycles/us @ 16 MHz
+    }
+
     // ── Custom USART probe ────────────────────────────────────────────────────
 
     /// <summary>
