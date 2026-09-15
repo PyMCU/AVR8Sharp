@@ -8,6 +8,13 @@ keeps its full speed; Python only drives coarse-grained ``run_*`` calls.
 from __future__ import annotations
 
 from .errors import Avr8SharpError
+from .responder import (
+    HCSR04_US_PER_CM,
+    hc_sr04_echo,
+    respond_to_rise,
+    wait_for_fall,
+    wait_for_rise,
+)
 from .simulation import (
     Adc,
     ArduinoMega,
@@ -36,6 +43,7 @@ __all__ = [
     "ATtinyX4",
     "Avr8SharpError",
     "Cpu",
+    "HCSR04_US_PER_CM",
     "PinState",
     "Port",
     "Serial",
@@ -44,7 +52,11 @@ __all__ = [
     "Twi",
     "board",
     "board_for_target",
+    "hc_sr04_echo",
+    "respond_to_rise",
     "selftest",
+    "wait_for_fall",
+    "wait_for_rise",
 ]
 
 __version__ = "1.1.0b1"
