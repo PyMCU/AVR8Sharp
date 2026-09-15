@@ -214,6 +214,10 @@ public static unsafe class Exports
     public static int RunMs(IntPtr h, double ms)
         => Run(h, s => s.Sim.RunMilliseconds(ms));
 
+    [UnmanagedCallersOnly(EntryPoint = "a8s_run_us")]
+    public static int RunUs(IntPtr h, double us)
+        => Run(h, s => s.Sim.RunMicroseconds(us));
+
     [UnmanagedCallersOnly(EntryPoint = "a8s_run_instructions")]
     public static int RunInstructions(IntPtr h, int count)
         => Run(h, s => s.Sim.RunInstructions(count));
@@ -278,7 +282,21 @@ public static unsafe class Exports
             s.Serials[idx].InjectByte(value);
         });
 
-    // ── GPIO observation ──────────────────────────────────────────────────────
+    /// <summary>Injects <paramref name="len"/> bytes into the USART receiver back to back. No
+    /// simulated time passes between them, and a byte delivered while the receiver is still
+    /// mid-frame on a previous one is silently dropped (real UART overrun behaviour); call
+    /// <c>a8s_run_us</c>/<c>a8s_run_ms</c> between bytes for reliable multi-byte delivery.</summary>
+    [UnmanagedCallersOnly(EntryPoint = "a8s_serial_inject_bytes")]
+    public static int SerialInjectBytes(IntPtr h, int idx, byte* data, int len)
+        => Run(h, s =>
+        {
+            if (idx < 0 || idx >= s.Serials.Count)
+                throw new ArgumentOutOfRangeException(nameof(idx));
+            for (var i = 0; i < len; i++)
+                s.Serials[idx].InjectByte(data[i]);
+        });
+
+    // ── GPIO observation and injection ──────────────────────────────────────────
 
     /// <summary>Returns the <see cref="PinState"/> of <paramref name="pin"/> on port
     /// <paramref name="portIdx"/> (0=Low,1=High,2=Input,3=InputPullup), or negative on error.</summary>
@@ -289,6 +307,20 @@ public static unsafe class Exports
         if (portIdx < 0 || portIdx >= s.Ports.Count) return ErrBadIndex;
         return (int)s.Ports[portIdx].GetPinState((byte)pin);
     }
+
+    /// <summary>Drives <paramref name="pin"/> on port <paramref name="portIdx"/> from the outside
+    /// world: sets the value latched into the PIN register when the pin is configured as an
+    /// input, simulating an external signal (a button, a sensor's response, a bit-banged line).
+    /// Has no effect on a pin the firmware has configured as an output — mirrors real hardware,
+    /// where an external driver contending with an output pin is not what this models.</summary>
+    [UnmanagedCallersOnly(EntryPoint = "a8s_gpio_set_pin")]
+    public static int GpioSetPin(IntPtr h, int portIdx, int pin, int value)
+        => Run(h, s =>
+        {
+            if (portIdx < 0 || portIdx >= s.Ports.Count)
+                throw new ArgumentOutOfRangeException(nameof(portIdx));
+            s.Ports[portIdx].SetPinValue((byte)pin, value != 0);
+        });
 
     // ── CPU / memory observation ──────────────────────────────────────────────
 
