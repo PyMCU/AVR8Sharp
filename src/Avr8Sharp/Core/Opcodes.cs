@@ -416,30 +416,36 @@ public static class Opcodes
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void LAC(ref Cpu cpu, ref ushort opcode)
     {
+        RequireXmega(ref cpu, ref opcode, "LAC");
         var r = (opcode & 0x1f0) >> 4;
         var clear = cpu.Mmio.Data[r];
         var value = cpu.ReadData(cpu.Mmio.DataView.GetUint16(30, true));
         cpu.WriteData(cpu.Mmio.DataView.GetUint16(30, true), (byte)(value & (255 - clear)));
         cpu.Mmio.Data[r] = value;
+        cpu.Cycles++;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void LAS(ref Cpu cpu, ref ushort opcode)
     {
+        RequireXmega(ref cpu, ref opcode, "LAS");
         var r = (opcode & 0x1f0) >> 4;
         var set = cpu.Mmio.Data[r];
         var value = cpu.ReadData(cpu.Mmio.DataView.GetUint16(30, true));
         cpu.WriteData(cpu.Mmio.DataView.GetUint16(30, true), (byte)(value | set));
         cpu.Mmio.Data[r] = value;
+        cpu.Cycles++;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void LAT(ref Cpu cpu, ref ushort opcode)
     {
+        RequireXmega(ref cpu, ref opcode, "LAT");
         var r = cpu.Mmio.Data[(opcode & 0x1f0) >> 4];
         var R = cpu.ReadData(cpu.Mmio.DataView.GetUint16(30, true));
         cpu.WriteData(cpu.Mmio.DataView.GetUint16(30, true), (byte)(r ^ R));
         cpu.Mmio.Data[(opcode & 0x1f0) >> 4] = R;
+        cpu.Cycles++;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1047,11 +1053,25 @@ public static class Opcodes
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void XCH(ref Cpu cpu, ref ushort opcode)
     {
+        RequireXmega(ref cpu, ref opcode, "XCH");
         var r = (opcode & 0x1f0) >> 4;
         var val1 = cpu.Mmio.Data[r];
         var val2 = cpu.Mmio.Data[cpu.Mmio.DataView.GetUint16(30, true)];
         cpu.Mmio.Data[cpu.Mmio.DataView.GetUint16(30, true)] = val1;
         cpu.Mmio.Data[r] = val2;
+        cpu.Cycles++;
+    }
+
+    /// <summary>
+    /// XCH, LAC, LAS and LAT exist only on the XMEGA (AVRxm) core; on a classic core
+    /// the opcode is undefined (DS40002198, Appendix A). Refuse it there rather than
+    /// let firmware built for the wrong part appear to work.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void RequireXmega(ref Cpu cpu, ref ushort opcode, string mnemonic)
+    {
+        if (cpu.Core != AvrCore.Xmega)
+            throw new AvrUnsupportedInstructionException(cpu.Pc, opcode, mnemonic, cpu.Core);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

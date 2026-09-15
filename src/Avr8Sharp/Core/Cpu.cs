@@ -44,6 +44,13 @@ public class Cpu
 	/// a board/simulation sets it to the chip's SRAM start to catch overflow.
 	/// </summary>
 	public int StackLowLimit { get; set; } = 0;
+	/// <summary>
+	/// The core variant this CPU models. Instructions the variant does not have throw
+	/// <see cref="AvrUnsupportedInstructionException"/> instead of executing; instructions
+	/// whose cost differs between variants are charged the modelled variant's cycles.
+	/// Defaults to <see cref="AvrCore.Classic"/>, the ATmega328P / ATmega2560 / ATtiny core.
+	/// </summary>
+	public AvrCore Core { get; set; } = AvrCore.Classic;
 	public byte Sreg
 	{
 		get

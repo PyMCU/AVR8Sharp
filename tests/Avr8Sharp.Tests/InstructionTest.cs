@@ -1,3 +1,4 @@
+using AVR8Sharp.Core;
 using Avr8Sharp.Tests.Utils;
 
 namespace Avr8Sharp.Tests;
@@ -645,6 +646,7 @@ public class Instruction : AvrTestBase
 		LoadProgram ([
 			"lac Z, r19",
 		]);
+		Cpu.Core = AvrCore.Xmega;
 		Cpu.Mmio.Data[R19] = 0x02;
 		Cpu.Mmio.DataView.SetUint16 (Z, 0x100, true);
 		Cpu.Mmio.Data[0x100] = 0x96;
@@ -652,7 +654,7 @@ public class Instruction : AvrTestBase
 		Assert.Multiple (() =>
 		{
 			Assert.That (Cpu.Pc, Is.EqualTo (1));
-			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
 			Assert.That (Cpu.Mmio.Data[R19], Is.EqualTo (0x96));
 			Assert.That (Cpu.Mmio.DataView.GetUint16 (Z, true), Is.EqualTo (0x100));
 			Assert.That (Cpu.Mmio.Data[0x100], Is.EqualTo (0x94));
@@ -665,6 +667,7 @@ public class Instruction : AvrTestBase
 		LoadProgram ([
 			"las Z, r17",
 		]);
+		Cpu.Core = AvrCore.Xmega;
 		Cpu.Mmio.Data[R17] = 0x11;
 		Cpu.Mmio.Data[Z] = 0x80;
 		Cpu.Mmio.Data[0x80] = 0x44;
@@ -672,7 +675,7 @@ public class Instruction : AvrTestBase
 		Assert.Multiple (() =>
 		{
 			Assert.That (Cpu.Pc, Is.EqualTo (1));
-			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
 			Assert.That (Cpu.Mmio.Data[R17], Is.EqualTo (0x44));
 			Assert.That (Cpu.Mmio.Data[Z], Is.EqualTo (0x80));
 			Assert.That (Cpu.Mmio.Data[0x80], Is.EqualTo (0x55));
@@ -685,6 +688,7 @@ public class Instruction : AvrTestBase
 		LoadProgram ([
 			"lat Z, r0",
 		]);
+		Cpu.Core = AvrCore.Xmega;
 		Cpu.Mmio.Data[R0] = 0x33;
 		Cpu.Mmio.Data[Z] = 0x80;
 		Cpu.Mmio.Data[0x80] = 0x66;
@@ -692,7 +696,7 @@ public class Instruction : AvrTestBase
 		Assert.Multiple (() =>
 		{
 			Assert.That (Cpu.Pc, Is.EqualTo (1));
-			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
 			Assert.That (Cpu.Mmio.Data[R0], Is.EqualTo (0x66));
 			Assert.That (Cpu.Mmio.Data[Z], Is.EqualTo (0x80));
 			Assert.That (Cpu.Mmio.Data[0x80], Is.EqualTo (0x55));
@@ -1800,6 +1804,7 @@ public class Instruction : AvrTestBase
 		LoadProgram ([
 			"xch Z, r21",
 		]);
+		Cpu.Core = AvrCore.Xmega;
 		Cpu.Mmio.Data[R21] = 0xa1;
 		Cpu.Mmio.Data[Z] = 0x50;
 		Cpu.Mmio.Data[0x50] = 0xb9;
@@ -1807,7 +1812,7 @@ public class Instruction : AvrTestBase
 		Assert.Multiple (() =>
 		{
 			Assert.That (Cpu.Pc, Is.EqualTo (1));
-			Assert.That (Cpu.Cycles, Is.EqualTo (1));
+			Assert.That (Cpu.Cycles, Is.EqualTo (2));
 			Assert.That (Cpu.Mmio.Data[R21], Is.EqualTo (0xb9));
 			Assert.That (Cpu.Mmio.Data[0x50], Is.EqualTo (0xa1));
 		});
