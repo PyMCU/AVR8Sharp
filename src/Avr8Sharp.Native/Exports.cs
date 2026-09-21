@@ -25,6 +25,7 @@ public static unsafe class Exports
     private const int ErrBadHandle = -1;
     private const int ErrException = -2;
     private const int ErrBadIndex = -3;
+    private const int ErrNotEnabled = -4;
 
     private const ushort BreakOpcode = 0x9598;
 
@@ -52,6 +53,16 @@ public static unsafe class Exports
         var n = Math.Min(src.Length, cap);
         if (n > 0) Marshal.Copy(src, 0, (IntPtr)outBuf, n);
         return src.Length;
+    }
+
+    /// <summary>Copies the raw little-endian bytes of a primitive array into the caller
+    /// buffer, returning the full byte length (two-pass pattern like <see cref="CopyOut(byte[],byte*,int)"/>).</summary>
+    private static int CopyOut<T>(T[] src, byte* outBuf, int cap) where T : unmanaged
+    {
+        var bytes = MemoryMarshal.AsBytes(src.AsSpan());
+        var n = Math.Min(bytes.Length, cap);
+        if (n > 0) bytes[..n].CopyTo(new Span<byte>(outBuf, n));
+        return bytes.Length;
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -243,6 +254,58 @@ public static unsafe class Exports
                 throw new ArgumentOutOfRangeException(nameof(serialIdx));
             s.Sim.RunUntilSerialBytes(s.Serials[serialIdx], byteCount, maxMs);
         });
+
+    // ── Execution counting (per-PC counters, branch taken/not-taken) ───────────
+
+    /// <summary>Turns counting on: every later <c>a8s_run_*</c> call collects per-PC execution
+    /// counts, per-PC cycle totals, and taken/not-taken counts for the conditional
+    /// instructions (BRBS/BRBC, SBRC/SBRS, SBIC/SBIS, CPSE). Calling again restarts with fresh,
+    /// zeroed arrays.</summary>
+    [UnmanagedCallersOnly(EntryPoint = "a8s_counting_enable")]
+    public static int CountingEnable(IntPtr h)
+        => Run(h, s => s.Sim.EnableCounting());
+
+    /// <summary>Turns counting off; later <c>a8s_run_*</c> calls take the plain fast path.</summary>
+    [UnmanagedCallersOnly(EntryPoint = "a8s_counting_disable")]
+    public static int CountingDisable(IntPtr h)
+        => Run(h, s => s.Sim.DisableCounting());
+
+    /// <summary>Number of program words the counter arrays cover (flash size in words), or
+    /// <c>ErrNotEnabled</c> when counting is off.</summary>
+    [UnmanagedCallersOnly(EntryPoint = "a8s_counts_len")]
+    public static int CountsLen(IntPtr h)
+    {
+        if (Get(h) is not { } s) return ErrBadHandle;
+        if (s.Sim.Counts is not { } c)
+        {
+            s.LastError = "counting is not enabled (call a8s_counting_enable first)";
+            return ErrNotEnabled;
+        }
+        return c.ProgramWords;
+    }
+
+    /// <summary>Copies one counter array into the caller buffer as raw little-endian words and
+    /// returns its full byte length, so callers can two-pass (query with cap 0, then size the
+    /// buffer exactly). <paramref name="which"/>: 0 = PcCount (u32 per word), 1 = PcCycles
+    /// (u64 per word), 2 = BranchTaken (u32), 3 = BranchNotTaken (u32).</summary>
+    [UnmanagedCallersOnly(EntryPoint = "a8s_counts_read")]
+    public static int CountsRead(IntPtr h, int which, byte* outBuf, int cap)
+    {
+        if (Get(h) is not { } s) return ErrBadHandle;
+        if (s.Sim.Counts is not { } c)
+        {
+            s.LastError = "counting is not enabled (call a8s_counting_enable first)";
+            return ErrNotEnabled;
+        }
+        return which switch
+        {
+            0 => CopyOut(c.PcCount, outBuf, cap),
+            1 => CopyOut(c.PcCycles, outBuf, cap),
+            2 => CopyOut(c.BranchTaken, outBuf, cap),
+            3 => CopyOut(c.BranchNotTaken, outBuf, cap),
+            _ => ErrBadIndex,
+        };
+    }
 
     // ── Serial observation ────────────────────────────────────────────────────
 
