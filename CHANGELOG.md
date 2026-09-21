@@ -72,6 +72,29 @@ suite that pinned the old numbers will need updating.
   classic AVR core it takes two, like `SBI`. Tight bit-banging loops ran fast by the
   difference; an `SBI`/`CBI`/`RJMP` toggle loop now takes the 6 cycles the board takes.
 
+### New: instruction-level execution counters
+
+`CountingDecoder` — a struct twin of `NativeLutDecoder` — records a full run's counters
+with no per-instruction callback: executions and cycle totals per PC (`ExecutionCounts.PcCount`,
+`PcCycles`), and taken/not-taken counts for the conditional instructions (the BRBS/BRBC
+family, SBRC/SBRS, SBIC/SBIS, CPSE; RJMP/JMP/CALL/RET count as executed only). "Taken" is
+decided by comparing the post-instruction PC with the fall-through address, so a branch to
+its own fall-through reads as not-taken. Measured on 16M-cycle runs of the bundled
+firmwares it costs ~1.3x the plain native decoder — within ~10% of a `ProfilingDecoder`
+whose callback only increments `counts[pc]`, while carrying cycle and branch data the
+callback does not, and it is reachable from the native library, where a per-instruction
+round trip is not viable.
+
+- **TestKit**: `EnableCounting()`/`DisableCounting()` make every `Run*` collect;
+  `RunCyclesCounted`/`RunUntilCounted` return the `ExecutionCounts` directly. `Counts`
+  stays readable after disabling, and `ExecutionCounts.ToJson()` dumps the non-zero
+  counters as JSON.
+- **C ABI**: `a8s_counting_enable`/`a8s_counting_disable`, `a8s_counts_len`, and
+  `a8s_counts_read` (two-pass, raw little-endian u32/u64 arrays).
+- **Python**: `sim.enable_counting()` / `sim.disable_counting()` /
+  `sim.counts() -> (pc_count, pc_cycles, branch_taken, branch_not_taken)` as
+  `array.array`s indexed by word PC.
+
 ---
 
 ## [v1.1.0-beta3] — 2026-06-10
