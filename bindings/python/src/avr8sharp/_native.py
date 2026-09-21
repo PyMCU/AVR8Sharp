@@ -51,6 +51,11 @@ _SIGNATURES: dict[str, tuple[list, object]] = {
     "a8s_run_to_break": ([c_void_p, c_int], c_int),
     "a8s_run_until_serial": ([c_void_p, c_int, c_char_p, c_int, c_double], c_int),
     "a8s_run_until_serial_bytes": ([c_void_p, c_int, c_int, c_double], c_int),
+    # execution counting (per-PC counters, branch taken/not-taken)
+    "a8s_counting_enable": ([c_void_p], c_int),
+    "a8s_counting_disable": ([c_void_p], c_int),
+    "a8s_counts_len": ([c_void_p], c_int),
+    "a8s_counts_read": ([c_void_p, c_int, c_char_p, c_int], c_int),
     # serial observation
     "a8s_serial_read": ([c_void_p, c_int, c_char_p, c_int], c_int),
     "a8s_serial_byte_count": ([c_void_p, c_int], c_int),

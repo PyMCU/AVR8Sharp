@@ -16,6 +16,7 @@ Example::
 from __future__ import annotations
 
 import ctypes
+from array import array
 from enum import IntEnum
 
 from . import _native
@@ -290,6 +291,45 @@ class Simulation:
         rc = self._lib.a8s_run_until_serial_bytes(self._h, serial._index, byte_count, max_ms)
         _check(self._lib, self._h, rc, "run_until_serial_bytes")
         return self
+
+    # ── execution counting (per-PC counters, branch taken/not-taken) ───────────
+
+    def enable_counting(self) -> "Simulation":
+        """Turns on instruction-level counting for every later ``run_*`` call: executions
+        and cycle totals per PC, plus taken/not-taken counts for the conditional
+        instructions (BRBS/BRBC family, SBRC/SBRS, SBIC/SBIS, CPSE). Costs roughly a
+        third of plain run speed — no per-instruction callback crosses the FFI.
+        Calling again restarts with fresh, zeroed counters."""
+        _check(self._lib, self._h, self._lib.a8s_counting_enable(self._h), "enable_counting")
+        return self
+
+    def disable_counting(self) -> "Simulation":
+        """Turns counting off; later ``run_*`` calls take the plain fast path."""
+        _check(self._lib, self._h, self._lib.a8s_counting_disable(self._h), "disable_counting")
+        return self
+
+    def counts(self) -> tuple[array, array, array, array]:
+        """Returns the counters collected since :meth:`enable_counting` as
+        ``(pc_count, pc_cycles, branch_taken, branch_not_taken)`` — four
+        :class:`array.array` objects indexed by **word** PC (byte address = index * 2,
+        the same convention as :attr:`Cpu.pc`).
+
+        ``pc_count``/``branch_*`` are ``'I'`` (u32), ``pc_cycles`` is ``'Q'`` (u64).
+        Branch entries are non-zero only at PCs holding a conditional instruction.
+        """
+        lib, h = self._lib, self._h
+        words = lib.a8s_counts_len(h)
+        _check(lib, h, words, "counts_len")
+        out: list[array] = []
+        for which, typecode in ((0, "I"), (1, "Q"), (2, "I"), (3, "I")):
+            size = words * (4 if typecode == "I" else 8)
+            buf = ctypes.create_string_buffer(size)
+            got = lib.a8s_counts_read(h, which, buf, size)
+            _check(lib, h, got, "counts_read")
+            arr = array(typecode)
+            arr.frombytes(buf.raw[: min(got, size)])
+            out.append(arr)
+        return tuple(out)
 
     # ── custom peripheral wiring (blank ATmega328P-style sessions) ─────────────
 
