@@ -209,8 +209,12 @@ public class AvrTestSimulation
     public AvrTestSimulation RunCycles(long cycles)
     {
         var target = (long)Runner.Cpu.Cycles + cycles;
-        while ((long)Runner.Cpu.Cycles < target)
-            Step();
+        if (!_counting)
+            while ((long)Runner.Cpu.Cycles < target)
+                Step();
+        else
+            while ((long)Runner.Cpu.Cycles < target)
+                StepCounted();
         return this;
     }
 
@@ -236,8 +240,12 @@ public class AvrTestSimulation
     /// </summary>
     public AvrTestSimulation RunInstructions(int count)
     {
-        for (var i = 0; i < count; i++)
-            Step();
+        if (!_counting)
+            for (var i = 0; i < count; i++)
+                Step();
+        else
+            for (var i = 0; i < count; i++)
+                StepCounted();
         return this;
     }
 
@@ -255,7 +263,7 @@ public class AvrTestSimulation
         {
             if (predicate(this))
                 return this;
-            Step();
+            if (!_counting) Step(); else StepCounted();
         }
         throw new TimeoutException(
             $"RunUntil: predicate was not satisfied within {maxInstructions} instructions.");
@@ -273,7 +281,7 @@ public class AvrTestSimulation
             var pc = Runner.Cpu.Pc;
             if (Runner.Cpu.ProgramMemory[(int)pc] == BreakOpcode)
                 return this;
-            Step();
+            if (!_counting) Step(); else StepCounted();
         }
         throw new TimeoutException(
             $"RunToBreak: BREAK instruction not reached within {maxInstructions} instructions.");
@@ -320,7 +328,7 @@ public class AvrTestSimulation
         while ((long)Runner.Cpu.Cycles < deadline)
         {
             if (predicate(this)) return this;
-            Step();
+            if (!_counting) Step(); else StepCounted();
         }
         throw new TimeoutException(
             $"RunUntilMs: predicate was not satisfied within {maxMs} ms of simulated time " +
@@ -356,6 +364,92 @@ public class AvrTestSimulation
         int byteCount,
         double maxMs = 2000)
         => RunUntilMs(_ => serial.ByteCount >= byteCount, maxMs);
+
+    // ── Counting (full-run counters, fast path) ────────────────────────────────
+
+    private ExecutionCounts? _counts;
+    private bool _counting;
+    private CountingDecoder _countingDecoder;
+
+    /// <summary>
+    /// The most recent <see cref="ExecutionCounts"/> produced by <see cref="EnableCounting"/>;
+    /// stays readable after <see cref="DisableCounting"/>. <c>null</c> if counting was never on.
+    /// </summary>
+    public ExecutionCounts? Counts => _counts;
+
+    /// <summary>
+    /// Enables per-PC execution/cycle counting and branch taken/not-taken tracking on every
+    /// subsequent <c>Run*</c> call, through <see cref="CountingDecoder"/> — a struct twin of
+    /// the native LUT decoder, so it costs roughly a third of throughput rather than paying a
+    /// per-instruction callback like <see cref="ProfilingDecoder"/>. Returns the live counters;
+    /// calling again starts fresh arrays.
+    /// </summary>
+    public ExecutionCounts EnableCounting()
+    {
+        _counts = new ExecutionCounts(Runner.Cpu.ProgramMemory.Length);
+        _countingDecoder = new CountingDecoder(_counts);
+        _counting = true;
+        return _counts;
+    }
+
+    /// <summary>Disables counting; later <c>Run*</c> calls take the plain fast path again.
+    /// The collected counters remain readable through <see cref="Counts"/>.</summary>
+    public AvrTestSimulation DisableCounting()
+    {
+        _counting = false;
+        return this;
+    }
+
+    /// <summary>
+    /// Runs exactly <paramref name="cycles"/> CPU cycles with counting on and returns the
+    /// counters. If counting was already enabled the existing counters keep accumulating;
+    /// otherwise a fresh set is enabled (and stays enabled — call <see cref="DisableCounting"/>
+    /// to return to the plain path).
+    /// </summary>
+    public ExecutionCounts RunCyclesCounted(long cycles)
+    {
+        var counts = _counting ? _counts! : EnableCounting();
+        RunCycles(cycles);
+        return counts;
+    }
+
+    /// <summary>
+    /// Counting twin of <see cref="RunUntil(Func{AvrTestSimulation,bool},int)"/>: enables
+    /// counting if needed, runs until <paramref name="predicate"/> holds, and returns the
+    /// counters. Throws <see cref="TimeoutException"/> if <paramref name="maxInstructions"/>
+    /// is reached.
+    /// </summary>
+    public ExecutionCounts RunUntilCounted(
+        Func<AvrTestSimulation, bool> predicate,
+        int maxInstructions = 100_000)
+    {
+        var counts = _counting ? _counts! : EnableCounting();
+        RunUntil(predicate, maxInstructions);
+        return counts;
+    }
+
+    /// <summary>
+    /// One counted instruction + tick; the <see cref="Step()"/> twin used while
+    /// counting is enabled. Same crash diagnostics as the plain path.
+    /// </summary>
+    private void StepCounted()
+    {
+        try
+        {
+            _countingDecoder.Decode(Runner.Cpu);
+            Runner.Cpu.Tick();
+        }
+        catch (IndexOutOfRangeException)
+        {
+            var pc = Runner.Cpu.Pc;
+            if (pc < Runner.Cpu.ProgramMemory.Length) throw;
+            var flash = Runner.Cpu.ProgramMemory.Length * 2;
+            throw new InvalidOperationException(
+                $"Simulation crashed: PC=0x{pc:X4} (byte addr 0x{pc * 2:X5}) is out of flash " +
+                $"(flash={flash} bytes, 0x{flash:X}). " +
+                $"Cycles={Runner.Cpu.Cycles}, SREG=0x{Runner.Cpu.Sreg:X2}, SP=0x{Runner.Cpu.Sp:X4}.");
+        }
+    }
 
     // ── Profiling (slow path) ─────────────────────────────────────────────────
 
