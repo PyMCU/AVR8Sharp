@@ -4,7 +4,7 @@ namespace AVR8Sharp.Core.Decoders;
 
 /// <summary>
 /// <see cref="NativeLutDecoder"/> wrapped with per-instruction counters: executions and cycles
-/// per PC, plus taken/not-taken for conditional control flow — the whole BRBS/BRBC family,
+/// per PC, plus taken/not-taken for conditional control flow, the whole BRBS/BRBC family,
 /// SBRC/SBRS, SBIC/SBIS and CPSE. RJMP/JMP/IJMP/CALL/RET and friends are counted as executed
 /// only. "Taken" is decided by comparing the PC after the instruction with the fall-through
 /// address, so a branch to its own fall-through (offset 0) reads as not-taken.

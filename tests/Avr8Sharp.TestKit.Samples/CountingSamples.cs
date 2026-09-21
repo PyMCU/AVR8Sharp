@@ -55,7 +55,7 @@ public class CountingSamples
         var sim = AvrTestSimulation.Create().WithAsm(Loop5);
 
         var counts = sim.EnableCounting();
-        sim.RunInstructions(6);          // ldi + dec/brne x2.5 — lands mid-loop
+        sim.RunInstructions(6);          // ldi + dec/brne x2.5, lands mid-loop
         sim.RunInstructions(5);          // rest of the trip count
 
         Assert.Multiple(() =>

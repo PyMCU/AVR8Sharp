@@ -74,13 +74,13 @@ suite that pinned the old numbers will need updating.
 
 ### New: instruction-level execution counters
 
-`CountingDecoder` — a struct twin of `NativeLutDecoder` — records a full run's counters
+`CountingDecoder`, a struct twin of `NativeLutDecoder`, records a full run's counters
 with no per-instruction callback: executions and cycle totals per PC (`ExecutionCounts.PcCount`,
 `PcCycles`), and taken/not-taken counts for the conditional instructions (the BRBS/BRBC
 family, SBRC/SBRS, SBIC/SBIS, CPSE; RJMP/JMP/CALL/RET count as executed only). "Taken" is
 decided by comparing the post-instruction PC with the fall-through address, so a branch to
 its own fall-through reads as not-taken. Measured on 16M-cycle runs of the bundled
-firmwares it costs ~1.3x the plain native decoder — within ~10% of a `ProfilingDecoder`
+firmwares it costs ~1.3x the plain native decoder, within ~10% of a `ProfilingDecoder`
 whose callback only increments `counts[pc]`, while carrying cycle and branch data the
 callback does not, and it is reachable from the native library, where a per-instruction
 round trip is not viable.

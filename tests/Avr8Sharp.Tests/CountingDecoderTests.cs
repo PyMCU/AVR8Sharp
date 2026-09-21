@@ -29,11 +29,11 @@ public class CountingDecoderTests
     public void Loop_ExactCounts()
     {
         var program = new AsmProgram(@"
-                ldi  r16, 5      ; pc 0 — 1 exec, 1 cycle
+                ldi  r16, 5      ; pc 0, 1 exec, 1 cycle
             loop:
-                dec  r16         ; pc 1 — 5 exec, 1 cycle each
-                brne loop        ; pc 2 — 5 exec; taken 4x (2 cy), falls through once (1 cy)
-                break            ; pc 3 — never executed
+                dec  r16         ; pc 1, 5 exec, 1 cycle each
+                brne loop        ; pc 2, 5 exec; taken 4x (2 cy), falls through once (1 cy)
+                break            ; pc 3, never executed
         ").Compile();
 
         var cpu = new AVR8Sharp.Core.Cpu(program.Program);
@@ -72,13 +72,13 @@ public class CountingDecoderTests
         var program = new AsmProgram(@"
                 ldi  r16, 0      ; pc 0
                 ldi  r17, 0      ; pc 1
-                cpse r16, r17    ; pc 2 — equal: skips the jmp (taken, 3 cy over a 2-word)
-                jmp  end         ; pc 3-4 — never executed
+                cpse r16, r17    ; pc 2, equal: skips the jmp (taken, 3 cy over a 2-word)
+                jmp  end         ; pc 3-4, never executed
                 ldi  r18, 5      ; pc 5
-                cpse r16, r18    ; pc 6 — 0 != 5: falls through (not taken, 1 cy)
+                cpse r16, r18    ; pc 6, 0 != 5: falls through (not taken, 1 cy)
                 nop              ; pc 7
             end:
-                break            ; pc 8 — never executed
+                break            ; pc 8, never executed
         ").Compile();
 
         var c = RunToPc(program.Program, 8).Counts;
@@ -106,10 +106,10 @@ public class CountingDecoderTests
     public void Unconditional_ControlFlow_CountsAsExecutedOnly()
     {
         var program = new AsmProgram(@"
-                rjmp fwd         ; pc 0 — 1 exec, 2 cycles, no branch record
-                nop              ; pc 1 — never executed
+                rjmp fwd         ; pc 0, 1 exec, 2 cycles, no branch record
+                nop              ; pc 1, never executed
             fwd:
-                break            ; pc 2 — never executed
+                break            ; pc 2, never executed
         ").Compile();
 
         var c = RunToPc(program.Program, 2).Counts;

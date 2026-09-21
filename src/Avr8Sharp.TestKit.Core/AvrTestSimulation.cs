@@ -379,7 +379,7 @@ public class AvrTestSimulation
 
     /// <summary>
     /// Enables per-PC execution/cycle counting and branch taken/not-taken tracking on every
-    /// subsequent <c>Run*</c> call, through <see cref="CountingDecoder"/> — a struct twin of
+    /// subsequent <c>Run*</c> call, through <see cref="CountingDecoder"/>, a struct twin of
     /// the native LUT decoder, so it costs roughly a third of throughput rather than paying a
     /// per-instruction callback like <see cref="ProfilingDecoder"/>. Returns the live counters;
     /// calling again starts fresh arrays.
@@ -403,7 +403,7 @@ public class AvrTestSimulation
     /// <summary>
     /// Runs exactly <paramref name="cycles"/> CPU cycles with counting on and returns the
     /// counters. If counting was already enabled the existing counters keep accumulating;
-    /// otherwise a fresh set is enabled (and stays enabled — call <see cref="DisableCounting"/>
+    /// otherwise a fresh set is enabled (and stays enabled, call <see cref="DisableCounting"/>
     /// to return to the plain path).
     /// </summary>
     public ExecutionCounts RunCyclesCounted(long cycles)

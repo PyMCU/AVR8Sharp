@@ -298,7 +298,7 @@ class Simulation:
         """Turns on instruction-level counting for every later ``run_*`` call: executions
         and cycle totals per PC, plus taken/not-taken counts for the conditional
         instructions (BRBS/BRBC family, SBRC/SBRS, SBIC/SBIS, CPSE). Costs roughly a
-        third of plain run speed — no per-instruction callback crosses the FFI.
+        third of plain run speed, no per-instruction callback crosses the FFI.
         Calling again restarts with fresh, zeroed counters."""
         _check(self._lib, self._h, self._lib.a8s_counting_enable(self._h), "enable_counting")
         return self
@@ -310,7 +310,7 @@ class Simulation:
 
     def counts(self) -> tuple[array, array, array, array]:
         """Returns the counters collected since :meth:`enable_counting` as
-        ``(pc_count, pc_cycles, branch_taken, branch_not_taken)`` — four
+        ``(pc_count, pc_cycles, branch_taken, branch_not_taken)``, four
         :class:`array.array` objects indexed by **word** PC (byte address = index * 2,
         the same convention as :attr:`Cpu.pc`).
 

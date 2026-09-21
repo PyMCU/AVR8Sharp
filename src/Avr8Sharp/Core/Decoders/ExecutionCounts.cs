@@ -7,7 +7,7 @@ namespace AVR8Sharp.Core.Decoders;
 /// counts, per-PC cycle totals, and taken/not-taken counts for the conditional-control-flow
 /// instructions (the BRBS/BRBC family, SBRC/SBRS, SBIC/SBIS and CPSE).
 /// <para>
-/// All arrays are indexed by <b>word</b> address — the same convention as <see cref="Cpu.Pc"/>
+/// All arrays are indexed by <b>word</b> address, the same convention as <see cref="Cpu.Pc"/>
 /// (byte address = index × 2). <see cref="BranchTaken"/>/<see cref="BranchNotTaken"/> are zero
 /// for PCs that never executed a conditional instruction.
 /// </para>

@@ -2,10 +2,10 @@
 
 The program is the same shape the C# suite pins down:
 
-    pc0  ldi r16, 5     — 1 exec, 1 cycle
-    pc1  dec r16        — 5 execs (trip count), 1 cycle each
-    pc2  brne loop      — 5 execs; taken 4x at 2 cy, falls through once at 1 cy
-    pc3  break          — never executed
+    pc0  ldi r16, 5   1 exec, 1 cycle
+    pc1  dec r16   5 execs (trip count), 1 cycle each
+    pc2  brne loop   5 execs; taken 4x at 2 cy, falls through once at 1 cy
+    pc3  break   never executed
 """
 
 from __future__ import annotations

@@ -12,7 +12,7 @@ namespace Avr8Sharp.Benchmark;
 // Reports two numbers:
 //   * MIPS              — millions of *instructions* retired per wall second
 //                         (this is the figure comparable to RP2040Sharp's bench).
-//   * cycles/s          — simulated AVR cycles per wall second; at 16 MHz the
+//   * cycles/s   simulated AVR cycles per wall second; at 16 MHz the
 //                         realtime ratio is cycles/s / 16e6.
 //
 // The loop is the same one the runner uses (decoder.Decode + cpu.Tick), driven through
