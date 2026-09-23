@@ -409,6 +409,13 @@ class ArduinoUno(Simulation):
         self.spi = Spi(self)
         self.twi = Twi(self)
 
+    def share_bus_responses(self) -> None:
+        """Point the SPI and TWI stubs at ONE response queue: a byte queued through
+        either stub answers whichever bus the firmware reads next -- the bench wiring
+        of a single scripted responder feeding both buses."""
+        _check(self._lib, self._h, self._lib.a8s_bus_share_responses(self._h),
+               "bus_share_responses")
+
 
 class ArduinoMega(Simulation):
     """ATmega2560: ports A..L, timers 0..5, USART0..3."""

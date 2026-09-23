@@ -69,6 +69,7 @@ _SIGNATURES: dict[str, tuple[list, object]] = {
     "a8s_adc_set_channel": ([c_void_p, c_int, c_double], c_int),
     "a8s_spi_queue_response": ([c_void_p, c_byte], c_int),
     "a8s_spi_read_mosi": ([c_void_p, c_char_p, c_int], c_int),
+    "a8s_bus_share_responses": ([c_void_p], c_int),
     "a8s_twi_set_slave": ([c_void_p, c_int, c_int], c_int),
     "a8s_twi_queue_response": ([c_void_p, c_byte], c_int),
     "a8s_twi_read_writes": ([c_void_p, c_char_p, c_int], c_int),
