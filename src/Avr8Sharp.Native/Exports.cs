@@ -508,8 +508,8 @@ public static unsafe class Exports
         => Run(h, s =>
         {
             if (s.Twi is null) throw new InvalidOperationException("Session has no TWI peripheral.");
-            s.Twi.Address = (byte)address;
-            s.Twi.Present = present != 0;
+            if (present != 0) s.Twi.Addresses.Add((byte)address);
+            else s.Twi.Addresses.Remove((byte)address);
         });
 
     /// <summary>Queues a byte for the I²C slave stub to return on the next firmware read.</summary>
@@ -520,6 +520,27 @@ public static unsafe class Exports
             if (s.Twi is null) throw new InvalidOperationException("Session has no TWI peripheral.");
             s.Twi.Responses.Enqueue(value);
         });
+
+    /// <summary>Copies the stub's transaction-event log into the caller buffer; returns the
+    /// full count. Each event is one byte: 0xFE = (repeated) START, 0xFF = STOP, otherwise
+    /// the 7-bit slave address with bit 7 set for a read connect.</summary>
+    [UnmanagedCallersOnly(EntryPoint = "a8s_twi_read_events")]
+    public static int TwiReadEvents(IntPtr h, byte* outBuf, int cap)
+    {
+        if (Get(h) is not { } s) return ErrBadHandle;
+        if (s.Twi is null) return ErrBadIndex;
+        return CopyOut(s.Twi.Addrs.ToArray(), outBuf, cap);
+    }
+
+    /// <summary>Copies the bytes the I²C slave returned to firmware reads into the caller
+    /// buffer; returns the full count.</summary>
+    [UnmanagedCallersOnly(EntryPoint = "a8s_twi_read_reads")]
+    public static int TwiReadReads(IntPtr h, byte* outBuf, int cap)
+    {
+        if (Get(h) is not { } s) return ErrBadHandle;
+        if (s.Twi is null) return ErrBadIndex;
+        return CopyOut(s.Twi.Reads.ToArray(), outBuf, cap);
+    }
 
     /// <summary>Copies the bytes the firmware has written to the I²C slave into the caller
     /// buffer; returns the full count.</summary>

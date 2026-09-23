@@ -20,31 +20,36 @@ internal sealed class SpiDeviceStub
 }
 
 /// <summary>
-/// A single-address I²C slave. ACKs transactions addressed to <see cref="Address"/> (when
-/// <see cref="Present"/>), logs the bytes the firmware writes, and replays a pre-loaded response
-/// queue on reads (0xFF when drained). Covers the common "firmware talks to one sensor" test.
+/// An I²C slave. ACKs transactions addressed to any address in <see cref="Addresses"/>,
+/// logs the bytes the firmware writes, and replays a pre-loaded response queue on reads
+/// (0xFF when drained). The response queue is shared across addresses, the way a scripted
+/// bench with one responder per pin would be wired.
 /// </summary>
 internal sealed class TwiDeviceStub(AvrTwi twi) : ITwiEventHandler
 {
-    public byte Address;     // 7-bit slave address this device answers to
-    public bool Present;     // whether a device is connected at Address
+    /// <summary>7-bit slave addresses this device answers to.</summary>
+    public readonly HashSet<byte> Addresses = new();
 
     public readonly List<byte> Writes = new();
+    public readonly List<byte> Reads = new();
+    public readonly List<byte> Addrs = new();
     public readonly Queue<byte> Responses = new();
 
     private bool _selected;
 
-    public void Start(bool repeated) => twi.CompleteStart();
+    public void Start(bool repeated) { Addrs.Add(0xFE); twi.CompleteStart(); }
 
     public void Stop()
     {
         _selected = false;
+        Addrs.Add(0xFF);
         twi.CompleteStop();
     }
 
     public void ConnectToSlave(byte address, bool write)
     {
-        _selected = Present && address == Address;
+        _selected = Addresses.Contains(address);
+        Addrs.Add((byte)(address | (write ? 0 : 0x80)));
         twi.CompleteConnect(_selected);
     }
 
@@ -57,6 +62,7 @@ internal sealed class TwiDeviceStub(AvrTwi twi) : ITwiEventHandler
     public void ReadByte(bool ack)
     {
         var b = Responses.Count > 0 ? Responses.Dequeue() : (byte)0xFF;
+        Reads.Add(b);
         twi.CompleteRead(b);
     }
 }
