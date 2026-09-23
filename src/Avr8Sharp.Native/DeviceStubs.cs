@@ -10,7 +10,9 @@ namespace Avr8Sharp.Native;
 internal sealed class SpiDeviceStub
 {
     public readonly List<byte> Mosi = new();
-    public readonly Queue<byte> Responses = new();
+    // Settable so a session can point both bus stubs at ONE queue -- the bench
+    // wiring "one scripted responder answers whichever bus reads".
+    public Queue<byte> Responses = new();
 
     public int Transfer(byte outgoing)
     {
@@ -33,7 +35,10 @@ internal sealed class TwiDeviceStub(AvrTwi twi) : ITwiEventHandler
     public readonly List<byte> Writes = new();
     public readonly List<byte> Reads = new();
     public readonly List<byte> Addrs = new();
-    public readonly Queue<byte> Responses = new();
+    // Settable so a session can share this queue with the SPI stub -- one
+    // scripted responder feeding both buses, matching the oracle's single
+    // take() script.
+    public Queue<byte> Responses = new();
 
     private bool _selected;
 

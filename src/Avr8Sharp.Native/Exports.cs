@@ -501,6 +501,18 @@ public static unsafe class Exports
         return CopyOut(s.Spi.Mosi.ToArray(), outBuf, cap);
     }
 
+    /// <summary>Points the SPI and TWI stubs at the same response queue, so one loaded
+    /// script answers whichever bus the firmware reads next -- the same wiring the
+    /// surfacecov oracle's single take() script models.</summary>
+    [UnmanagedCallersOnly(EntryPoint = "a8s_bus_share_responses")]
+    public static int BusShareResponses(IntPtr h)
+        => Run(h, s =>
+        {
+            if (s.Spi is null || s.Twi is null)
+                throw new InvalidOperationException("Session needs both SPI and TWI stubs.");
+            s.Spi.Responses = s.Twi.Responses;
+        });
+
     /// <summary>Configures the I²C slave stub: ACK transactions to <paramref name="address"/>
     /// (7-bit) when <paramref name="present"/> is non-zero.</summary>
     [UnmanagedCallersOnly(EntryPoint = "a8s_twi_set_slave")]
