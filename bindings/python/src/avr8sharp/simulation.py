@@ -169,6 +169,14 @@ class Twi:
     def writes(self) -> bytes:
         return _read_buffer(self._sim._lib.a8s_twi_read_writes, self._sim)
 
+    @property
+    def events(self) -> bytes:
+        return _read_buffer(self._sim._lib.a8s_twi_read_events, self._sim)
+
+    @property
+    def reads(self) -> bytes:
+        return _read_buffer(self._sim._lib.a8s_twi_read_reads, self._sim)
+
 
 class Serial:
     """USART capture probe accessor, identified by a serial index registered at creation."""

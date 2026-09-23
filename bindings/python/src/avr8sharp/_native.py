@@ -72,6 +72,8 @@ _SIGNATURES: dict[str, tuple[list, object]] = {
     "a8s_twi_set_slave": ([c_void_p, c_int, c_int], c_int),
     "a8s_twi_queue_response": ([c_void_p, c_byte], c_int),
     "a8s_twi_read_writes": ([c_void_p, c_char_p, c_int], c_int),
+    "a8s_twi_read_events": ([c_void_p, c_char_p, c_int], c_int),
+    "a8s_twi_read_reads": ([c_void_p, c_char_p, c_int], c_int),
     # cpu / memory
     "a8s_cpu_pc": ([c_void_p], c_uint),
     "a8s_cpu_sp": ([c_void_p], c_uint),
