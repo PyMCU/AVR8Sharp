@@ -664,4 +664,81 @@ public class Usart : AvrTestBase
 			});
 		}
 	}
+
+	[TestFixture]
+	public class UcsraStatusBits : AvrTestBase
+	{
+		private AvrUsart _usart;
+
+		protected override void SetupPeripherals ()
+		{
+			_usart = new AvrUsart (Cpu, AvrUsart.Usart0Config, FREQ_16MHZ);
+		}
+
+		[Test (Description = "Writing UCSRA must leave the read-only status bits alone (datasheet 19.10.2)")]
+		public void WriteDoesNotTouchReadOnlyBits ()
+		{
+			// Put every read-only bit up the way the hardware would: RXC and FE/UPE come with a
+			// bad frame, TXC and UDRE come from a completed transmission, DOR from an overrun.
+			Cpu.WriteData (UCSR0B, RXEN | TXEN);
+			Cpu.Mmio.Data[UBRR0L] = 103; // 9600 @ 16 MHz
+			_usart.WriteByte (0x41, immediate: true, frameError: true, parityError: true);
+			_usart.WriteByte (0x42, immediate: true); // second frame with the first unread: DOR
+			Cpu.Mmio.Data[UCSR0A] |= TXC | UDRE;
+
+			var before = Cpu.Mmio.Data[UCSR0A];
+			Assert.That (before & (RXC | FE | UPE | DOR | TXC | UDRE),
+				Is.EqualTo (RXC | FE | UPE | DOR | TXC | UDRE),
+				"the fixture must start with every read-only bit set");
+
+			// What Serial.begin() and PyMCU's uart_init() both write to select double speed.
+			Cpu.WriteData (UCSR0A, U2X0);
+
+			Assert.Multiple (() =>
+			{
+				Assert.That (Cpu.Mmio.Data[UCSR0A] & RXC, Is.EqualTo (RXC), "RXC is read-only");
+				Assert.That (Cpu.Mmio.Data[UCSR0A] & UDRE, Is.EqualTo (UDRE), "UDRE is read-only");
+				Assert.That (Cpu.Mmio.Data[UCSR0A] & FE, Is.EqualTo (FE), "FE is read-only");
+				Assert.That (Cpu.Mmio.Data[UCSR0A] & DOR, Is.EqualTo (DOR), "DOR is read-only");
+				Assert.That (Cpu.Mmio.Data[UCSR0A] & UPE, Is.EqualTo (UPE), "UPE is read-only");
+				Assert.That (Cpu.Mmio.Data[UCSR0A] & TXC, Is.EqualTo (TXC),
+					"writing a zero to TXC must not clear it");
+				Assert.That (Cpu.Mmio.Data[UCSR0A] & U2X0, Is.EqualTo (U2X0), "U2X is writable");
+			});
+		}
+
+		[Test (Description = "TXC is cleared by writing a one to it, not a zero (datasheet 19.10.2)")]
+		public void TxcClearsOnlyOnWritingOne ()
+		{
+			Cpu.WriteData (UCSR0B, TXEN);
+			Cpu.Mmio.Data[UCSR0A] |= TXC;
+
+			Cpu.WriteData (UCSR0A, U2X0); // a zero in the TXC position
+			Assert.That (Cpu.Mmio.Data[UCSR0A] & TXC, Is.EqualTo (TXC),
+				"a zero written to TXC leaves it set");
+
+			Cpu.WriteData (UCSR0A, TXC); // a one in the TXC position
+			Assert.That (Cpu.Mmio.Data[UCSR0A] & TXC, Is.EqualTo (0),
+				"a one written to TXC clears it");
+		}
+
+		[Test (Description = "A second init must not strand the transmitter (wokwi/avr8js#158)")]
+		public void SecondInitLeavesTheTransmitterReady ()
+		{
+			// First init: UCSRA for double speed, then UCSRB turns TXEN on and UDRE comes up.
+			Cpu.WriteData (UCSR0A, U2X0);
+			Cpu.Mmio.Data[UBRR0L] = 16;
+			Cpu.WriteData (UCSR0B, RXEN | TXEN);
+			Assert.That (Cpu.Mmio.Data[UCSR0A] & UDRE, Is.EqualTo (UDRE),
+				"the transmitter is ready after the first init");
+
+			// Second init, byte for byte the same, with TXEN already on and nothing in flight.
+			Cpu.WriteData (UCSR0A, U2X0);
+			Cpu.Mmio.Data[UBRR0L] = 16;
+			Cpu.WriteData (UCSR0B, RXEN | TXEN);
+
+			Assert.That (Cpu.Mmio.Data[UCSR0A] & UDRE, Is.EqualTo (UDRE),
+				"the transmitter must still be ready: a firmware polling UDRE would spin forever");
+		}
+	}
 }

@@ -14,6 +14,9 @@ public class AvrUsart
     const int UCSRA_U2X = 0x02; // Double the USART Transmission Speed
     const int UCSRA_MPCM = 0x01; // Multi-processor Communication Mode
     const int UCSRA_CFG_MASK = UCSRA_U2X;
+    // Status bits the firmware cannot write (datasheet 19.10.2). A write to UCSRA preserves
+    // them; TXC is cleared only by writing a one to it, handled separately.
+    const int UCSRA_READ_ONLY_MASK = UCSRA_RXC | UCSRA_TXC | UCSRA_UDRE | UCSRA_FE | UCSRA_DOR | UCSRA_UPE;
     const int UCSRB_RXCIE = 0x80; // RX Complete Interrupt Enable
     const int UCSRB_TXCIE = 0x40; // TX Complete Interrupt Enable
     const int UCSRB_UDRIE = 0x20; // USART Data Register Empty Interrupt Enable
@@ -222,7 +225,17 @@ public class AvrUsart
         
         cpu.Mmio.RegisterWrite(_config.UCSRA, (value, oldValue, _, _) =>
         {
-            _cpu.Mmio.Data[_config.UCSRA] = (byte)(value & (UCSRA_MPCM | UCSRA_U2X));
+            // RXC, TXC, UDRE, FE, DOR and UPE are read-only to firmware (datasheet 19.10.2),
+            // so a write to UCSRA leaves them as they were. Only U2X and MPCM are writable.
+            // TXC is the one flag a write can affect, and only by writing a ONE to it, which
+            // ClearInterruptByFlag does below; writing a zero to TXC leaves it alone.
+            //
+            // Clearing them here instead is what upstream avr8js does, and it is the cause of
+            // wokwi/avr8js#158: a second Serial.begin() writes UCSRA to set U2X, UDRE goes to
+            // zero, and the following UCSRB write does not put it back because TXEN is already
+            // set. Every later `while (!(UCSRA & UDRE))` then spins forever.
+            _cpu.Mmio.Data[_config.UCSRA] = (byte)(
+                (oldValue & UCSRA_READ_ONLY_MASK) | (value & (UCSRA_MPCM | UCSRA_U2X)));
             UpdateCalculatedValues();
             _cpu.ClearInterruptByFlag(_txc, value);
             if ((value & UCSRA_CFG_MASK) != (oldValue & UCSRA_CFG_MASK))

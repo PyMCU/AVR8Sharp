@@ -71,6 +71,14 @@ suite that pinned the old numbers will need updating.
 - **CBI cycle cost** (#18) — `CBI` was charged one cycle, the reduced-core timing. On the
   classic AVR core it takes two, like `SBI`. Tight bit-banging loops ran fast by the
   difference; an `SBI`/`CBI`/`RJMP` toggle loop now takes the 6 cycles the board takes.
+- **A write to UCSRA no longer clears the read-only status bits** — RXC, TXC, UDRE, FE, DOR
+  and UPE are read-only to firmware (datasheet 19.10.2) and a write to UCSRA now leaves them
+  as they were. TXC still clears when a one is written to it, which is the only way the chip
+  clears it. The old behaviour cleared all six, which is the cause of wokwi/avr8js#158: a
+  second `Serial.begin()` writes UCSRA to select double speed, UDRE goes to zero, and the
+  UCSRB write that follows does not put it back because TXEN is already set, so every later
+  `while (!(UCSRA & UDRE))` spins forever. The same write also stranded a received byte by
+  clearing RXC while the byte stayed in the receive buffer.
 
 ### New: instruction-level execution counters
 
