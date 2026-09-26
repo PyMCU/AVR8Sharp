@@ -55,23 +55,27 @@ permissions:
   id-token: write
 ```
 
+---
+
+## [v1.1.0-beta10] - 2026-09-26
+
 ### Bug Fixes
 
-Two timing divergences found by putting the emulator and an Arduino Uno on the same
-oscilloscope, 2026-09-14. Both change what a cycle-accurate or waveform test reads, so a
+The first two are timing divergences found by putting the emulator and an Arduino Uno on
+the same oscilloscope, 2026-09-14. Both change what a cycle-accurate or waveform test reads, so a
 suite that pinned the old numbers will need updating.
 
-- **Fast PWM pulse width** (#17) — the compare output was held for `OCRnx` counts; the chip
+- **Fast PWM pulse width** (#17). The compare output was held for `OCRnx` counts; the chip
   holds it for `OCRnx + 1`, because the waveform generator updates `OCnx` on the timer clock
   after the match. `OCR0A = 128` at 16 MHz now reads 129 of 256 counts, as the scope does.
   Both extremes the datasheet names come out right too: `OCRnx` at BOTTOM is a one-count
   spike per period rather than a constant high, and `OCRnx` at MAX is constantly high. The
   compare interrupt flag still fires on the match itself, and phase correct PWM, which was
   already correct, is unchanged.
-- **CBI cycle cost** (#18) — `CBI` was charged one cycle, the reduced-core timing. On the
+- **CBI cycle cost** (#18). `CBI` was charged one cycle, the reduced-core timing. On the
   classic AVR core it takes two, like `SBI`. Tight bit-banging loops ran fast by the
   difference; an `SBI`/`CBI`/`RJMP` toggle loop now takes the 6 cycles the board takes.
-- **A write to UCSRA no longer clears the read-only status bits** — RXC, TXC, UDRE, FE, DOR
+- **A write to UCSRA no longer clears the read-only status bits.** RXC, TXC, UDRE, FE, DOR
   and UPE are read-only to firmware (datasheet 19.10.2) and a write to UCSRA now leaves them
   as they were. TXC still clears when a one is written to it, which is the only way the chip
   clears it. The old behaviour cleared all six, which is the cause of wokwi/avr8js#158: a
@@ -79,6 +83,12 @@ suite that pinned the old numbers will need updating.
   UCSRB write that follows does not put it back because TXEN is already set, so every later
   `while (!(UCSRA & UDRE))` spins forever. The same write also stranded a received byte by
   clearing RXC while the byte stayed in the receive buffer.
+- **XCH, LAC, LAS and LAT are refused on the classic core** (#19). They are XMEGA-only
+  instructions and their opcodes are undefined on the ATmega and ATtiny parts, yet the
+  emulator executed them for one cycle. They now raise `AvrUnsupportedInstructionException`
+  naming the PC, opcode and mnemonic, unless the new `Cpu.Core` is `AvrCore.Xmega`, where
+  they cost the manual's two cycles. `Cpu.Core` defaults to `AvrCore.Classic`. All three
+  decoders agree.
 
 ### New: instruction-level execution counters
 
@@ -102,6 +112,19 @@ round trip is not viable.
 - **Python**: `sim.enable_counting()` / `sim.disable_counting()` /
   `sim.counts() -> (pc_count, pc_cycles, branch_taken, branch_not_taken)` as
   `array.array`s indexed by word PC.
+
+### New: external stimulus and bus probes
+
+- **TestKit**: `RunMicroseconds`, the microsecond sibling of `RunMilliseconds`, for driving a
+  pin pulse or a sensor's response delay between writes.
+- **C ABI**: `a8s_gpio_set_pin` drives a pin the firmware reads as an input (no effect on an
+  output, as on the chip), `a8s_run_us` steps in microseconds, and `a8s_serial_inject_bytes`
+  injects several USART RX bytes in one call. The I2C slave stub answers a set of addresses
+  and journals its transactions, and the SPI and TWI response queues can be shared on demand.
+- **Python**: `Port.set`/`set_high`/`set_low`, `Simulation.run_us` and
+  `Serial.inject_bytes`; timed-response helpers `wait_for_rise`/`wait_for_fall`,
+  `respond_to_rise` and `hc_sr04_echo`; `twi.events` and `twi.reads` probes; and
+  `sim.share_bus_responses()`.
 
 ---
 
