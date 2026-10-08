@@ -30,6 +30,15 @@ public class AvrWatchdog
         WDTCSR = 0x60
     };
 
+    /// <summary>ATmega2560 watchdog: MCUSR 0x54 and WDTCSR 0x60 as on the ATmega328P; WDT is vector 12 -> word 0x18.</summary>
+    public static readonly AvrWatchdogConfig Mega2560WatchdogConfig = new AvrWatchdogConfig
+    {
+        WatchdogInterrupt = 0x18,
+
+        MCUSR = 0x54,
+        WDTCSR = 0x60
+    };
+
     readonly long _clockFrequency = 128_000;
 
     private readonly Cpu _cpu;
@@ -91,13 +100,20 @@ public class AvrWatchdog
 
         // Any CPU reset that is not the watchdog's own is seen by the chip as an external
         // reset (RESET pin), which sets EXTRF. MCUSR itself survives the reset, as on silicon.
+        _cpu.PreserveOnReset(config.MCUSR);
         _cpu.OnPeripheralReset += () =>
         {
+            // WDTCSR was zeroed by Cpu.Reset: the watchdog is off and its timer event is gone
+            _enabledValue = false;
+            _scheduled = false;
             if (!_watchdogReset) _cpu.Mmio.Data[config.MCUSR] |= MCUSR_EXTRF;
         };
 
         _cpu.Mmio.RegisterWrite(config.WDTCSR, (value, oldValue, _, _) =>
         {
+            // WDIF is cleared by writing a one (at the end of this hook); writing zero keeps it.
+            var written = value;
+            value = (byte)((value & ~WDTCSR_WDIF) | (oldValue & WDTCSR_WDIF));
             if ((value & WDTCSR_WDCE) != 0 && (value & WDTCSR_WDE) != 0)
             {
                 _changeEnabledCycles = _cpu.Cycles + 4;
@@ -127,7 +143,7 @@ public class AvrWatchdog
                 _scheduled = false;
             }
 
-            _cpu.ClearInterruptByFlag(_watchdog, value);
+            _cpu.ClearInterruptByFlag(_watchdog, written);
             return true;
         });
     }

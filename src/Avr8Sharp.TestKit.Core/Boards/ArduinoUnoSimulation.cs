@@ -82,6 +82,7 @@ public sealed class ArduinoUnoSimulation : AvrTestSimulation
         // stack into the I/O/register space. Surface it instead of silently corrupting
         // peripheral state.
         Cpu.StackLowLimit = 0x100;
+        Cpu.RamStart = 0x100;
 
         AddGpio(AvrIoPort.PortBConfig, out var portB); PortB = portB;
         AddGpio(AvrIoPort.PortCConfig, out var portC); PortC = portC;

@@ -400,7 +400,7 @@ public class Gpio : AvrTestBase
 			
 			Assert.Multiple (() => {
 				Assert.That (Cpu.Pc, Is.EqualTo (PC_INT_INT0));
-				Assert.That (Cpu.Cycles, Is.EqualTo (3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
+				Assert.That (Cpu.Cycles, Is.EqualTo (4)); // 4 cycles from DoAvrInterrupt (interrupt response, excludes the interrupted instruction)
 				Assert.That (Cpu.Mmio.Data[EIFR], Is.EqualTo (0));
 			});
 			
@@ -425,7 +425,7 @@ public class Gpio : AvrTestBase
 			
 			Assert.Multiple (() => {
 				Assert.That (Cpu.Pc, Is.EqualTo (PC_INT_INT0));
-				Assert.That (Cpu.Cycles, Is.EqualTo (3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
+				Assert.That (Cpu.Cycles, Is.EqualTo (4)); // 4 cycles from DoAvrInterrupt (interrupt response, excludes the interrupted instruction)
 				Assert.That (Cpu.Mmio.Data[EIFR], Is.EqualTo (0));
 			});
 		}
@@ -467,7 +467,7 @@ public class Gpio : AvrTestBase
 			Cpu.Tick ();
 			Assert.Multiple (() => {
 				Assert.That (Cpu.Pc, Is.EqualTo (PC_INT_INT0));
-				Assert.That (Cpu.Cycles, Is.EqualTo (3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
+				Assert.That (Cpu.Cycles, Is.EqualTo (4)); // 4 cycles from DoAvrInterrupt (interrupt response, excludes the interrupted instruction)
 			});
 			
 			// Flag shouldn't be cleared, as the interrupt is sticky
@@ -503,7 +503,7 @@ public class Gpio : AvrTestBase
 			
 			Assert.Multiple (() => {
 				Assert.That (Cpu.Pc, Is.EqualTo (PC_INT_PCINT0));
-				Assert.That (Cpu.Cycles, Is.EqualTo(3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
+				Assert.That (Cpu.Cycles, Is.EqualTo(4)); // 4 cycles from DoAvrInterrupt (interrupt response, excludes the interrupted instruction)
 				Assert.That (Cpu.Mmio.Data[PCIFR], Is.EqualTo (0));
 			});
 		}
@@ -524,7 +524,7 @@ public class Gpio : AvrTestBase
 			
 			Assert.Multiple (() => {
 				Assert.That (Cpu.Pc, Is.EqualTo (PC_INT_PCINT0));
-				Assert.That (Cpu.Cycles, Is.EqualTo(3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
+				Assert.That (Cpu.Cycles, Is.EqualTo(4)); // 4 cycles from DoAvrInterrupt (interrupt response, excludes the interrupted instruction)
 				Assert.That (Cpu.Mmio.Data[PCIFR], Is.EqualTo (0));
 			});
 		}

@@ -195,7 +195,7 @@ public class AvrTestSimulation
     public AvrTestSimulation AddEeprom(AvrEepromConfig config, out AvrEeprom eeprom, uint eepromSize = 1024)
     {
         var backend = new EepromMemoryBackend(eepromSize);
-        eeprom = new AvrEeprom(Runner.Cpu, backend, config);
+        eeprom = new AvrEeprom(Runner.Cpu, backend, config, Runner.Speed);
         return this;
     }
 
@@ -203,7 +203,7 @@ public class AvrTestSimulation
     public AvrTestSimulation AddEeprom(AvrEepromConfig config, uint eepromSize = 1024)
     {
         var backend = new EepromMemoryBackend(eepromSize);
-        _ = new AvrEeprom(Runner.Cpu, backend, config);
+        _ = new AvrEeprom(Runner.Cpu, backend, config, Runner.Speed);
         return this;
     }
 

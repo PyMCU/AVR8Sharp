@@ -163,6 +163,176 @@ public class AvrTimer
         ociec: DefaultTimerBits.OCIEC
     );
 
+    // ── ATmega2560 ──────────────────────────────────────────────────────────
+    // Naming: Mega2560Timer<N>Config. Interrupt "address" values are word indices = avr-libc vector
+    // number x 2. Output compare / T / ICP pins follow the ATmega2560 datasheet pin table.
+
+    /// <summary>ATmega2560 Timer0: 8-bit, OC0A = PB7, OC0B = PG5, T0 = PD7. Vectors COMPA 0x2A, COMPB 0x2C, OVF 0x2E.</summary>
+    public static readonly AvrTimerConfig Mega2560Timer0Config = Timer0Config.CreateNew(
+        comparatorAInterrupt: 0x2a,
+        comparatorBInterrupt: 0x2c,
+        overflowInterrupt: 0x2e,
+        comparatorPortA: AvrIoPort.Mega2560PortBConfig.PORT,
+        comparatorPinA: 7,
+        comparatorPortB: AvrIoPort.Mega2560PortGConfig.PORT,
+        comparatorPinB: 5,
+        externalClockPort: AvrIoPort.Mega2560PortDConfig.PORT,
+        externalClockPin: 7);
+
+    /// <summary>ATmega2560 Timer1: 16-bit with channel C (OCR1C 0x8C), OC1A = PB5, OC1B = PB6, OC1C = PB7, T1 = PD6, ICP1 = PD4. Vectors CAPT 0x20, COMPA 0x22, COMPB 0x24, COMPC 0x26, OVF 0x28.</summary>
+    public static readonly AvrTimerConfig Mega2560Timer1Config = Timer1Config.CreateNew(
+        captureInterrupt: 0x20,
+        comparatorAInterrupt: 0x22,
+        comparatorBInterrupt: 0x24,
+        comparatorCInterrupt: 0x26,
+        overflowInterrupt: 0x28,
+        ocrc: 0x8c,
+        ocfc: 0x08,
+        ociec: 0x08,
+        comparatorPortA: AvrIoPort.Mega2560PortBConfig.PORT,
+        comparatorPinA: 5,
+        comparatorPortB: AvrIoPort.Mega2560PortBConfig.PORT,
+        comparatorPinB: 6,
+        comparatorPortC: AvrIoPort.Mega2560PortBConfig.PORT,
+        comparatorPinC: 7,
+        externalClockPort: AvrIoPort.Mega2560PortDConfig.PORT,
+        externalClockPin: 6,
+        icpPort: AvrIoPort.Mega2560PortDConfig.PORT,
+        icpPin: 4);
+
+    /// <summary>ATmega2560 Timer2: 8-bit async, OC2A = PB4, OC2B = PH6. Vectors COMPA 0x1A, COMPB 0x1C, OVF 0x1E.</summary>
+    public static readonly AvrTimerConfig Mega2560Timer2Config = Timer2Config.CreateNew(
+        comparatorAInterrupt: 0x1a,
+        comparatorBInterrupt: 0x1c,
+        overflowInterrupt: 0x1e,
+        comparatorPortA: AvrIoPort.Mega2560PortBConfig.PORT,
+        comparatorPinA: 4,
+        comparatorPortB: AvrIoPort.Mega2560PortHConfig.PORT,
+        comparatorPinB: 6);
+
+    /// <summary>ATmega2560 Timer3: 16-bit, OC3A/B/C = PE3/PE4/PE5, T3 = PE6, ICP3 = PE7. Vectors CAPT 0x3E, COMPA 0x40, COMPB 0x42, COMPC 0x44, OVF 0x46.</summary>
+    public static readonly AvrTimerConfig Mega2560Timer3Config = new AvrTimerConfig(
+        bits: 16,
+        dividers: Timer01Dividers,
+        captureInterrupt: 0x3e,
+        comparatorAInterrupt: 0x40,
+        comparatorBInterrupt: 0x42,
+        comparatorCInterrupt: 0x44,
+        overflowInterrupt: 0x46,
+        tifr: 0x38,
+        ocra: 0x98,
+        ocrb: 0x9a,
+        ocrc: 0x9c,
+        icr: 0x96,
+        tcnt: 0x94,
+        tccra: 0x90,
+        tccrb: 0x91,
+        tccrc: 0x92,
+        timsk: 0x71,
+        comparatorPortA: AvrIoPort.Mega2560PortEConfig.PORT,
+        comparatorPinA: 3,
+        comparatorPortB: AvrIoPort.Mega2560PortEConfig.PORT,
+        comparatorPinB: 4,
+        comparatorPortC: AvrIoPort.Mega2560PortEConfig.PORT,
+        comparatorPinC: 5,
+        externalClockPort: AvrIoPort.Mega2560PortEConfig.PORT,
+        externalClockPin: 6,
+        icpPort: AvrIoPort.Mega2560PortEConfig.PORT,
+        icpPin: 7,
+        tov: DefaultTimerBits.TOV,
+        ocfa: DefaultTimerBits.OCFA,
+        ocfb: DefaultTimerBits.OCFB,
+        ocfc: 0x08,
+        icf: 0x20,
+        toie: DefaultTimerBits.TOIE,
+        ociea: DefaultTimerBits.OCIEA,
+        ocieb: DefaultTimerBits.OCIEB,
+        ociec: 0x08,
+        icie: 0x20
+    );
+
+    /// <summary>ATmega2560 Timer4: 16-bit, OC4A/B/C = PH3/PH4/PH5, T4 = PH7, ICP4 = PL0. Vectors CAPT 0x52, COMPA 0x54, COMPB 0x56, COMPC 0x58, OVF 0x5A.</summary>
+    public static readonly AvrTimerConfig Mega2560Timer4Config = new AvrTimerConfig(
+        bits: 16,
+        dividers: Timer01Dividers,
+        captureInterrupt: 0x52,
+        comparatorAInterrupt: 0x54,
+        comparatorBInterrupt: 0x56,
+        comparatorCInterrupt: 0x58,
+        overflowInterrupt: 0x5a,
+        tifr: 0x39,
+        ocra: 0xa8,
+        ocrb: 0xaa,
+        ocrc: 0xac,
+        icr: 0xa6,
+        tcnt: 0xa4,
+        tccra: 0xa0,
+        tccrb: 0xa1,
+        tccrc: 0xa2,
+        timsk: 0x72,
+        comparatorPortA: AvrIoPort.Mega2560PortHConfig.PORT,
+        comparatorPinA: 3,
+        comparatorPortB: AvrIoPort.Mega2560PortHConfig.PORT,
+        comparatorPinB: 4,
+        comparatorPortC: AvrIoPort.Mega2560PortHConfig.PORT,
+        comparatorPinC: 5,
+        externalClockPort: AvrIoPort.Mega2560PortHConfig.PORT,
+        externalClockPin: 7,
+        icpPort: AvrIoPort.Mega2560PortLConfig.PORT,
+        icpPin: 0,
+        tov: DefaultTimerBits.TOV,
+        ocfa: DefaultTimerBits.OCFA,
+        ocfb: DefaultTimerBits.OCFB,
+        ocfc: 0x08,
+        icf: 0x20,
+        toie: DefaultTimerBits.TOIE,
+        ociea: DefaultTimerBits.OCIEA,
+        ocieb: DefaultTimerBits.OCIEB,
+        ociec: 0x08,
+        icie: 0x20
+    );
+
+    /// <summary>ATmega2560 Timer5: 16-bit, OC5A/B/C = PL3/PL4/PL5, T5 = PL2, ICP5 = PL1. Vectors CAPT 0x5C, COMPA 0x5E, COMPB 0x60, COMPC 0x62, OVF 0x64.</summary>
+    public static readonly AvrTimerConfig Mega2560Timer5Config = new AvrTimerConfig(
+        bits: 16,
+        dividers: Timer01Dividers,
+        captureInterrupt: 0x5c,
+        comparatorAInterrupt: 0x5e,
+        comparatorBInterrupt: 0x60,
+        comparatorCInterrupt: 0x62,
+        overflowInterrupt: 0x64,
+        tifr: 0x3a,
+        ocra: 0x128,
+        ocrb: 0x12a,
+        ocrc: 0x12c,
+        icr: 0x126,
+        tcnt: 0x124,
+        tccra: 0x120,
+        tccrb: 0x121,
+        tccrc: 0x122,
+        timsk: 0x73,
+        comparatorPortA: AvrIoPort.Mega2560PortLConfig.PORT,
+        comparatorPinA: 3,
+        comparatorPortB: AvrIoPort.Mega2560PortLConfig.PORT,
+        comparatorPinB: 4,
+        comparatorPortC: AvrIoPort.Mega2560PortLConfig.PORT,
+        comparatorPinC: 5,
+        externalClockPort: AvrIoPort.Mega2560PortLConfig.PORT,
+        externalClockPin: 2,
+        icpPort: AvrIoPort.Mega2560PortLConfig.PORT,
+        icpPin: 1,
+        tov: DefaultTimerBits.TOV,
+        ocfa: DefaultTimerBits.OCFA,
+        ocfb: DefaultTimerBits.OCFB,
+        ocfc: 0x08,
+        icf: 0x20,
+        toie: DefaultTimerBits.TOIE,
+        ociea: DefaultTimerBits.OCIEA,
+        ocieb: DefaultTimerBits.OCIEB,
+        ociec: 0x08,
+        icie: 0x20
+    );
+
     public static readonly WgmConfig[] WgmModes8Bit =
     [
         new WgmConfig(mode: TimerMode.Normal, timerTopValue: 0xff, ocrUpdateMode: OcrUpdateMode.Immediate,
@@ -435,6 +605,7 @@ public class AvrTimer
             }
 
             _cpu.Mmio.Data[_config.TCCRB] = value;
+            TryAttachIcp();
             _updateDivider = true;
             _cpu.ClearClockEvent(_countAction);
             _cpu.AddClockEvent(_countAction, 0);
@@ -453,7 +624,8 @@ public class AvrTimer
 
         cpu.Mmio.RegisterWrite(config.TIFR, (value, _, _, _) =>
         {
-            _cpu.Mmio.Data[config.TIFR] = value;
+            // TIFR flags are cleared by writing 1; writing 0 leaves them untouched (datasheet:
+            // "cleared by writing a logic one"), so the written value is never stored.
             _cpu.ClearInterruptByFlag(_ovf, value);
             _cpu.ClearInterruptByFlag(_ocfa, value);
             _cpu.ClearInterruptByFlag(_ocfb, value);
@@ -471,6 +643,49 @@ public class AvrTimer
             if (_hasCaptureInterrupt) _cpu.UpdateInterruptEnable(_capt!, value);
             return false;
         });
+
+        cpu.OnPeripheralReset += ResetFromCpu;
+        TryAttachIcp();
+    }
+
+    /// <summary>
+    /// CPU reset: the timer stops (no clock source until TCCRnB is written again), counters
+    /// and compare buffers clear, and the waveform mode returns to Normal. Pin overrides are
+    /// released by the GPIO reset, so only the local bookkeeping is cleared here.
+    /// </summary>
+    private void ResetFromCpu()
+    {
+        Reset();
+        _countingUp = true;
+        _highByteTemp = 0;
+        _compA = 0;
+        _compB = 0;
+        _compC = 0;
+        if (_externalClockPort != null)
+        {
+            _externalClockPort.ExternalClockListeners[_config.ExternalClockPin] = null;
+        }
+
+        UpdateWgmConfig();
+    }
+
+    private bool _icpAttached;
+
+    /// <summary>
+    /// Hooks the ICPn pin (when the config models it) so an edge selected by ICESn (TCCRnB bit 6)
+    /// triggers an input capture. Retried on TCCRB writes in case the port was added after the timer.
+    /// </summary>
+    private void TryAttachIcp()
+    {
+        if (_icpAttached || !_hasCaptureInterrupt || _config.IcpPort == 0) return;
+        var port = _cpu.GpioByPort.GetValueOrDefault(_config.IcpPort);
+        if (port == null) return;
+        port.ExternalClockListeners[_config.IcpPin] = level =>
+        {
+            var risingEdgeSelected = (_cpu.Mmio.Data[_config.TCCRB] & 0x40) != 0;
+            if (level == risingEdgeSelected) TriggerCapture();
+        };
+        _icpAttached = true;
     }
 
     private byte ReadTcnt(ushort addr)
@@ -685,6 +900,11 @@ public class AvrTimer
                     if (_compB != 0)
                     {
                         UpdateCompPin(_compB, 'B', true);
+                    }
+
+                    if (_hasOcrC && _compC != 0)
+                    {
+                        UpdateCompPin(_compC, 'C', true);
                     }
                 }
 
@@ -1131,6 +1351,10 @@ public class AvrTimerConfig
     public readonly ushort ExternalClockPort;
     public readonly byte ExternalClockPin;
 
+    // Input capture pin (ICPn) and its port. Optional: 0 if the pin is not modelled.
+    public readonly ushort IcpPort;
+    public readonly byte IcpPin;
+
     public AvrTimerConfig(
         byte bits = 0,
         int[]? dividers = null,
@@ -1166,7 +1390,9 @@ public class AvrTimerConfig
         ushort comparatorPortC = 0,
         byte comparatorPinC = 0,
         ushort externalClockPort = 0,
-        byte externalClockPin = 0
+        byte externalClockPin = 0,
+        ushort icpPort = 0,
+        byte icpPin = 0
     )
     {
         Bits = bits;
@@ -1204,81 +1430,91 @@ public class AvrTimerConfig
         ComparatorPinC = comparatorPinC;
         ExternalClockPort = externalClockPort;
         ExternalClockPin = externalClockPin;
+        IcpPort = icpPort;
+        IcpPin = icpPin;
     }
 
-    public AvrTimerConfig CreateNew(byte bits = 0,
+    /// <summary>
+    /// Creates a copy of this config replacing only the values that are passed. A parameter left
+    /// <c>null</c> keeps the source value, so an explicit <c>0</c> (for example pin 0 or bit 0)
+    /// is honoured.
+    /// </summary>
+    public AvrTimerConfig CreateNew(byte? bits = null,
         int[]? dividers = null,
-        byte captureInterrupt = 0,
-        byte comparatorAInterrupt = 0,
-        byte comparatorBInterrupt = 0,
-        byte comparatorCInterrupt = 0,
-        byte overflowInterrupt = 0,
-        ushort tifr = 0,
-        ushort ocra = 0,
-        ushort ocrb = 0,
-        ushort ocrc = 0,
-        ushort icr = 0,
-        ushort tcnt = 0,
-        ushort tccra = 0,
-        ushort tccrb = 0,
-        ushort tccrc = 0,
-        ushort timsk = 0,
-        byte tov = 0,
-        byte ocfa = 0,
-        byte ocfb = 0,
-        byte ocfc = 0,
-        byte icf = 0,
-        byte toie = 0,
-        byte ociea = 0,
-        byte ocieb = 0,
-        byte ociec = 0,
-        byte icie = 0,
-        ushort comparatorPortA = 0,
-        byte comparatorPinA = 0,
-        ushort comparatorPortB = 0,
-        byte comparatorPinB = 0,
-        ushort comparatorPortC = 0,
-        byte comparatorPinC = 0,
-        ushort externalClockPort = 0,
-        byte externalClockPin = 0)
+        byte? captureInterrupt = null,
+        byte? comparatorAInterrupt = null,
+        byte? comparatorBInterrupt = null,
+        byte? comparatorCInterrupt = null,
+        byte? overflowInterrupt = null,
+        ushort? tifr = null,
+        ushort? ocra = null,
+        ushort? ocrb = null,
+        ushort? ocrc = null,
+        ushort? icr = null,
+        ushort? tcnt = null,
+        ushort? tccra = null,
+        ushort? tccrb = null,
+        ushort? tccrc = null,
+        ushort? timsk = null,
+        byte? tov = null,
+        byte? ocfa = null,
+        byte? ocfb = null,
+        byte? ocfc = null,
+        byte? icf = null,
+        byte? toie = null,
+        byte? ociea = null,
+        byte? ocieb = null,
+        byte? ociec = null,
+        byte? icie = null,
+        ushort? comparatorPortA = null,
+        byte? comparatorPinA = null,
+        ushort? comparatorPortB = null,
+        byte? comparatorPinB = null,
+        ushort? comparatorPortC = null,
+        byte? comparatorPinC = null,
+        ushort? externalClockPort = null,
+        byte? externalClockPin = null,
+        ushort? icpPort = null,
+        byte? icpPin = null)
     {
-        // The create new function should be used to create a new instance of the AvrTimerConfig class reusing the same values and replacing only the ones that are different
         return new AvrTimerConfig(
-            bits: bits == 0 ? Bits : bits,
+            bits: bits ?? Bits,
             dividers: dividers ?? Dividers,
-            captureInterrupt: captureInterrupt == 0 ? CaptureInterrupt : captureInterrupt,
-            comparatorAInterrupt: comparatorAInterrupt == 0 ? ComparatorAInterrupt : comparatorAInterrupt,
-            comparatorBInterrupt: comparatorBInterrupt == 0 ? ComparatorBInterrupt : comparatorBInterrupt,
-            comparatorCInterrupt: comparatorCInterrupt == 0 ? ComparatorCInterrupt : comparatorCInterrupt,
-            overflowInterrupt: overflowInterrupt == 0 ? OverflowInterrupt : overflowInterrupt,
-            tifr: tifr == 0 ? TIFR : tifr,
-            ocra: ocra == 0 ? OCRA : ocra,
-            ocrb: ocrb == 0 ? OCRB : ocrb,
-            ocrc: ocrc == 0 ? OCRC : ocrc,
-            icr: icr == 0 ? ICR : icr,
-            tcnt: tcnt == 0 ? TCNT : tcnt,
-            tccra: tccra == 0 ? TCCRA : tccra,
-            tccrb: tccrb == 0 ? TCCRB : tccrb,
-            tccrc: tccrc == 0 ? TCCRC : tccrc,
-            timsk: timsk == 0 ? TIMSK : timsk,
-            tov: tov == 0 ? TOV : tov,
-            ocfa: ocfa == 0 ? OCFA : ocfa,
-            ocfb: ocfb == 0 ? OCFB : ocfb,
-            ocfc: ocfc == 0 ? OCFC : ocfc,
-            icf: icf == 0 ? ICF : icf,
-            toie: toie == 0 ? TOIE : toie,
-            ociea: ociea == 0 ? OCIEA : ociea,
-            ocieb: ocieb == 0 ? OCIEB : ocieb,
-            ociec: ociec == 0 ? OCIEC : ociec,
-            icie: icie == 0 ? ICIE : icie,
-            comparatorPortA: comparatorPortA == 0 ? ComparatorPortA : comparatorPortA,
-            comparatorPinA: comparatorPinA == 0 ? ComparatorPinA : comparatorPinA,
-            comparatorPortB: comparatorPortB == 0 ? ComparatorPortB : comparatorPortB,
-            comparatorPinB: comparatorPinB == 0 ? ComparatorPinB : comparatorPinB,
-            comparatorPortC: comparatorPortC == 0 ? ComparatorPortC : comparatorPortC,
-            comparatorPinC: comparatorPinC == 0 ? ComparatorPinC : comparatorPinC,
-            externalClockPort: externalClockPort == 0 ? ExternalClockPort : externalClockPort,
-            externalClockPin: externalClockPin == 0 ? ExternalClockPin : externalClockPin
+            captureInterrupt: captureInterrupt ?? CaptureInterrupt,
+            comparatorAInterrupt: comparatorAInterrupt ?? ComparatorAInterrupt,
+            comparatorBInterrupt: comparatorBInterrupt ?? ComparatorBInterrupt,
+            comparatorCInterrupt: comparatorCInterrupt ?? ComparatorCInterrupt,
+            overflowInterrupt: overflowInterrupt ?? OverflowInterrupt,
+            tifr: tifr ?? TIFR,
+            ocra: ocra ?? OCRA,
+            ocrb: ocrb ?? OCRB,
+            ocrc: ocrc ?? OCRC,
+            icr: icr ?? ICR,
+            tcnt: tcnt ?? TCNT,
+            tccra: tccra ?? TCCRA,
+            tccrb: tccrb ?? TCCRB,
+            tccrc: tccrc ?? TCCRC,
+            timsk: timsk ?? TIMSK,
+            tov: tov ?? TOV,
+            ocfa: ocfa ?? OCFA,
+            ocfb: ocfb ?? OCFB,
+            ocfc: ocfc ?? OCFC,
+            icf: icf ?? ICF,
+            toie: toie ?? TOIE,
+            ociea: ociea ?? OCIEA,
+            ocieb: ocieb ?? OCIEB,
+            ociec: ociec ?? OCIEC,
+            icie: icie ?? ICIE,
+            comparatorPortA: comparatorPortA ?? ComparatorPortA,
+            comparatorPinA: comparatorPinA ?? ComparatorPinA,
+            comparatorPortB: comparatorPortB ?? ComparatorPortB,
+            comparatorPinB: comparatorPinB ?? ComparatorPinB,
+            comparatorPortC: comparatorPortC ?? ComparatorPortC,
+            comparatorPinC: comparatorPinC ?? ComparatorPinC,
+            externalClockPort: externalClockPort ?? ExternalClockPort,
+            externalClockPin: externalClockPin ?? ExternalClockPin,
+            icpPort: icpPort ?? IcpPort,
+            icpPin: icpPin ?? IcpPin
         );
     }
 }

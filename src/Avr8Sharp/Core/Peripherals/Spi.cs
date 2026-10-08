@@ -28,11 +28,21 @@ public class AvrSpi
 		SPDR = 0x4e
 	};
 	
+	/// <summary>ATmega2560 SPI: same registers as the ATmega328P; SPI STC is vector 24 -> word 0x30.</summary>
+	public static readonly AvrSpiConfig Mega2560SpiConfig = new AvrSpiConfig {
+		SpiInterrupt = 0x30,
+
+		SPCR = 0x4c,
+		SPSR = 0x4d,
+		SPDR = 0x4e
+	};
+
 	readonly Cpu _cpu;
 	readonly AvrSpiConfig _config;
 	readonly uint _freqHz;
 	
 	bool _transmissionActive = false;
+	bool _spsrReadWithSpif = false;
 	byte _shiftRegister = 0;
 
 	readonly AvrInterruptConfig _spi;
@@ -120,6 +130,7 @@ public class AvrSpi
 			}
 			
 			// Clear write collision / interrupt flags
+			_spsrReadWithSpif = false;
 			_cpu.Mmio.Data[_config.SPSR] &= ~SPSR_WCOL & 0xFF;
 			_cpu.ClearInterrupt (_spi);
 			
@@ -128,6 +139,22 @@ public class AvrSpi
 			return true;
 		});
 		
+		// SPIF is cleared by reading SPSR with SPIF set and then accessing SPDR (datasheet SPSR).
+		cpu.Mmio.RegisterRead(_config.SPSR, _ => {
+			var value = _cpu.Mmio.Data[_config.SPSR];
+			_spsrReadWithSpif = (value & SPSR_SPIF) != 0;
+			return value;
+		});
+
+		cpu.Mmio.RegisterRead(_config.SPDR, _ => {
+			var value = _cpu.Mmio.Data[_config.SPDR];
+			if (_spsrReadWithSpif) {
+				_spsrReadWithSpif = false;
+				_cpu.ClearInterrupt (_spi);
+			}
+			return value;
+		});
+
 		cpu.Mmio.RegisterWrite(_config.SPCR, (value, _, _, _) => {
 			_cpu.UpdateInterruptEnable (_spi, value);
 			return false;
@@ -135,10 +162,16 @@ public class AvrSpi
 
 		cpu.Mmio.RegisterWrite(_config.SPSR, (value, _, _, _) =>
 		{
-			_cpu.Mmio.Data[_config.SPSR] = value;
-			_cpu.ClearInterruptByFlag(_spi, value);
-			return false;
+			// SPIF and WCOL are read-only; only SPI2X is writable (datasheet SPSR).
+			_cpu.Mmio.Data[_config.SPSR] = (byte)((_cpu.Mmio.Data[_config.SPSR] & ~SPSR_SPI2X) | (value & SPSR_SPI2X));
+			return true;
 		});
+
+		cpu.OnPeripheralReset += () => {
+			// Any transfer in flight lost its completion event with the clock events
+			_transmissionActive = false;
+			_shiftRegister = 0;
+		};
 	}
 
 	public void CompleteTransfer (int receivedByte)

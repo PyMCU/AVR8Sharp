@@ -299,7 +299,7 @@ public class Usart : AvrTestBase
             Assert.Multiple(() =>
             {
                 Assert.That(Cpu.Pc, Is.EqualTo(PC_INT_UDRE));
-                Assert.That(Cpu.Cycles, Is.EqualTo(3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
+                Assert.That(Cpu.Cycles, Is.EqualTo(4)); // 4 cycles from DoAvrInterrupt (interrupt response, excludes the interrupted instruction)
                 Assert.That((Cpu.Mmio.Data[UCSR0A] & UDRE), Is.EqualTo(0));
             });
         }
@@ -315,7 +315,7 @@ public class Usart : AvrTestBase
             Assert.Multiple(() =>
             {
                 Assert.That(Cpu.Pc, Is.EqualTo(PC_INT_TXC));
-                Assert.That(Cpu.Cycles, Is.EqualTo(1_000_000 + 3)); // 3 cycles from DoAvrInterrupt
+                Assert.That(Cpu.Cycles, Is.EqualTo(1_000_000 + 4)); // 4 cycles from DoAvrInterrupt
                 Assert.That((Cpu.Mmio.Data[UCSR0A] & TXC), Is.EqualTo(0));
             });
         }
@@ -740,5 +740,34 @@ public class Usart : AvrTestBase
 			Assert.That (Cpu.Mmio.Data[UCSR0A] & UDRE, Is.EqualTo (UDRE),
 				"the transmitter must still be ready: a firmware polling UDRE would spin forever");
 		}
+	}
+
+
+	[Test(Description = "A UCSRB write that keeps RXEN set (e.g. toggling UDRIE) must not drop a received byte")]
+	public void UcsrbWriteKeepsPendingRxc()
+	{
+		Cpu.WriteData(UCSR0B, RXEN | TXEN);
+		_usart.WriteByte(0x42, immediate: true);
+		Cpu.WriteData(UCSR0B, RXEN | TXEN | UDRIE);
+		Cpu.WriteData(UCSR0B, RXEN | TXEN);
+
+		Assert.Multiple(() =>
+		{
+			Assert.That(Cpu.Mmio.Data[UCSR0A] & RXC, Is.EqualTo(RXC), "RXC must survive");
+			Assert.That(Cpu.ReadData(UDR0), Is.EqualTo(0x42));
+		});
+	}
+
+	[Test(Description = "Disabling the receiver (RXEN 1->0) flushes the receive buffer and RXC (datasheet 19.7.3)")]
+	public void DisablingReceiverFlushesBuffer()
+	{
+		Cpu.WriteData(UCSR0B, RXEN);
+		_usart.WriteByte(0x42, immediate: true);
+		Cpu.WriteData(UCSR0B, 0);
+
+		Assert.That(Cpu.Mmio.Data[UCSR0A] & RXC, Is.Zero);
+
+		Cpu.WriteData(UCSR0B, RXEN);
+		Assert.That(Cpu.ReadData(UDR0), Is.Zero, "the stale byte must be gone");
 	}
 }

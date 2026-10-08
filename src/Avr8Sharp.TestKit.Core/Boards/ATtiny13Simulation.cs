@@ -29,6 +29,7 @@ public sealed class ATtiny13Simulation : AvrTestSimulation
     {
         WithFrequency(Frequency);
         Cpu.StackLowLimit = 0x60;
+        Cpu.RamStart = 0x60;
 
         AddGpio(PortBConfig, out var pb); PortB = pb;
     }

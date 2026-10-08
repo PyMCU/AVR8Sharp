@@ -24,7 +24,7 @@ public class Interrupt : AvrTestBase
 
 		Assert.Multiple(() =>
 		{
-			Assert.That(Cpu.Cycles, Is.EqualTo(3)); // 2 for PC push + 1 for vector fetch (AVR spec: 4 cycles total)
+			Assert.That(Cpu.Cycles, Is.EqualTo(4)); // datasheet: interrupt response is 4 cycles with a 16-bit PC
 			Assert.That(Cpu.Pc, Is.EqualTo(5));
 			Assert.That(Cpu.Mmio.Data[93], Is.EqualTo(0x7E)); // SP <- 0x7E
 			Assert.That(Cpu.Mmio.Data[0x80], Is.EqualTo(0x20)); // Return address low byte
@@ -47,7 +47,7 @@ public class Interrupt : AvrTestBase
 
 		Assert.Multiple(() =>
 		{
-			Assert.That(Cpu.Cycles, Is.EqualTo(3)); // 2 for PC push + 1 for vector fetch (AVR spec: 4 cycles total)
+			Assert.That(Cpu.Cycles, Is.EqualTo(5)); // datasheet: interrupt response is 5 cycles with a 22-bit PC
 			Assert.That(Cpu.Pc, Is.EqualTo(5));
 			Assert.That(Cpu.Mmio.Data[93], Is.EqualTo(0x7D)); // SP <- 0x7D
 			Assert.That(Cpu.Mmio.Data[0x80], Is.EqualTo(0x20)); // Return address low byte
@@ -57,19 +57,31 @@ public class Interrupt : AvrTestBase
 		});
 	}
 
-	[Test(Description = "Interrupt latency must be exactly 3 cycles from DoAvrInterrupt (4 total incl. executing instruction)")]
-	public void InterruptLatency_ThreeCycles ()
+	[Test(Description = "Interrupt response is 4 cycles on a 16-bit PC part, on top of the interrupted instruction")]
+	public void InterruptLatency_FourCycles ()
 	{
-		// AVR spec: after a pending interrupt is recognized, the current instruction
-		// finishes (1 cycle), then the PC is pushed onto the stack (2 cycles),
-		// then the vector address is fetched (1 cycle) = 4 cycles total.
-		// DoAvrInterrupt is called *after* the instruction cycle, so it must add exactly 3.
+		// Datasheet: "the interrupt execution response for all the enabled AVR interrupts is
+		// minimum four clock cycles" (PC push + vector). DoAvrInterrupt runs after the interrupted
+		// instruction already charged its own cycles, so it adds exactly 4.
+		var cpu = new AVR8Sharp.Core.Cpu(new ushort[0x8000]);
+		cpu.Mmio.Data[93] = 0x80;
+		cpu.Mmio.Data[95] = 0b10000001; // I flag + C flag
+
+		var cyclesBefore = cpu.Cycles;
+		AvrInterrupt.DoAvrInterrupt(cpu, 10);
+		Assert.That(cpu.Cycles - cyclesBefore, Is.EqualTo(4));
+	}
+
+	[Test(Description = "Interrupt response is 5 cycles on a 22-bit PC part (3-byte PC push)")]
+	public void InterruptLatency_FiveCyclesOn22BitPc ()
+	{
+		Assert.That(Cpu.Pc22Bits, Is.True);
 		Cpu.Mmio.Data[93] = 0x80;
-		Cpu.Mmio.Data[95] = 0b10000001; // I flag + C flag
+		Cpu.Mmio.Data[95] = 0b10000001;
 
 		var cyclesBefore = Cpu.Cycles;
 		AvrInterrupt.DoAvrInterrupt(Cpu, 10);
-		Assert.That(Cpu.Cycles - cyclesBefore, Is.EqualTo(3));
+		Assert.That(Cpu.Cycles - cyclesBefore, Is.EqualTo(5));
 	}
 
 	[Test(Description = "SREG is cleared to zero on CPU Reset")]

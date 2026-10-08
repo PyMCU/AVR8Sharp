@@ -57,6 +57,19 @@ public class AvrTwi
         TWAMR = 0xbd
     };
 
+    /// <summary>ATmega2560 TWI: same registers as the ATmega328P; TWI is vector 39 -> word 0x4E.</summary>
+    public static readonly AvrTwiConfig Mega2560TwiConfig = new()
+    {
+        TwiInterrupt = 0x4e,
+
+        TWBR = 0xb8,
+        TWSR = 0xb9,
+        TWAR = 0xba,
+        TWDR = 0xbb,
+        TWCR = 0xbc,
+        TWAMR = 0xbd
+    };
+
     private readonly Cpu _cpu;
     private readonly AvrTwiConfig _config;
     private readonly uint _freqHz;
@@ -161,6 +174,11 @@ public class AvrTwi
             _deferred = null;
             _busy = false;
             _eventWireCycles = 0;
+            // TWSR resets to idle (TWS = 0xF8) and TWDR to 0xFF (datasheet register summary).
+            // TWAR is left at 0, which this model reads as "not a slave".
+            _cpu.Mmio.Data[_config.TWSR] = STATUS_TWI_IDLE;
+            _cpu.Mmio.Data[_config.TWDR] = 0xff;
+            SlaveAddressChanged?.Invoke(0);
         };
 
         cpu.Mmio.RegisterWrite(_config.TWAR, (value, _, _, _) =>
@@ -172,7 +190,8 @@ public class AvrTwi
 
         cpu.Mmio.RegisterWrite(_config.TWCR, (value, _, _, _) =>
         {
-            _cpu.Mmio.Data[_config.TWCR] = value;
+            // TWINT is cleared by writing a one; writing zero must not drop a pending flag.
+            _cpu.Mmio.Data[_config.TWCR] = (byte)((value & ~TWCR_TWINT) | (_cpu.Mmio.Data[_config.TWCR] & TWCR_TWINT));
             var clearInt = (value & TWCR_TWINT) != 0;
             _cpu.ClearInterruptByFlag(_twi, value);
             _cpu.UpdateInterruptEnable(_twi, value);
@@ -211,7 +230,7 @@ public class AvrTwi
                 return true;
             }
 
-            return false;
+            return true;
         });
     }
 

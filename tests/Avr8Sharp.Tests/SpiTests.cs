@@ -361,4 +361,28 @@ public class Spi : AvrTestBase
 		Cpu.Tick();
 		Assert.That(Cpu.ReadData(SPDR), Is.EqualTo(0x88));
 	}
+
+
+	[Test (Description = "SPIF and WCOL are read-only; only SPI2X is writable in SPSR")]
+	public void SpsrOnlySpi2xWritable ()
+	{
+		Cpu.Mmio.Data[SPSR] = SPIF | WCOL;
+		Cpu.WriteData(SPSR, SPI2X);
+		Assert.That(Cpu.Mmio.Data[SPSR], Is.EqualTo(SPIF | WCOL | SPI2X));
+
+		Cpu.WriteData(SPSR, 0);
+		Assert.That(Cpu.Mmio.Data[SPSR], Is.EqualTo(SPIF | WCOL));
+	}
+
+	[Test (Description = "SPIF is cleared by reading SPSR with SPIF set and then accessing SPDR")]
+	public void SpifClearedBySpsrThenSpdrRead ()
+	{
+		Cpu.Mmio.Data[SPSR] = SPIF;
+		Cpu.ReadData(SPDR);
+		Assert.That(Cpu.Mmio.Data[SPSR] & SPIF, Is.EqualTo(SPIF), "SPDR read alone does not clear SPIF");
+
+		Cpu.ReadData(SPSR);
+		Cpu.ReadData(SPDR);
+		Assert.That(Cpu.Mmio.Data[SPSR] & SPIF, Is.Zero);
+	}
 }

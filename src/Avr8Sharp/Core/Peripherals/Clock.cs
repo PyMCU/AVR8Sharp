@@ -78,6 +78,18 @@ public class AvrClock
 
             return true;
         });
+
+        // CLKPR resets to the unprogrammed-CKDIV8 value (division factor 1)
+        cpu.OnPeripheralReset += () =>
+        {
+            _clockEnabledCycles = 0;
+            if (_prescalerValue != 1)
+            {
+                _cyclesDelta = (int)(((double)cpu.Cycles + _cyclesDelta) * (_prescalerValue / 1.0) -
+                                     (double)cpu.Cycles);
+                _prescalerValue = 1;
+            }
+        };
     }
 }
 

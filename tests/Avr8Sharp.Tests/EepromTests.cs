@@ -503,4 +503,65 @@ public class Eeprom : AvrTestBase
 			});
 		}
 	}
+
+	[TestFixture]
+	public class Timing : AvrTestBase
+	{
+		private EepromMemoryBackend _backend;
+
+		protected override void SetupPeripherals()
+		{
+			_backend = new EepromMemoryBackend(1024);
+			_ = new AvrEeprom(Cpu, _backend, null, 8_000_000);
+		}
+
+		private void StartWrite(int eecrValue)
+		{
+			Cpu.WriteData(EEDR, 0x55);
+			Cpu.WriteData(EEARL, 15);
+			Cpu.WriteData(EEARH, 0);
+			Cpu.WriteData(EECR, EEMPE);
+			Cpu.WriteData(EECR, (byte)eecrValue);
+		}
+
+		[Test(Description = "At 8 MHz the atomic erase+write takes 3.4 ms = 27200 cycles, not the 16 MHz count")]
+		public void AtomicWriteScalesWithFrequency()
+		{
+			var start = Cpu.Cycles;
+			StartWrite(EEPE);
+			Cpu.Cycles = start + 27199;
+			Cpu.Tick();
+			Assert.That(Cpu.Mmio.Data[EECR] & EEPE, Is.EqualTo(EEPE), "still programming");
+
+			Cpu.Cycles = start + 27200;
+			Cpu.Tick();
+			Assert.Multiple(() =>
+			{
+				Assert.That(Cpu.Mmio.Data[EECR] & EEPE, Is.Zero);
+				Assert.That(_backend.ReadMemory(15), Is.EqualTo(0x55));
+			});
+		}
+
+		[Test(Description = "Erase-only is 1.8 ms = 14400 cycles at 8 MHz")]
+		public void EraseOnlyScalesWithFrequency()
+		{
+			var start = Cpu.Cycles;
+			StartWrite(EEPE | EEPM0);
+			Cpu.Cycles = start + 14399;
+			Cpu.Tick();
+			Assert.That(Cpu.Mmio.Data[EECR] & EEPE, Is.EqualTo(EEPE));
+
+			Cpu.Cycles = start + 14400;
+			Cpu.Tick();
+			Assert.That(Cpu.Mmio.Data[EECR] & EEPE, Is.Zero);
+		}
+
+		[Test(Description = "Writing EECR without EEPE (e.g. toggling EERIE) must not clear EEPE while programming")]
+		public void EepeSurvivesEecrWrite()
+		{
+			StartWrite(EEPE);
+			Cpu.WriteData(EECR, EERIE);
+			Assert.That(Cpu.Mmio.Data[EECR] & EEPE, Is.EqualTo(EEPE));
+		}
+	}
 }

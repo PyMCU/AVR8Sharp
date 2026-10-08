@@ -108,7 +108,8 @@ public static unsafe class Exports
         var t = new ATtiny85Simulation();
         var s = new NativeSession(t);
         s.Ports.Add(t.PortB);
-        s.Timers.AddRange([t.Timer0, t.Timer1]);
+        // Timer1 (AvrAttinyTimer1) resets itself through Cpu.OnPeripheralReset, so only Timer0 is tracked.
+        s.Timers.Add(t.Timer0);
         return Wrap(s);
     }
 

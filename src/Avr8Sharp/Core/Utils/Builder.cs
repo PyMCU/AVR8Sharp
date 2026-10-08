@@ -11,6 +11,13 @@ public class AvrBuilder (AvrRunner @base, int flashSize = 0x8000)
 		return new AvrBuilder (new AvrRunner (new byte[flashSize], ramSize), flashSize);
 	}
 	
+	/// <summary>Sets the chip's first SRAM address (see <see cref="Cpu.RamStart"/>).</summary>
+	public AvrBuilder WithRamStart (int ramStart)
+	{
+		@base.Cpu.RamStart = ramStart;
+		return this;
+	}
+
 	public AvrBuilder SetSpeed(uint speed)
 	{
 		@base.SetSpeed (speed);
@@ -67,7 +74,7 @@ public class AvrBuilder (AvrRunner @base, int flashSize = 0x8000)
 	
 	public AvrBuilder AddEeprom(AvrEepromConfig config, IEepromBackend backend, out AvrEeprom eeprom)
 	{
-		eeprom = new AvrEeprom (@base.Cpu, backend, config);
+		eeprom = new AvrEeprom (@base.Cpu, backend, config, @base.Speed);
 		return this;
 	}
 	

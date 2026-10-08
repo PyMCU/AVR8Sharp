@@ -136,7 +136,11 @@ public static class Opcodes
     {
         var bit = (opcode & 0x70) >> 4;
         if (bit < 6) cpu._sregArith |= (byte)(1 << bit);
-        else cpu.Mmio.Data[95] |= (byte)(1 << bit);
+        else
+        {
+            if (bit == 7 && (cpu.Mmio.Data[95] & 0x80) == 0) cpu.HoldInterrupts();
+            cpu.Mmio.Data[95] |= (byte)(1 << bit);
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -659,14 +663,13 @@ public static class Opcodes
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void BREAK(ref Cpu cpu, ref ushort opcode)
     {
-        AvrInterrupt.OnBreakpoint?.Invoke(cpu.Pc);
+        cpu.RaiseBreakpoint();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void SLEEP(ref Cpu cpu, ref ushort opcode)
     {
-        // Invoke OnSleep with SM2:SM1:SM0 bits from SMCR register (0x53), bits 3:1
-        AvrInterrupt.OnSleep?.Invoke((byte)((cpu.Mmio.Data[0x53] >> 1) & 0x07));
+        cpu.RaiseSleep();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -696,7 +699,7 @@ public static class Opcodes
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void OUT(ref Cpu cpu, ref ushort opcode)
     {
-        cpu.WriteData((ushort)(((opcode & 0xf) | ((opcode & 0x600) >> 5)) + 32), cpu.Mmio.Data[(opcode & 0x1f0) >> 4]);
+        cpu.WriteDataSreg((ushort)(((opcode & 0xf) | ((opcode & 0x600) >> 5)) + 32), cpu.Mmio.Data[(opcode & 0x1f0) >> 4]);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -774,6 +777,7 @@ public static class Opcodes
 
         cpu.Cycles += cpu.Pc22Bits ? 4UL : 3UL;
         cpu.Mmio.Data[95] |= 0x80; // Enable interrupts
+        cpu.HoldInterrupts();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -899,7 +903,7 @@ public static class Opcodes
     {
         var value = cpu.Mmio.Data[(opcode & 0x1f0) >> 4];
         var addr = cpu.ProgramMemory[(int)(cpu.Pc + 1)];
-        cpu.WriteData(addr, value);
+        cpu.WriteDataSreg(addr, value);
         cpu.Pc++;
         cpu.Cycles++;
     }
@@ -907,7 +911,7 @@ public static class Opcodes
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void STX(ref Cpu cpu, ref ushort opcode)
     {
-        cpu.WriteData(cpu.Mmio.DataView.GetUint16(26, true), cpu.Mmio.Data[(opcode & 0x1f0) >> 4]);
+        cpu.WriteDataSreg(cpu.Mmio.DataView.GetUint16(26, true), cpu.Mmio.Data[(opcode & 0x1f0) >> 4]);
         cpu.Cycles++;
     }
 
@@ -915,7 +919,7 @@ public static class Opcodes
     public static void STX_INC(ref Cpu cpu, ref ushort opcode)
     {
         var x = cpu.Mmio.DataView.GetUint16(26, true);
-        cpu.WriteData(x, cpu.Mmio.Data[(opcode & 0x1f0) >> 4]);
+        cpu.WriteDataSreg(x, cpu.Mmio.Data[(opcode & 0x1f0) >> 4]);
         cpu.Mmio.DataView.SetUint16(26, (ushort)(x + 1), true);
         cpu.Cycles++;
     }
@@ -926,14 +930,14 @@ public static class Opcodes
         var i = cpu.Mmio.Data[(opcode & 0x1f0) >> 4];
         var x = cpu.Mmio.DataView.GetUint16(26, true) - 1;
         cpu.Mmio.DataView.SetUint16(26, (ushort)x, true);
-        cpu.WriteData((ushort)x, i);
+        cpu.WriteDataSreg((ushort)x, i);
         cpu.Cycles++;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void STY(ref Cpu cpu, ref ushort opcode)
     {
-        cpu.WriteData(cpu.Mmio.DataView.GetUint16(28, true), cpu.Mmio.Data[(opcode & 0x1f0) >> 4]);
+        cpu.WriteDataSreg(cpu.Mmio.DataView.GetUint16(28, true), cpu.Mmio.Data[(opcode & 0x1f0) >> 4]);
         cpu.Cycles++;
     }
 
@@ -942,7 +946,7 @@ public static class Opcodes
     {
         var i = cpu.Mmio.Data[(opcode & 0x1f0) >> 4];
         var y = cpu.Mmio.DataView.GetUint16(28, true);
-        cpu.WriteData(y, i);
+        cpu.WriteDataSreg(y, i);
         cpu.Mmio.DataView.SetUint16(28, (ushort)(y + 1), true);
         cpu.Cycles++;
     }
@@ -953,14 +957,14 @@ public static class Opcodes
         var i = cpu.Mmio.Data[(opcode & 0x1f0) >> 4];
         var y = cpu.Mmio.DataView.GetUint16(28, true) - 1;
         cpu.Mmio.DataView.SetUint16(28, (ushort)y, true);
-        cpu.WriteData((ushort)y, i);
+        cpu.WriteDataSreg((ushort)y, i);
         cpu.Cycles++;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void STDY(ref Cpu cpu, ref ushort opcode)
     {
-        cpu.WriteData(
+        cpu.WriteDataSreg(
             (ushort)(cpu.Mmio.DataView.GetUint16(28, true) +
                      ((opcode & 7) | ((opcode & 0xc00) >> 7) | ((opcode & 0x2000) >> 8))),
             cpu.Mmio.Data[(opcode & 0x1f0) >> 4]
@@ -971,7 +975,7 @@ public static class Opcodes
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void STZ(ref Cpu cpu, ref ushort opcode)
     {
-        cpu.WriteData(cpu.Mmio.DataView.GetUint16(30, true), cpu.Mmio.Data[(opcode & 0x1f0) >> 4]);
+        cpu.WriteDataSreg(cpu.Mmio.DataView.GetUint16(30, true), cpu.Mmio.Data[(opcode & 0x1f0) >> 4]);
         cpu.Cycles++;
     }
 
@@ -979,7 +983,7 @@ public static class Opcodes
     public static void STZ_INC(ref Cpu cpu, ref ushort opcode)
     {
         var z = cpu.Mmio.DataView.GetUint16(30, true);
-        cpu.WriteData(z, cpu.Mmio.Data[(opcode & 0x1f0) >> 4]);
+        cpu.WriteDataSreg(z, cpu.Mmio.Data[(opcode & 0x1f0) >> 4]);
         cpu.Mmio.DataView.SetUint16(30, (ushort)(z + 1), true);
         cpu.Cycles++;
     }
@@ -990,14 +994,14 @@ public static class Opcodes
         var i = cpu.Mmio.Data[(opcode & 0x1f0) >> 4];
         var z = cpu.Mmio.DataView.GetUint16(30, true) - 1;
         cpu.Mmio.DataView.SetUint16(30, (ushort)z, true);
-        cpu.WriteData((ushort)z, i);
+        cpu.WriteDataSreg((ushort)z, i);
         cpu.Cycles++;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void STDZ(ref Cpu cpu, ref ushort opcode)
     {
-        cpu.WriteData(
+        cpu.WriteDataSreg(
             (ushort)(cpu.Mmio.DataView.GetUint16(30, true) +
                      ((opcode & 7) | ((opcode & 0xc00) >> 7) | ((opcode & 0x2000) >> 8))),
             cpu.Mmio.Data[(opcode & 0x1f0) >> 4]

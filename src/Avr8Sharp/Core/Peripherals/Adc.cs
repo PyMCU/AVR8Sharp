@@ -61,6 +61,9 @@ public class AvrAdc
         ]
     );
 
+    /// <summary>Alias of <see cref="Atmega2560AdcConfig"/> following the Mega2560&lt;Peripheral&gt;Config naming scheme.</summary>
+    public static readonly AvrAdcConfig Mega2560AdcConfig = Atmega2560AdcConfig;
+
     public static readonly AdcMuxInput FallbackMuxInput = new AdcMuxInput(type: AdcMuxInputType.Constant, voltage: 0);
 
     public static readonly AvrAdcConfig AdcConfig = new AvrAdcConfig(
@@ -104,8 +107,26 @@ public class AvrAdc
     int _conversionCycles = 25;
     readonly AvrAdcConfig _config;
     readonly AvrInterruptConfig _adc;
-    readonly double avcc = 5.0;
-    readonly double aref = 5.0;
+    private double avcc = 5.0;
+    private double aref = 5.0;
+
+    /// <summary>
+    /// The voltage on the AVCC pin, which is the reference when ADMUX selects AVCC (the
+    /// Arduino core's DEFAULT). 5 V unless the host says otherwise; a board fed from a
+    /// different supply, or a 3.3 V board, sets it so conversions scale like the chip's do.
+    /// </summary>
+    public double Avcc
+    {
+        get => avcc;
+        set { avcc = value; UpdateCaches(); }
+    }
+
+    /// <summary>The voltage on the AREF pin, the reference when ADMUX selects EXTERNAL.</summary>
+    public double Aref
+    {
+        get => aref;
+        set { aref = value; UpdateCaches(); }
+    }
     
     private int _cachedSampleCycles;
     private double _cachedReferenceVoltage;
@@ -222,9 +243,15 @@ public class AvrAdc
                 _conversionCycles = 25;
             }
 
+            // ADIF is cleared by writing a one and never stored (datasheet 24.9.2, so sbi on
+            // ADCSRA clears it); ADSC cannot be cleared by firmware while a conversion runs.
+            var written = value;
+            value = (byte)((value & ~ADIF) | (oldValue & ADIF));
+            if (_converting) value |= ADSC;
             cpu.Mmio.Data[config.ADCSRA] = value;
             UpdateCaches();
             cpu.UpdateInterruptEnable(_adc, value);
+            cpu.ClearInterruptByFlag(_adc, written);
 
             if (!_converting && (value & ADSC) != 0)
             {
@@ -239,10 +266,19 @@ public class AvrAdc
                 return true;
             }
 
-            return false;
+            return true;
         });
 
         UpdateCaches();
+
+        cpu.OnPeripheralReset += () =>
+        {
+            // A conversion in flight lost its completion event with the clock events
+            _converting = false;
+            _pendingAdcResult = 0;
+            _conversionCycles = 25;
+            UpdateCaches();
+        };
     }
 
     /// <summary>

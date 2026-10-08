@@ -34,6 +34,7 @@ public sealed class ATtinyX4Simulation : AvrTestSimulation
     {
         WithFrequency(Frequency);
         Cpu.StackLowLimit = 0x60;   // SRAM starts at 0x60 on ATtiny parts
+        Cpu.RamStart = 0x60;
 
         AddGpio(PortAConfig, out var pa); PortA = pa;
         AddGpio(PortBConfig, out var pb); PortB = pb;

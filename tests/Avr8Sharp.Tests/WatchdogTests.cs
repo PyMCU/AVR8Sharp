@@ -156,6 +156,7 @@ public class Watchdog : AvrTestBase
     
     nop
     sei
+    nop
 
     break
 ").Compile();
@@ -172,6 +173,9 @@ public class Watchdog : AvrTestBase
 		
 		// Now we skip an extra 8ms. Watchdog should fire and jump to the interrupt handler
 		Cpu.Cycles += 16000 * 8;
+		runner.RunInstructions (1); // sei
+		// The instruction after SEI always runs before a pending interrupt is served
+		Assert.That (Cpu.Pc, Is.Not.EqualTo(INT_WDT));
 		runner.RunInstructions (1);
 		
 		Assert.That (Cpu.Pc, Is.EqualTo(INT_WDT));
@@ -302,5 +306,17 @@ public class Watchdog : AvrTestBase
 			Assert.That(Cpu.Pc, Is.EqualTo(0), "CPU should have reset because 20ms > new 16ms timeout");
 			Assert.That(Cpu.ReadData(MCUSR) & WDRF, Is.EqualTo(WDRF), "WDRF flag must be set");
 		});
+	}
+
+
+	[Test (Description = "WDIF is write-one-to-clear: writing zero keeps it")]
+	public void WdifWriteOneToClear ()
+	{
+		Cpu.Mmio.Data[WDTCSR] = 0x80 | WDIE;
+		Cpu.WriteData(WDTCSR, WDIE);
+		Assert.That(Cpu.Mmio.Data[WDTCSR] & 0x80, Is.EqualTo(0x80));
+
+		Cpu.WriteData(WDTCSR, WDIE | 0x80);
+		Assert.That(Cpu.Mmio.Data[WDTCSR] & 0x80, Is.Zero);
 	}
 }
