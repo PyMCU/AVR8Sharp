@@ -8,6 +8,7 @@ public class Adc : AvrTestBase
 {
 	const int ADMUX = 0x7c;
 	const int REFS0 = 1 << 6;
+	const int REFS1 = 1 << 7;
 
 	const int ADCSRA = 0x7a;
 	const int ADEN = 1 << 7;
@@ -270,5 +271,97 @@ public class Adc : AvrTestBase
 		Cpu.Mmio.Data[ADMUX] = 0xc0;
 		Assert.That (_adc.ReferenceVoltageType, Is.EqualTo (AdcReference.Internal1V1), "REFS = 11 (analogReference(INTERNAL))");
 		Assert.That (_adc.ReferenceVoltage, Is.EqualTo (1.1));
+	}
+
+
+	[Test(Description = "The AVCC reference follows the supply the host reports, so a 3.3 V board converts full-scale at 3.3 V")]
+	public void Conversion_Scales_With_Avcc ()
+	{
+		var program = new AsmProgram (@$"
+	    _REPLACE ADMUX, {ADMUX}
+		_REPLACE ADCSRA, {ADCSRA}
+	    _REPLACE ADCH, {ADCH}
+		_REPLACE ADCL, {ADCL}
+		ldi r24, {REFS0}
+	    sts ADMUX, r24
+	    ldi r24, {ADEN | ADSC | ADPS0 | ADPS1 | ADPS2}
+		sts ADCSRA, r24
+	  waitComplete:
+		lds r24, {ADCSRA}
+	    andi r24, {ADSC}
+		brne waitComplete
+		lds r16, {ADCL}
+	    lds r17, {ADCH}
+		break
+").Compile();
+		Cpu.LoadProgram(program.Program);
+		var runner = new TestProgramRunner (Cpu);
+
+		_adc.Avcc = 3.3;
+		_adc.ChannelValues[0] = 1.65; // half of AVCC: 512
+
+		runner.RunInstructions (16);
+		Cpu.Cycles += 128 * 25;
+		Cpu.Tick ();
+		runner.RunInstructions (5);
+
+		var result = (Cpu.Mmio.Data[R17] << 8) | Cpu.Mmio.Data[R16];
+		Assert.That(result, Is.EqualTo(512));
+	}
+
+	[Test(Description = "REFS1:0 = 11 is the internal 1.1 V bandgap on the ATmega328P (the Arduino core's INTERNAL)")]
+	public void Conversion_Against_The_Internal_Bandgap ()
+	{
+		var program = new AsmProgram (@$"
+	    _REPLACE ADMUX, {ADMUX}
+		_REPLACE ADCSRA, {ADCSRA}
+	    _REPLACE ADCH, {ADCH}
+		_REPLACE ADCL, {ADCL}
+		ldi r24, {REFS1 | REFS0}
+	    sts ADMUX, r24
+	    ldi r24, {ADEN | ADSC | ADPS0 | ADPS1 | ADPS2}
+		sts ADCSRA, r24
+	  waitComplete:
+		lds r24, {ADCSRA}
+	    andi r24, {ADSC}
+		brne waitComplete
+		lds r16, {ADCL}
+	    lds r17, {ADCH}
+		break
+").Compile();
+		Cpu.LoadProgram(program.Program);
+		var runner = new TestProgramRunner (Cpu);
+
+		_adc.ChannelValues[0] = 0.55; // half of 1.1 V: 512
+
+		runner.RunInstructions (16);
+		Cpu.Cycles += 128 * 25;
+		Cpu.Tick ();
+		runner.RunInstructions (5);
+
+		var result = (Cpu.Mmio.Data[R17] << 8) | Cpu.Mmio.Data[R16];
+		Assert.That(result, Is.EqualTo(512));
+	}
+
+	[Test(Description = "ADIF is cleared by writing a one and a write of zero keeps it (datasheet 24.9.2)")]
+	public void Adif_Is_Write_One_To_Clear ()
+	{
+		Cpu.Mmio.Data[ADCSRA] = ADEN | ADIF;
+		Cpu.WriteData(ADCSRA, ADEN | ADPS0);
+		Assert.That(Cpu.ReadData(ADCSRA) & ADIF, Is.EqualTo(ADIF), "writing 0 to ADIF must not clear it");
+
+		Cpu.WriteData(ADCSRA, ADEN | ADIF);
+		Assert.That(Cpu.ReadData(ADCSRA) & ADIF, Is.Zero, "writing 1 to ADIF clears it");
+	}
+
+	[Test(Description = "A write cannot set ADIF, and ADSC cannot be cleared while a conversion runs")]
+	public void Adif_Cannot_Be_Set_And_Adsc_Sticks_While_Converting ()
+	{
+		Cpu.WriteData(ADCSRA, ADEN | ADIF);
+		Assert.That(Cpu.ReadData(ADCSRA) & ADIF, Is.Zero, "ADIF is not a stored bit");
+
+		Cpu.WriteData(ADCSRA, ADEN | ADSC | ADPS0 | ADPS1 | ADPS2);
+		Cpu.WriteData(ADCSRA, ADEN | ADPS0 | ADPS1 | ADPS2);
+		Assert.That(Cpu.ReadData(ADCSRA) & ADSC, Is.EqualTo(ADSC), "ADSC stays set while converting");
 	}
 }

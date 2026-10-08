@@ -23,11 +23,31 @@ public class Cpu
 	private ulong _nextEventCycle = ulong.MaxValue;
 	private short _nextInterrupt = -1;
 	private short _maxInterrupt = 0;
+	// Set by SEI/RETI/anything that raises I: the next Tick must not dispatch an interrupt
+	// (the instruction after it always runs first). It is paired with _nextEventCycle = 0
+	// so the next Tick takes the existing slow path and consumes it; the hot path pays nothing.
+	private bool _interruptHold;
     #endregion
 
 	#region Public Properties
 	public Action OnWatchdogReset { get; set; } = () => { };
 	public event Action? OnPeripheralReset;
+	/// <summary>
+	/// Raised when this CPU dispatches an interrupt. Arguments: vector address, PC that was
+	/// pushed. Instance-level replacement for the process-global <c>AvrInterrupt.OnInterruptDispatch</c>.
+	/// </summary>
+	public event Action<int, uint>? OnInterruptDispatch;
+	/// <summary>
+	/// Raised when this CPU executes a BREAK instruction (0x9598). The argument is the word
+	/// address of the BREAK. Instance-level replacement for <c>AvrInterrupt.OnBreakpoint</c>.
+	/// </summary>
+	public event Action<uint>? OnBreakpoint;
+	/// <summary>
+	/// Raised when this CPU executes a SLEEP instruction (0x9588). The argument is the
+	/// SM2:SM1:SM0 sleep mode bits from SMCR (bits 3:1). Instance-level replacement for
+	/// <c>AvrInterrupt.OnSleep</c>.
+	/// </summary>
+	public event Action<byte>? OnSleep;
 	public MmioController Mmio { get; }
 	public ushort[] ProgramMemory { get; }
 	public byte[] ProgBytes { get; }
@@ -44,6 +64,18 @@ public class Cpu
 	/// a board/simulation sets it to the chip's SRAM start to catch overflow.
 	/// </summary>
 	public int StackLowLimit { get; set; } = 0;
+
+	private int _ramStart = -1;
+	/// <summary>
+	/// The chip's first SRAM address, i.e. the end of the register/I/O space that
+	/// <see cref="Reset"/> returns to reset values. When not set it is 0x200 for cores
+	/// with a 22-bit PC (ATmega2560/2561) and 0x100 otherwise, never above the data size.
+	/// Independent of <see cref="StackLowLimit"/>. Boards set it explicitly (ATtiny: 0x60).
+	/// </summary>
+	public int RamStart {
+		get => Math.Min (_ramStart >= 0 ? _ramStart : (Pc22Bits ? 0x200 : RegisterSpace), Mmio.Data.Length);
+		set => _ramStart = value;
+	}
 	/// <summary>
 	/// The core variant this CPU models. Instructions the variant does not have throw
 	/// <see cref="AvrUnsupportedInstructionException"/> instead of executing; instructions
@@ -113,9 +145,85 @@ public class Cpu
 		});
 	}
 	
+	#region Instance hooks
+	// Instance handlers run first, then the obsolete process-global ones.
+	#pragma warning disable CS0618
+	internal void RaiseInterruptDispatch (int address, uint pc)
+	{
+		OnInterruptDispatch?.Invoke (address, pc);
+		AvrInterrupt.OnInterruptDispatch?.Invoke (address, pc);
+	}
+
+	internal void RaiseBreakpoint ()
+	{
+		OnBreakpoint?.Invoke (Pc);
+		AvrInterrupt.OnBreakpoint?.Invoke (Pc);
+	}
+
+	internal void RaiseSleep ()
+	{
+		var mode = (byte)((Mmio.Data[0x53] >> 1) & 0x07);
+		OnSleep?.Invoke (mode);
+		AvrInterrupt.OnSleep?.Invoke (mode);
+	}
+	#pragma warning restore CS0618
+	#endregion
+
+	/// <summary>
+	/// Makes the next <see cref="Tick"/> skip interrupt dispatch, so the instruction after
+	/// SEI / RETI / a write that sets I always runs before a pending interrupt is served.
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	internal void HoldInterrupts ()
+	{
+		_interruptHold = true;
+		_nextEventCycle = 0;
+	}
+
+	/// <summary>
+	/// Data write issued by an instruction. Identical to <see cref="WriteData"/> except that a
+	/// write to SREG (0x5F) that sets I from 0 holds interrupts for one instruction.
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	internal void WriteDataSreg (ushort address, byte value)
+	{
+		if (address != 95) {
+			Mmio.WriteData (address, value);
+			return;
+		}
+		var wasEnabled = (_ram[95] & 0x80) != 0;
+		Mmio.WriteData (address, value);
+		if (!wasEnabled && (value & 0x80) != 0) HoldInterrupts ();
+	}
+
+	private readonly List<int> _preservedOnReset = [];
+
+	/// <summary>
+	/// Registers a data address that <see cref="Reset"/> must not zero (a register that
+	/// survives a reset on silicon, such as MCUSR which holds the reset-cause flags).
+	/// </summary>
+	public void PreserveOnReset (int address)
+	{
+		if (!_preservedOnReset.Contains (address)) _preservedOnReset.Add (address);
+	}
+
+	/// <summary>
+	/// Resets the CPU and every peripheral, as the RESET pin would. The I/O register space
+	/// (0x20 up to <see cref="RamStart"/>)
+	/// returns to its reset value: zero here, then each peripheral subscribed to
+	/// <see cref="OnPeripheralReset"/> resets its internal state and writes its non-zero
+	/// reset values. SRAM and the general registers r0-r31 are kept, as on silicon. The
+	/// zeroing writes the data array directly, so no MMIO write hook runs.
+	/// </summary>
 	public void Reset ()
 	{
-		// Reset the CPU
+		var ioEnd = RamStart;
+		if (ioEnd > 0x20) {
+			var preserved = new byte[_preservedOnReset.Count];
+			for (var i = 0; i < preserved.Length; i++) preserved[i] = Mmio.Data[_preservedOnReset[i]];
+			Array.Clear (Mmio.Data, 0x20, ioEnd - 0x20);
+			for (var i = 0; i < preserved.Length; i++) Mmio.Data[_preservedOnReset[i]] = preserved[i];
+		}
 		Sp = (ushort)(Mmio.Data.Length - 1);
 		Mmio.Data[95] = 0;
 		_sregArith = 0;
@@ -124,6 +232,7 @@ public class Cpu
 			_pendingInterrupts[i] = null;
 		}
 		_nextInterrupt = -1;
+		_interruptHold = false;
 		_clockHead = 0;
 		_clockEventCount = 0;
 		_nextEventCycle = ulong.MaxValue;
@@ -296,6 +405,10 @@ public class Cpu
 		if (Cycles >= _nextEventCycle)
 		{
 			ProcessClockEvents();
+			if (_interruptHold) {
+				_interruptHold = false;
+				return;
+			}
 		}
 
 		if (!InterruptsEnabled || _nextInterrupt < 0) return;

@@ -66,7 +66,7 @@ public class Twi : AvrTestBase
         Assert.Multiple(() =>
         {
             Assert.That(Cpu.Pc, Is.EqualTo(0x30)); // 2-wire Serial Interface Vector
-            Assert.That(Cpu.Cycles, Is.EqualTo(3)); // 3 cycles from DoAvrInterrupt (4 total incl. instruction)
+            Assert.That(Cpu.Cycles, Is.EqualTo(4)); // 4 cycles from DoAvrInterrupt (interrupt response, excludes the interrupted instruction)
             Assert.That(Cpu.ReadData(TWCR) & TWINT, Is.EqualTo(0));
         });
     }
@@ -1116,5 +1116,15 @@ public class Twi : AvrTestBase
                 Assert.That(Cpu.Pc, Is.EqualTo(INT_TWI), "CPU should jump to TWI interrupt vector because TWIE is 1");
             });
         }
+    }
+
+
+    [Test]
+    public void TwcrWriteOfZeroKeepsTwint()
+    {
+        Cpu.Mmio.Data[TWCR] = TWINT | TWEN;
+        Cpu.WriteData(TWCR, TWEN | TWIE);
+
+        Assert.That(Cpu.Mmio.Data[TWCR] & TWINT, Is.EqualTo(TWINT));
     }
 }

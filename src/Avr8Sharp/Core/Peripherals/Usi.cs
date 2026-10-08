@@ -71,6 +71,8 @@ public class AvrUsi
         _cpu.Mmio.RegisterWrite(USISR, DelegateWriteHookUsisr);
 
         _cpu.Mmio.RegisterWrite(USICR, DelegateWriteHookUsicr);
+
+        _cpu.OnPeripheralReset += () => _port.OpenCollector = 0;
     }
 
     private void DelegatePortListener(byte value, byte oldValue)

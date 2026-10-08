@@ -204,10 +204,10 @@ public class Timer : AvrTestBase
 		var tcnt = Cpu.ReadData(TCNT0);
         Assert.Multiple(() =>
         {
-            Assert.That(tcnt, Is.EqualTo(3)); // TCNT = 3 (one tick + 3 interrupt-dispatch cycles, AVR spec)
+            Assert.That(tcnt, Is.EqualTo(4)); // TCNT = 4 (one tick + 4 interrupt-dispatch cycles, AVR spec)
             Assert.That(Cpu.ReadData(TIFR0) & TOV0, Is.Zero);
             Assert.That(Cpu.Pc, Is.EqualTo(0x20));
-            Assert.That(Cpu.Cycles, Is.EqualTo(5)); // cycles: 2 (tick) + 3 (DoAvrInterrupt) = 5
+            Assert.That(Cpu.Cycles, Is.EqualTo(6)); // cycles: 2 (tick) + 4 (DoAvrInterrupt) = 6
         });
     }
 	
@@ -230,10 +230,10 @@ public class Timer : AvrTestBase
 		var tcnt = Cpu.ReadData(TCNT0);
 		Assert.Multiple(() =>
 		{
-			Assert.That(tcnt, Is.EqualTo(3)); // TCNT = 3 (one tick + 3 interrupt-dispatch cycles, AVR spec)
+			Assert.That(tcnt, Is.EqualTo(4)); // TCNT = 4 (one tick + 4 interrupt-dispatch cycles, AVR spec)
 			Assert.That(Cpu.ReadData(TIFR0) & 2, Is.Zero);
 			Assert.That(Cpu.Pc, Is.EqualTo(0x20));
-			Assert.That(Cpu.Cycles, Is.EqualTo(5)); // cycles: 2 (tick) + 3 (DoAvrInterrupt) = 5
+			Assert.That(Cpu.Cycles, Is.EqualTo(6)); // cycles: 2 (tick) + 4 (DoAvrInterrupt) = 6
 		});
 	}
 	
@@ -465,10 +465,10 @@ public class Timer : AvrTestBase
 		var tcnt = Cpu.ReadData(TCNT0);
 		Assert.Multiple(() =>
 		{
-			Assert.That(tcnt, Is.EqualTo(0x24)); // TCNT = 0x24 (one tick + 3 interrupt-dispatch cycles, AVR spec)
+			Assert.That(tcnt, Is.EqualTo(0x25)); // TCNT = 0x25 (one tick + 4 interrupt-dispatch cycles, AVR spec)
 			Assert.That(Cpu.ReadData(TIFR0) & OCF0A, Is.Zero);
 			Assert.That(Cpu.Pc, Is.EqualTo(0x1c));
-			Assert.That(Cpu.Cycles, Is.EqualTo(5)); // cycles: 2 (tick) + 3 (DoAvrInterrupt) = 5
+			Assert.That(Cpu.Cycles, Is.EqualTo(6)); // cycles: 2 (tick) + 4 (DoAvrInterrupt) = 6
 		});
 	}
 	
@@ -507,10 +507,10 @@ public class Timer : AvrTestBase
 		var tcnt = Cpu.ReadData(TCNT0);
 		Assert.Multiple(() =>
 		{
-			Assert.That(tcnt, Is.EqualTo(0x24)); // TCNT = 0x24 (one tick + 3 interrupt-dispatch cycles, AVR spec)
+			Assert.That(tcnt, Is.EqualTo(0x25)); // TCNT = 0x25 (one tick + 4 interrupt-dispatch cycles, AVR spec)
 			Assert.That(Cpu.ReadData(TIFR0) & OCF0B, Is.Zero);
 			Assert.That(Cpu.Pc, Is.EqualTo(0x1e));
-			Assert.That(Cpu.Cycles, Is.EqualTo(5)); // cycles: 2 (tick) + 3 (DoAvrInterrupt) = 5
+			Assert.That(Cpu.Cycles, Is.EqualTo(6)); // cycles: 2 (tick) + 4 (DoAvrInterrupt) = 6
 		});
 	}
 	
@@ -1273,10 +1273,10 @@ public class Timer : AvrTestBase
 			Cpu.ReadData(TCNT1); // Refresh TCNT1
 			Assert.Multiple(() =>
 			{
-				Assert.That(Cpu.Mmio.DataView.GetUint16(TCNT1, true), Is.EqualTo(3)); // TCNT = 3 (3 interrupt-dispatch cycles)
+				Assert.That(Cpu.Mmio.DataView.GetUint16(TCNT1, true), Is.EqualTo(4)); // TCNT = 4 (4 interrupt-dispatch cycles)
 				Assert.That(Cpu.ReadData(TIFR1) & TOV1, Is.Zero);
 				Assert.That(Cpu.Pc, Is.EqualTo(0x1a));
-				Assert.That(Cpu.Cycles, Is.EqualTo(6)); // cycles: 3 (pre-interrupt) + 3 (DoAvrInterrupt) = 6
+				Assert.That(Cpu.Cycles, Is.EqualTo(7)); // cycles: 3 (pre-interrupt) + 4 (DoAvrInterrupt) = 7
 			});
 		}
 		
@@ -2050,5 +2050,17 @@ public class Timer : AvrTestBase
 				Assert.That (Cpu.Mmio.Data[TIFR5] & ICF5, Is.EqualTo (ICF5), "ICF5 must be set after capture");
 			});
 		}
+	}
+
+
+	[Test (Description = "TIFR is write-one-to-clear: writing zero keeps flags, writing one clears only that flag")]
+	public void TifrWriteOneToClear ()
+	{
+		Cpu.Mmio.Data[TIFR0] = TOV0 | OCF0A;
+		Cpu.WriteData(TIFR0, 0);
+		Assert.That(Cpu.Mmio.Data[TIFR0], Is.EqualTo(TOV0 | OCF0A));
+
+		Cpu.WriteData(TIFR0, OCF0A);
+		Assert.That(Cpu.Mmio.Data[TIFR0], Is.EqualTo(TOV0));
 	}
 }

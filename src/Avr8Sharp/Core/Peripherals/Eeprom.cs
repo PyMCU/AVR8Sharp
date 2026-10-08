@@ -23,6 +23,28 @@ public class AvrEeprom
         atomicCycles: 54400   // 3.4 ms at 16 MHz (atomic erase+write, datasheet Table 7-1)
     );
 
+    /// <summary>ATmega2560 EEPROM: same registers as the ATmega328P; EE_READY is vector 30 -> word 0x3C.</summary>
+    public static readonly AvrEepromConfig Mega2560EepromConfig = new AvrEepromConfig(
+        eepromReadyInterrupt: 0x3c,
+        eecr: 0x3f,
+        eedr: 0x40,
+        eearl: 0x41,
+        eearh: 0x42,
+        eraseCycles: 28800,
+        writeCycles: 28800,
+        atomicCycles: 54400
+    );
+
+    /// <summary>
+    /// CPU frequency the cycle counts in <see cref="AvrEepromConfig"/> are expressed at (16 MHz).
+    /// The EEPROM programming time is fixed in wall-clock time (datasheet: 3.4 ms erase+write,
+    /// 1.8 ms erase-only or write-only, self-timed), so the cycles scale with the CPU frequency.
+    /// </summary>
+    public const uint ReferenceFrequencyHz = 16_000_000;
+
+    /// <summary>CPU frequency in Hz used to convert the configured times into cycles.</summary>
+    public uint FrequencyHz { get; set; }
+
     private ulong _writeEnabledCycles = 0;
     private ulong _writeCompleteCycles = 0;
     readonly AvrEepromConfig _config;
@@ -30,9 +52,11 @@ public class AvrEeprom
     readonly IEepromBackend _backend;
     readonly Cpu _cpu;
 
-    public AvrEeprom(Cpu cpu, IEepromBackend backend, AvrEepromConfig? config = null)
+    public AvrEeprom(Cpu cpu, IEepromBackend backend, AvrEepromConfig? config = null,
+        uint frequencyHz = ReferenceFrequencyHz)
     {
         _cpu = cpu;
+        FrequencyHz = frequencyHz == 0 ? ReferenceFrequencyHz : frequencyHz;
         _backend = backend;
         _config = config ?? EepromConfig;
         _eer = new AvrInterruptConfig(
@@ -49,7 +73,10 @@ public class AvrEeprom
         {
             var addr = (ushort)((cpu.Mmio.Data[_config.EEARH] << 8) | cpu.Mmio.Data[_config.EEARL]);
 
-            cpu.Mmio.Data[_config.EECR] = (byte)((cpu.Mmio.Data[_config.EECR] & ~EECR_WRITE_MASK) | (eecr & EECR_WRITE_MASK));
+            // EEPE is set only by the write sequence below and cleared by hardware when the
+            // programming finishes; writing zero to it (e.g. toggling EERIE) must not clear it.
+            var keepEepe = (eecr & EEPE) == 0 ? cpu.Mmio.Data[_config.EECR] & EEPE : 0;
+            cpu.Mmio.Data[_config.EECR] = (byte)((cpu.Mmio.Data[_config.EECR] & ~EECR_WRITE_MASK) | (eecr & EECR_WRITE_MASK) | keepEepe);
             cpu.UpdateInterruptEnable(_eer, eecr);
 
             if ((eecr & EERE) != 0)
@@ -80,7 +107,7 @@ public class AvrEeprom
                 // If EEMPE is zero, setting EEPE will have no effect.
                 if (cpu.Cycles >= _writeEnabledCycles)
                 {
-                    cpu.Mmio.Data[_config.EECR] &= ~EEPE & 0xFF;
+                    if (cpu.Cycles >= _writeCompleteCycles) cpu.Mmio.Data[_config.EECR] &= ~EEPE & 0xFF;
                     return true;
                 }
 
@@ -114,6 +141,12 @@ public class AvrEeprom
                     duration = 0;
                     if (doErase) duration += (int)_config.EraseCycles;
                     if (doWrite) duration += (int)_config.WriteCycles;
+                }
+
+                // Config cycles are at the 16 MHz reference; rescale to the actual CPU clock.
+                if (FrequencyHz != ReferenceFrequencyHz)
+                {
+                    duration = (int)Math.Max(1L, (long)duration * FrequencyHz / ReferenceFrequencyHz);
                 }
 
                 _writeCompleteCycles = cpu.Cycles + (ulong)duration;
@@ -169,19 +202,23 @@ public class EepromMemoryBackend : IEepromBackend
         }
     }
 
+    // On silicon the address bits above the EEPROM size are ignored (the address registers
+    // are wider than the array), so out-of-range addresses wrap instead of faulting.
+    private int Index(uint address) => (int)(address % (uint)_memory.Length);
+
     public byte ReadMemory(uint address)
     {
-        return _memory[address];
+        return _memory[Index(address)];
     }
 
     public void WriteMemory(uint address, byte value)
     {
-        _memory[address] &= value;
+        _memory[Index(address)] &= value;
     }
 
     public void EraseMemory(uint address)
     {
-        _memory[address] = 0xFF;
+        _memory[Index(address)] = 0xFF;
     }
 }
 

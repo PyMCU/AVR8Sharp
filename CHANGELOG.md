@@ -4,6 +4,70 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [Unreleased]
+
+Fidelity fixes from an audit of the CPU, the peripherals and the iCircuit integration.
+Several change cycle counts or register values that a test may have pinned; each entry says so.
+
+### Bug Fixes
+
+- **Intel HEX above 64 KB.** `AvrRunner.LoadHex` ignored the extended segment (02) and
+  extended linear (04) records, so a Mega sketch larger than 64 KB wrote its upper half over
+  the start of flash, vectors included. A shared `IntelHex` parser now handles 00/01/02/04,
+  skips 03/05 and verifies checksums. `LoadHex` stays lenient; the new
+  `TryLoadHex(hex, out HexInfo)` is strict and leaves flash untouched when the image has
+  errors or does not fit.
+- **`Cpu.Reset()` is a real reset.** It only reset SP, SREG and PC, so I/O registers and
+  peripheral state survived: after a firmware reload `Serial.write` could hang (TXEN was still
+  set, so UDRE never came back) and pins stayed outputs. The I/O space from 0x20 to the new
+  `Cpu.RamStart` now returns to its reset values (UCSRnA 0x20, UCSRnC 0x06, TWSR 0xF8, the rest
+  0), every peripheral resets its internal state, and port listeners see the pins go back to
+  input. SRAM and r0-r31 are kept, as on the chip. `RamStart` defaults to 0x200 on 22-bit-PC
+  parts and 0x100 otherwise; `AvrBuilder.WithRamStart` and the TestKit boards set it.
+- **Interrupt response time.** Entry cost 3 cycles; the datasheet gives 4, and 5 on parts with
+  a 22-bit PC. Every ISR timing moves by one cycle (two on the Mega).
+- **One instruction after SEI and RETI.** A pending interrupt was served right after `sei`,
+  `reti` or a write that set I, so `sei; sleep` raced and an always-pending interrupt starved
+  the main loop. The next instruction now always runs first, in every decoder.
+- **USART loses a received byte while transmitting.** Any UCSRnB write with RXEN set cleared
+  RXC; Arduino's HardwareSerial toggles UDRIE on every byte it sends. RXC and the receive
+  buffer are now flushed only when RXEN goes from 1 to 0. Inherited from avr8js.
+- **Write-one-to-clear flags.** TIFRn stored the written value, so clearing one flag wiped
+  the others; ADIF was stored instead of cleared by a written one; SPIF and WCOL were
+  writable, and SPIF did not clear on SPSR-then-SPDR. TWINT, WDIF and EEPE were lost on
+  writes that left them at 0. All now follow the datasheet.
+- **ATmega2560 configs.** Timer0/1/2 drove the 328P compare-output pins, so `analogWrite` on
+  Mega pins 4, 9, 10, 11, 12 and 13 hit the wrong pin or none. Timer1 had no channel C, and
+  Timer3/4 had no input capture. INT0-7 did not exist and the pin-change interrupts went to
+  328P vectors, so `attachInterrupt` and SoftwareSerial RX were dead on the Mega.
+- **Channel C in fast PWM** never set its pin at BOTTOM, so OCnC PWM did not toggle.
+- **ATtiny85 EEPROM.** EEARH was mapped to address 0x00 (r0), so `eeprom_write_byte` with
+  interrupts enabled threw. It is now 0x3F, and the memory backend wraps addresses beyond the
+  EEPROM size, as the chip does.
+- **ATtiny85 Timer1** used the generic ATmega timer: TOV1 on the wrong bit, TCCR1 read r0 as
+  TCCRA (PB1 froze high), no CTC1, PWM1A/B, OCR1C or prescalers above /64.
+  `ATtiny85Simulation.Timer1` is now an `AvrAttinyTimer1`, ported from avr8js `timer-attiny.ts`.
+- **EEPROM write time** was fixed in 16 MHz cycles; it now scales with the CPU frequency
+  (3.4 ms erase and write, 1.8 ms either alone).
+
+### New
+
+- `Mega2560<Peripheral>Config` in the core: `AvrTimer.Mega2560Timer0Config` to `Timer5Config`,
+  `AvrUsart.Mega2560Usart0Config` to `Usart3Config`, `AvrSpi`, `AvrTwi`, `AvrEeprom`,
+  `AvrWatchdog` and `AvrAdc.Mega2560*Config`, and `AvrIoPort.Mega2560PortAConfig` to
+  `PortLConfig` with INT0-7 and PCINT0-2. `ArduinoMegaSimulation` uses them.
+- Timers sample their ICPn pin when the config names one (Mega Timer1/3/4/5), on the edge
+  selected by ICESn.
+- `AvrTimerConfig.CreateNew` takes nullable arguments, so an explicit 0 can be set.
+- `AvrAdc.Avcc` and `Aref` are settable (5 V by default).
+- `Cpu.OnInterruptDispatch`, `OnBreakpoint` and `OnSleep` are per-CPU events; the static
+  `AvrInterrupt` hooks still work but are obsolete, because they fire for every CPU in the
+  process.
+- `AvrRunner.Run(budget)`, `RunUntil(cycle)` and `RunCycles(budget)` carry the target across
+  calls, so stepping in small slices no longer drifts. `Execute()` uses the same target.
+
+---
+
 ## [v1.1.0] - 2026-10-07
 
 ### Bug Fixes

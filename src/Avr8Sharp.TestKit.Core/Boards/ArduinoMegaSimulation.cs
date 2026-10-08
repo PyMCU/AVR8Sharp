@@ -32,160 +32,6 @@ public sealed class ArduinoMegaSimulation : AvrTestSimulation
     private const uint Frequency = 16_000_000;
     private const uint EepromSize = 4096;
 
-    // ── ATmega2560 Timer interrupt vectors (JMP/4-byte vectors) ──────────────
-    // ATmega2560 uses 4-byte JMP entries; vector N sits at byte address (N-1)×4.
-    // Interrupt addresses are WORD indices (byte_address / 2) because DoAvrInterrupt
-    // sets cpu.Pc = address directly and Pc is a word index into ProgramMemory[].
-
-    private static readonly AvrTimerConfig Mega2560Timer0Config =
-        AvrTimer.Timer0Config.CreateNew(
-            comparatorAInterrupt: 0x2A,   // vector 22 — word addr (byte 0x54)
-            comparatorBInterrupt: 0x2C,   // vector 23 — word addr (byte 0x58)
-            overflowInterrupt:    0x2E);  // vector 24 — word addr (byte 0x5C)
-
-    private static readonly AvrTimerConfig Mega2560Timer1Config =
-        AvrTimer.Timer1Config.CreateNew(
-            captureInterrupt:     0x20,   // vector 17 — word addr (byte 0x40)
-            comparatorAInterrupt: 0x22,   // vector 18 — word addr (byte 0x44)
-            comparatorBInterrupt: 0x24,   // vector 19 — word addr (byte 0x48)
-            comparatorCInterrupt: 0x26,   // vector 20 — word addr (byte 0x4C)
-            overflowInterrupt:    0x28);  // vector 21 — word addr (byte 0x50)
-
-    private static readonly AvrTimerConfig Mega2560Timer2Config =
-        AvrTimer.Timer2Config.CreateNew(
-            comparatorAInterrupt: 0x1A,   // vector 14 — word addr (byte 0x34)
-            comparatorBInterrupt: 0x1C,   // vector 15 — word addr (byte 0x38)
-            overflowInterrupt:    0x1E);  // vector 16 — word addr (byte 0x3C)
-
-    // Timer 3 — 16-bit, registers 0x90–0x9C, TIMSK3 0x71, TIFR3 0x38
-    private static readonly AvrTimerConfig Mega2560Timer3Config = new AvrTimerConfig(
-        bits:                 16,
-        dividers:             AvrTimer.Timer01Dividers,
-        captureInterrupt:     0x3E,   // vector 32 — word addr (byte 0x7C)
-        comparatorAInterrupt: 0x40,   // vector 33 — word addr (byte 0x80)
-        comparatorBInterrupt: 0x42,   // vector 34 — word addr (byte 0x84)
-        comparatorCInterrupt: 0x44,   // vector 35 — word addr (byte 0x88)
-        overflowInterrupt:    0x46,   // vector 36 — word addr (byte 0x8C)
-        tccra: 0x90, tccrb: 0x91, tccrc: 0x92,
-        tcnt:  0x94, ocra:  0x98, ocrb: 0x9A, ocrc: 0x9C, icr: 0x96,
-        timsk: 0x71, tifr:  0x38,
-        comparatorPortA: AvrIoPort.PortEConfig.PORT, comparatorPinA: 3,
-        comparatorPortB: AvrIoPort.PortEConfig.PORT, comparatorPinB: 4,
-        comparatorPortC: AvrIoPort.PortEConfig.PORT, comparatorPinC: 5,
-        externalClockPort: AvrIoPort.PortEConfig.PORT, externalClockPin: 6,
-        tov: 1, ocfa: 2, ocfb: 4, ocfc: 8,
-        toie: 1, ociea: 2, ocieb: 4, ociec: 8);
-
-    // Timer 4 — 16-bit, registers 0xA0–0xAC, TIMSK4 0x72, TIFR4 0x39
-    private static readonly AvrTimerConfig Mega2560Timer4Config = new AvrTimerConfig(
-        bits:                 16,
-        dividers:             AvrTimer.Timer01Dividers,
-        captureInterrupt:     0x52,   // vector 42 — word addr (byte 0xA4)
-        comparatorAInterrupt: 0x54,   // vector 43 — word addr (byte 0xA8)
-        comparatorBInterrupt: 0x56,   // vector 44 — word addr (byte 0xAC)
-        comparatorCInterrupt: 0x58,   // vector 45 — word addr (byte 0xB0)
-        overflowInterrupt:    0x5A,   // vector 46 — word addr (byte 0xB4)
-        tccra: 0xA0, tccrb: 0xA1, tccrc: 0xA2,
-        tcnt:  0xA4, ocra:  0xA8, ocrb: 0xAA, ocrc: 0xAC, icr: 0xA6,
-        timsk: 0x72, tifr:  0x39,
-        comparatorPortA: AvrIoPort.PortHConfig.PORT, comparatorPinA: 3,
-        comparatorPortB: AvrIoPort.PortHConfig.PORT, comparatorPinB: 4,
-        comparatorPortC: AvrIoPort.PortHConfig.PORT, comparatorPinC: 5,
-        externalClockPort: AvrIoPort.PortHConfig.PORT, externalClockPin: 3,
-        tov: 1, ocfa: 2, ocfb: 4, ocfc: 8,
-        toie: 1, ociea: 2, ocieb: 4, ociec: 8);
-
-    // Timer 5 — 16-bit, registers 0x120–0x12D, TIMSK5 0x73, TIFR5 0x3A
-    private static readonly AvrTimerConfig Mega2560Timer5Config = new AvrTimerConfig(
-        bits:                 16,
-        dividers:             AvrTimer.Timer01Dividers,
-        captureInterrupt:     0x5C,   // vector 47 — word addr (byte 0xB8)
-        comparatorAInterrupt: 0x5E,   // vector 48 — word addr (byte 0xBC)
-        comparatorBInterrupt: 0x60,   // vector 49 — word addr (byte 0xC0)
-        comparatorCInterrupt: 0x62,   // vector 50 — word addr (byte 0xC4)
-        overflowInterrupt:    0x64,   // vector 51 — word addr (byte 0xC8)
-        tccra: 0x120, tccrb: 0x121, tccrc: 0x122,
-        tcnt:  0x124, icr:   0x126,
-        ocra:  0x128, ocrb:  0x12A, ocrc: 0x12C,
-        timsk: 0x73,  tifr:  0x3A,
-        comparatorPortA: AvrIoPort.PortLConfig.PORT, comparatorPinA: 3,
-        comparatorPortB: AvrIoPort.PortLConfig.PORT, comparatorPinB: 4,
-        comparatorPortC: AvrIoPort.PortLConfig.PORT, comparatorPinC: 5,
-        externalClockPort: AvrIoPort.PortLConfig.PORT, externalClockPin: 2,
-        tov: 1, ocfa: 2, ocfb: 4, ocfc: 8,
-        toie: 1, ociea: 2, ocieb: 4, ociec: 8,
-        icf: 0x20, icie: 0x20);
-
-    // USART0 — same I/O registers as ATmega328P (0xC0–0xC6) but different interrupt vectors
-    private static readonly AvrUsartConfig Mega2560Usart0Config = new AvrUsartConfig
-    {
-        RxCompleteInterrupt        = 0x32,  // Vector 26 — byte addr 0x0064
-        DataRegisterEmptyInterrupt = 0x34,  // Vector 27
-        TxCompleteInterrupt        = 0x36,  // Vector 28
-        UCSRA = 0xC0, UCSRB = 0xC1, UCSRC = 0xC2,
-        UBRRL = 0xC4, UBRRH = 0xC5, UDR   = 0xC6,
-    };
-
-    // USART1 — registers 0xC8–0xCE
-    private static readonly AvrUsartConfig Mega2560Usart1Config = new AvrUsartConfig
-    {
-        RxCompleteInterrupt        = 0x48,  // Vector 37
-        DataRegisterEmptyInterrupt = 0x4A,  // Vector 38
-        TxCompleteInterrupt        = 0x4C,  // Vector 39
-        UCSRA = 0xC8, UCSRB = 0xC9, UCSRC = 0xCA,
-        UBRRL = 0xCC, UBRRH = 0xCD, UDR   = 0xCE,
-    };
-
-    // USART2 — registers 0xD0–0xD6
-    private static readonly AvrUsartConfig Mega2560Usart2Config = new AvrUsartConfig
-    {
-        RxCompleteInterrupt        = 0x66,  // Vector 52 — word addr (byte 0xCC)
-        DataRegisterEmptyInterrupt = 0x68,  // Vector 53 — word addr (byte 0xD0)
-        TxCompleteInterrupt        = 0x6A,  // Vector 54 — word addr (byte 0xD4)
-        UCSRA = 0xD0, UCSRB = 0xD1, UCSRC = 0xD2,
-        UBRRL = 0xD4, UBRRH = 0xD5, UDR   = 0xD6,
-    };
-
-    // USART3 — registers 0x130–0x136
-    private static readonly AvrUsartConfig Mega2560Usart3Config = new AvrUsartConfig
-    {
-        RxCompleteInterrupt        = 0x6C,  // Vector 55
-        DataRegisterEmptyInterrupt = 0x6E,  // Vector 56
-        TxCompleteInterrupt        = 0x70,  // Vector 57
-        UCSRA = 0x130, UCSRB = 0x131, UCSRC = 0x132,
-        UBRRL = 0x134, UBRRH = 0x135, UDR   = 0x136,
-    };
-
-    // EEPROM — same I/O register addresses as ATmega328P; interrupt vector differs
-    // ATmega2560 EE_READY: avr-libc vect_num 30 → word addr 30×2 = 0x3C (byte 0x78).
-    // (0x3A is the ADC vector, vect_num 29 — do not confuse the two.)
-    private static readonly AvrEepromConfig Mega2560EepromConfig = new AvrEepromConfig(
-        eepromReadyInterrupt: 0x3C,
-        eecr: 0x3F, eedr: 0x40, eearl: 0x41, eearh: 0x42,
-        eraseCycles: 28800, writeCycles: 28800, atomicCycles: 54400);
-
-    // SPI — same I/O registers as ATmega328P (0x4C-0x4E); SPI STC is avr-libc vector 24 -> word 0x30
-    private static readonly AvrSpiConfig Mega2560SpiConfig = new AvrSpiConfig
-    {
-        SpiInterrupt = 0x30,
-        SPCR = 0x4c, SPSR = 0x4d, SPDR = 0x4e,
-    };
-
-    // TWI — same I/O registers as ATmega328P (0xB8-0xBD); TWI is avr-libc vector 39 -> word 0x4E
-    private static readonly AvrTwiConfig Mega2560TwiConfig = new()
-    {
-        TwiInterrupt = 0x4e,
-        TWBR = 0xb8, TWSR = 0xb9, TWAR = 0xba, TWDR = 0xbb, TWCR = 0xbc, TWAMR = 0xbd,
-    };
-
-    // Watchdog — MCUSR 0x54 and WDTCSR 0x60 as on the ATmega328P; WDT is avr-libc vector 12 -> word 0x18
-    private static readonly AvrWatchdogConfig Mega2560WatchdogConfig = new AvrWatchdogConfig
-    {
-        WatchdogInterrupt = 0x18,
-        MCUSR = 0x54,
-        WDTCSR = 0x60,
-    };
-
     // ── GPIO ports ────────────────────────────────────────────────────────────
     /// <summary>Port A — digital pins 22–29.</summary>
     public AvrIoPort PortA { get; }
@@ -262,43 +108,44 @@ public sealed class ArduinoMegaSimulation : AvrTestSimulation
         // ATmega2560 SRAM starts at 0x200 (extended I/O occupies 0x100-0x1FF); a
         // PUSH/CALL below it has overflowed the stack into the I/O/register space.
         Cpu.StackLowLimit = 0x200;
+        Cpu.RamStart = 0x200;
 
-        AddGpio(AvrIoPort.PortAConfig, out var pA); PortA = pA;
-        AddGpio(AvrIoPort.PortBConfig, out var pB); PortB = pB;
-        AddGpio(AvrIoPort.PortCConfig, out var pC); PortC = pC;
-        AddGpio(AvrIoPort.PortDConfig, out var pD); PortD = pD;
-        AddGpio(AvrIoPort.PortEConfig, out var pE); PortE = pE;
-        AddGpio(AvrIoPort.PortFConfig, out var pF); PortF = pF;
-        AddGpio(AvrIoPort.PortGConfig, out var pG); PortG = pG;
-        AddGpio(AvrIoPort.PortHConfig, out var pH); PortH = pH;
-        AddGpio(AvrIoPort.PortJConfig, out var pJ); PortJ = pJ;
-        AddGpio(AvrIoPort.PortKConfig, out var pK); PortK = pK;
-        AddGpio(AvrIoPort.PortLConfig, out var pL); PortL = pL;
+        AddGpio(AvrIoPort.Mega2560PortAConfig, out var pA); PortA = pA;
+        AddGpio(AvrIoPort.Mega2560PortBConfig, out var pB); PortB = pB;
+        AddGpio(AvrIoPort.Mega2560PortCConfig, out var pC); PortC = pC;
+        AddGpio(AvrIoPort.Mega2560PortDConfig, out var pD); PortD = pD;
+        AddGpio(AvrIoPort.Mega2560PortEConfig, out var pE); PortE = pE;
+        AddGpio(AvrIoPort.Mega2560PortFConfig, out var pF); PortF = pF;
+        AddGpio(AvrIoPort.Mega2560PortGConfig, out var pG); PortG = pG;
+        AddGpio(AvrIoPort.Mega2560PortHConfig, out var pH); PortH = pH;
+        AddGpio(AvrIoPort.Mega2560PortJConfig, out var pJ); PortJ = pJ;
+        AddGpio(AvrIoPort.Mega2560PortKConfig, out var pK); PortK = pK;
+        AddGpio(AvrIoPort.Mega2560PortLConfig, out var pL); PortL = pL;
 
-        AddTimer(Mega2560Timer0Config, out var t0); Timer0 = t0;
-        AddTimer(Mega2560Timer1Config, out var t1); Timer1 = t1;
-        AddTimer(Mega2560Timer2Config, out var t2); Timer2 = t2;
-        AddTimer(Mega2560Timer3Config, out var t3); Timer3 = t3;
-        AddTimer(Mega2560Timer4Config, out var t4); Timer4 = t4;
-        AddTimer(Mega2560Timer5Config, out var t5); Timer5 = t5;
+        AddTimer(AvrTimer.Mega2560Timer0Config, out var t0); Timer0 = t0;
+        AddTimer(AvrTimer.Mega2560Timer1Config, out var t1); Timer1 = t1;
+        AddTimer(AvrTimer.Mega2560Timer2Config, out var t2); Timer2 = t2;
+        AddTimer(AvrTimer.Mega2560Timer3Config, out var t3); Timer3 = t3;
+        AddTimer(AvrTimer.Mega2560Timer4Config, out var t4); Timer4 = t4;
+        AddTimer(AvrTimer.Mega2560Timer5Config, out var t5); Timer5 = t5;
 
-        AddUsart(Mega2560Usart0Config,     out var s0); Serial0 = s0;
-        AddUsart(Mega2560Usart1Config,     out var s1); Serial1 = s1;
-        AddUsart(Mega2560Usart2Config,     out var s2); Serial2 = s2;
-        AddUsart(Mega2560Usart3Config,     out var s3); Serial3 = s3;
+        AddUsart(AvrUsart.Mega2560Usart0Config, out var s0); Serial0 = s0;
+        AddUsart(AvrUsart.Mega2560Usart1Config, out var s1); Serial1 = s1;
+        AddUsart(AvrUsart.Mega2560Usart2Config, out var s2); Serial2 = s2;
+        AddUsart(AvrUsart.Mega2560Usart3Config, out var s3); Serial3 = s3;
 
-        AddEeprom(Mega2560EepromConfig, out var eeprom, EepromSize); Eeprom = eeprom;
+        AddEeprom(AvrEeprom.Mega2560EepromConfig, out var eeprom, EepromSize); Eeprom = eeprom;
 
-        AddSpi(Mega2560SpiConfig, out var spi); Spi = spi;
+        AddSpi(AvrSpi.Mega2560SpiConfig, out var spi); Spi = spi;
         SpiBus = new SpiDeviceStub();
         spi.OnTransfer = SpiBus.Transfer;
 
-        AddTwi(Mega2560TwiConfig, out var twi); Twi = twi;
+        AddTwi(AvrTwi.Mega2560TwiConfig, out var twi); Twi = twi;
         TwiBus = new TwiDeviceStub(twi);
         twi.EventHandler = TwiBus;
 
-        AddAdc(AvrAdc.Atmega2560AdcConfig, out var adc); Adc = adc;
+        AddAdc(AvrAdc.Mega2560AdcConfig, out var adc); Adc = adc;
 
-        AddWatchdog(Mega2560WatchdogConfig, out var watchdog); Watchdog = watchdog;
+        AddWatchdog(AvrWatchdog.Mega2560WatchdogConfig, out var watchdog); Watchdog = watchdog;
     }
 }

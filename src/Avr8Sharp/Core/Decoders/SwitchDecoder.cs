@@ -317,14 +317,14 @@ public struct SwitchDecoder : IInstructionDecoder
                         if (opcode == 0x9588)
                         {
                             /* SLEEP — invoke OnSleep callback with SM2:SM1:SM0 bits from SMCR */
-                            AvrInterrupt.OnSleep?.Invoke((byte)((cpu.Mmio.Data[0x53] >> 1) & 0x07));
+                            cpu.RaiseSleep();
                             break;
                         }
 
                         if (opcode == 0x9598)
                         {
                             /* BREAK - hardware breakpoint */
-                            AvrInterrupt.OnBreakpoint?.Invoke(cpu.Pc);
+                            cpu.RaiseBreakpoint();
                             break;
                         }
 

@@ -50,6 +50,65 @@ public class AvrUsart
         UDR = 0xc6,
     };
 
+    // ── ATmega2560 ──────────────────────────────────────────────────────────
+    // Naming: Mega2560Usart<N>Config. Interrupt values are word indices (avr-libc vector number x 2).
+
+    /// <summary>ATmega2560 USART0: registers 0xC0-0xC6; RX 0x32, UDRE 0x34, TX 0x36.</summary>
+    public static readonly AvrUsartConfig Mega2560Usart0Config = new AvrUsartConfig
+    {
+        RxCompleteInterrupt = 0x32,
+        DataRegisterEmptyInterrupt = 0x34,
+        TxCompleteInterrupt = 0x36,
+        UCSRA = 0xc0,
+        UCSRB = 0xc1,
+        UCSRC = 0xc2,
+        UBRRL = 0xc4,
+        UBRRH = 0xc5,
+        UDR = 0xc6,
+    };
+
+    /// <summary>ATmega2560 USART1: registers 0xC8-0xCE; RX 0x48, UDRE 0x4A, TX 0x4C.</summary>
+    public static readonly AvrUsartConfig Mega2560Usart1Config = new AvrUsartConfig
+    {
+        RxCompleteInterrupt = 0x48,
+        DataRegisterEmptyInterrupt = 0x4a,
+        TxCompleteInterrupt = 0x4c,
+        UCSRA = 0xc8,
+        UCSRB = 0xc9,
+        UCSRC = 0xca,
+        UBRRL = 0xcc,
+        UBRRH = 0xcd,
+        UDR = 0xce,
+    };
+
+    /// <summary>ATmega2560 USART2: registers 0xD0-0xD6; RX 0x66, UDRE 0x68, TX 0x6A.</summary>
+    public static readonly AvrUsartConfig Mega2560Usart2Config = new AvrUsartConfig
+    {
+        RxCompleteInterrupt = 0x66,
+        DataRegisterEmptyInterrupt = 0x68,
+        TxCompleteInterrupt = 0x6a,
+        UCSRA = 0xd0,
+        UCSRB = 0xd1,
+        UCSRC = 0xd2,
+        UBRRL = 0xd4,
+        UBRRH = 0xd5,
+        UDR = 0xd6,
+    };
+
+    /// <summary>ATmega2560 USART3: registers 0x130-0x136; RX 0x6C, UDRE 0x6E, TX 0x70.</summary>
+    public static readonly AvrUsartConfig Mega2560Usart3Config = new AvrUsartConfig
+    {
+        RxCompleteInterrupt = 0x6c,
+        DataRegisterEmptyInterrupt = 0x6e,
+        TxCompleteInterrupt = 0x70,
+        UCSRA = 0x130,
+        UCSRB = 0x131,
+        UCSRC = 0x132,
+        UBRRL = 0x134,
+        UBRRH = 0x135,
+        UDR = 0x136,
+    };
+
     public static Dictionary<int, int> RxMasks { get; } = new Dictionary<int, int>
     {
         { 5, 0x1f },
@@ -222,6 +281,11 @@ public class AvrUsart
         
         Reset();
         UpdateCalculatedValues();
+        cpu.OnPeripheralReset += () =>
+        {
+            Reset();
+            UpdateCalculatedValues();
+        };
         
         cpu.Mmio.RegisterWrite(_config.UCSRA, (value, oldValue, _, _) =>
         {
@@ -251,8 +315,11 @@ public class AvrUsart
             _cpu.UpdateInterruptEnable(_rxc, value);
             _cpu.UpdateInterruptEnable(_udre, value);
             _cpu.UpdateInterruptEnable(_txc, value);
-            if ((value & UCSRB_RXEN) != 0 && (oldValue & UCSRB_RXEN) != 0)
+            // Disabling the receiver (RXEN 1->0) flushes the receive buffer and RXC
+            // (datasheet 19.7.3). Other UCSRB writes (e.g. toggling UDRIE) must keep a pending RXC.
+            if ((value & UCSRB_RXEN) == 0 && (oldValue & UCSRB_RXEN) != 0)
             {
+                _rxBuffer = 0;
                 _cpu.ClearInterrupt(_rxc);
             }
 
@@ -348,6 +415,9 @@ public class AvrUsart
         _cpu.Mmio.Data[_config.UCSRC] = UCSRC_UCSZ1 | UCSRC_UCSZ0; // default: 8 bits per byte
         _rxBusyValue = false;
         _rxBuffer = 0;
+        _incomingRxBuffer = 0;
+        _incomingFrameError = false;
+        _incomingParityError = false;
         _lineBuffer.Clear();
     }
 
