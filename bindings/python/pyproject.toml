@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "avr8sharp"
-version = "1.1.0b1"
+version = "1.1.0"
 description = "Fast AVR-8 emulator with a pytest-friendly test harness (Python bindings over the C# Avr8Sharp engine, compiled to a self-contained Native AOT library)."
 readme = "README.md"
 authors = [
