@@ -110,6 +110,13 @@ public class Twi : AvrTestBase
             _twi.EventHandler = _mockTwiEventHandler.Object;
         }
 
+        // Lets the wire time of the event in flight elapse (TWBR=0 makes a byte 144 cycles)
+        private void AdvanceBus()
+        {
+            Cpu.Cycles += 200;
+            Cpu.Tick();
+        }
+
         [Test]
         public void ShouldCallStartEventWhenTwstaIsSet()
         {
@@ -131,6 +138,7 @@ public class Twi : AvrTestBase
             Cpu.Tick();
 
             _mockTwiEventHandler.Verify(t => t.Start(false), Times.Once);
+            AdvanceBus();
 
             // Repeated start
             Cpu.WriteData(TWCR, TWINT | TWSTA | TWEN);
@@ -138,6 +146,7 @@ public class Twi : AvrTestBase
             Cpu.Tick();
 
             _mockTwiEventHandler.Verify(t => t.Start(true), Times.Once);
+            AdvanceBus();
 
             // Now try to connect...
             Cpu.WriteData(TWDR, 0x80); // Address 0x40, write mode
@@ -155,6 +164,7 @@ public class Twi : AvrTestBase
             Cpu.WriteData(TWCR, TWINT | TWSTA | TWEN);
             Cpu.Cycles++;
             Cpu.Tick();
+            AdvanceBus();
 
             // Send Stop
             Cpu.WriteData(TWCR, TWINT | TWSTO | TWEN);
@@ -293,28 +303,28 @@ public class Twi : AvrTestBase
             runner.RunInstructions(4);
             _mockTwiEventHandler.Verify(t => t.Start(false), Times.Once);
 
-            runner.RunInstructions(16);
+            runner.RunInstructions(100);
 
             // Step 2: wait for slave connect in write mode
-            runner.RunInstructions(16);
+            runner.RunInstructions(100);
             _mockTwiEventHandler.Verify(t => t.ConnectToSlave(0x22, true), Times.Once);
 
-            runner.RunInstructions(16);
+            runner.RunInstructions(100);
 
             // Step 3: wait for first data byte
-            runner.RunInstructions(16);
+            runner.RunInstructions(100);
             _mockTwiEventHandler.Verify(t => t.WriteByte(0x55), Times.Once);
 
-            runner.RunInstructions(16);
+            runner.RunInstructions(100);
 
             // Step 4: wait for stop condition
-            runner.RunInstructions(16);
+            runner.RunInstructions(100);
             _mockTwiEventHandler.Verify(t => t.Stop(), Times.Once);
 
-            runner.RunInstructions(16);
+            runner.RunInstructions(100);
 
             // Step 5: wait for the assembly code to indicate success by settings r17 to 0x42
-            runner.RunInstructions(16);
+            runner.RunInstructions(100);
             Assert.That(Cpu.ReadData(R17), Is.EqualTo(0x42));
         }
 
@@ -464,35 +474,212 @@ public class Twi : AvrTestBase
             runner.RunInstructions(4);
             _mockTwiEventHandler.Verify(t => t.Start(false), Times.Once);
 
-            runner.RunInstructions(16);
+            runner.RunInstructions(100);
 
             // Step 2: wait for slave connect in read mode
-            runner.RunInstructions(16);
+            runner.RunInstructions(100);
             _mockTwiEventHandler.Verify(t => t.ConnectToSlave(0x50, false), Times.Once);
 
-            runner.RunInstructions(16);
+            runner.RunInstructions(100);
 
             // Step 3: send the first byte to the master, expect ack
-            runner.RunInstructions(16);
+            runner.RunInstructions(100);
             _mockTwiEventHandler.Verify(t => t.ReadByte(true), Times.Once);
 
-            runner.RunInstructions(16);
+            runner.RunInstructions(100);
 
             // Step 4: send the second byte to the master, expect nack
-            runner.RunInstructions(16);
+            runner.RunInstructions(100);
             _mockTwiEventHandler.Verify(t => t.ReadByte(false), Times.Once);
 
-            runner.RunInstructions(16);
+            runner.RunInstructions(100);
 
             // Step 5: wait for stop condition
-            runner.RunInstructions(24);
+            runner.RunInstructions(100);
             _mockTwiEventHandler.Verify(t => t.Stop(), Times.Once);
 
-            runner.RunInstructions(16);
+            runner.RunInstructions(100);
 
             // Step 6: wait for the assembly code to indicate success by settings r17 to 0x42
-            runner.RunInstructions(16);
+            runner.RunInstructions(100);
             Assert.That(Cpu.Mmio.Data[R17], Is.EqualTo(0x42));
+        }
+    }
+
+    [TestFixture]
+    public class BusTiming : AvrTestBase
+    {
+        private AvrTwi _twi;
+        private DeferredHandler _handler;
+
+        // Handler that only records the events; the test completes them when it wants.
+        private class DeferredHandler(Func<AvrTwi> twi) : ITwiEventHandler
+        {
+            public int Starts;
+            public bool CompleteStartInline = true;
+            public void Start(bool repeated) { Starts++; if (CompleteStartInline) twi().CompleteStart(); }
+            public void Stop() { }
+            public void ConnectToSlave(byte address, bool write) { }
+            public void WriteByte(byte data) { }
+            public void ReadByte(bool ack) { }
+        }
+
+        private class AckingHandler(Func<AvrTwi> twi) : ITwiEventHandler
+        {
+            public void Start(bool repeated) => twi().CompleteStart();
+            public void Stop() => twi().CompleteStop();
+            public void ConnectToSlave(byte address, bool write) => twi().CompleteConnect(true);
+            public void WriteByte(byte data) => twi().CompleteWrite(true);
+            public void ReadByte(bool ack) => twi().CompleteRead(0x66);
+        }
+
+        protected override void SetupPeripherals()
+        {
+            _twi = new AvrTwi(Cpu, AvrTwi.TwiConfig, FREQ_16MHZ);
+            _handler = new DeferredHandler(() => _twi);
+            _twi.EventHandler = _handler;
+        }
+
+        private bool TwintSet => (Cpu.ReadData(TWCR) & TWINT) != 0;
+
+        private void Run(int cycles)
+        {
+            for (var i = 0; i < cycles; i++)
+            {
+                Cpu.Cycles++;
+                Cpu.Tick();
+            }
+        }
+
+        // Cycles from the moment the TWCR write happens until TWINT reads back as set
+        private int CyclesUntilTwint(int twcr)
+        {
+            var start = Cpu.Cycles;
+            Cpu.WriteData(TWCR, (byte)twcr);
+            var guard = 0;
+            while (!TwintSet && guard++ < 1_000_000)
+            {
+                Cpu.Cycles++;
+                Cpu.Tick();
+            }
+            return (int)(Cpu.Cycles - start);
+        }
+
+        [TestCase(72, 0, 161)]  // 100 kHz: period 160 cycles + 1 dispatch cycle
+        [TestCase(12, 0, 41)]   // 400 kHz: period 40 cycles + 1
+        [TestCase(12, 1, 113)]  // TWPS=1 (x4): period 16 + 2*12*4 = 112 cycles + 1
+        [TestCase(2, 3, 273)]   // TWPS=3 (x64): period 16 + 2*2*64 = 272 cycles + 1
+        public void StartTakesOneSclPeriod(int twbr, int twps, int expected)
+        {
+            Cpu.WriteData(TWBR, (byte)twbr);
+            Cpu.WriteData(TWSR, (byte)(0xf8 | twps));
+
+            Assert.That(CyclesUntilTwint(TWINT | TWSTA | TWEN), Is.EqualTo(expected));
+            Assert.That(_twi.Status, Is.EqualTo(0x08));
+        }
+
+        [Test]
+        public void ByteWriteTakesNineSclPeriods()
+        {
+            Cpu.WriteData(TWBR, 72);
+            _twi.EventHandler = new AckingHandler(() => _twi);
+            CyclesUntilTwint(TWINT | TWSTA | TWEN);
+
+            Cpu.WriteData(TWDR, 0x44);
+            Assert.That(CyclesUntilTwint(TWINT | TWEN), Is.EqualTo(1 + 9 * 160));
+            Assert.That(_twi.Status, Is.EqualTo(0x18));
+
+            Cpu.WriteData(TWDR, 0x55);
+            Assert.That(CyclesUntilTwint(TWINT | TWEN), Is.EqualTo(1 + 9 * 160));
+            Assert.That(_twi.Status, Is.EqualTo(0x28));
+
+            Assert.That(CyclesUntilTwint(TWINT | TWEN | TWSTO), Is.EqualTo(1 + 160));
+            Assert.That(_twi.Status, Is.EqualTo(0xf8));
+        }
+
+        [Test]
+        public void ByteReadTakesNineSclPeriods()
+        {
+            Cpu.WriteData(TWBR, 12);
+            _twi.EventHandler = new AckingHandler(() => _twi);
+            CyclesUntilTwint(TWINT | TWSTA | TWEN);
+            Cpu.WriteData(TWDR, 0xa1);
+            CyclesUntilTwint(TWINT | TWEN);
+
+            Assert.That(CyclesUntilTwint(TWINT | TWEN | TWEA), Is.EqualTo(1 + 9 * 40));
+            Assert.That(_twi.Status, Is.EqualTo(0x50));
+            Assert.That(Cpu.ReadData(TWDR), Is.EqualTo(0x66));
+        }
+
+        [Test]
+        public void LateCompletionGetsNoExtraDelay()
+        {
+            Cpu.WriteData(TWBR, 12); // start wire time: 40 cycles
+            _handler.CompleteStartInline = false;
+            Cpu.WriteData(TWCR, TWINT | TWSTA | TWEN);
+            Run(1);
+            Assert.That(_handler.Starts, Is.EqualTo(1));
+
+            Run(5000); // the external model takes much longer than the wire time
+            Assert.That(TwintSet, Is.False);
+
+            _twi.CompleteStart();
+            Assert.That(TwintSet, Is.True);
+            Assert.That(_twi.Status, Is.EqualTo(0x08));
+        }
+
+        [Test]
+        public void EarlyCompletionIsHeldUntilWireTimeElapses()
+        {
+            Cpu.WriteData(TWBR, 12);
+            _handler.CompleteStartInline = false;
+            Cpu.WriteData(TWCR, TWINT | TWSTA | TWEN);
+            Run(1);       // dispatched here
+            Run(10);
+            _twi.CompleteStart(); // 10 cycles in, wire time is 40
+
+            Assert.That(TwintSet, Is.False);
+            Run(29);
+            Assert.That(TwintSet, Is.False);
+            Run(1);
+            Assert.That(TwintSet, Is.True);
+        }
+
+        [Test]
+        public void TwcrWriteWhileBusyIsIgnored()
+        {
+            Cpu.WriteData(TWBR, 12);
+            Cpu.WriteData(TWCR, TWINT | TWSTA | TWEN);
+            Run(1);
+            Run(10); // event in flight
+
+            Cpu.WriteData(TWCR, TWINT | TWSTA | TWEN);
+            Run(100);
+
+            Assert.That(_handler.Starts, Is.EqualTo(1));
+            Assert.That(TwintSet, Is.True);
+        }
+
+        [Test]
+        public void ResetDropsDeferredCompletion()
+        {
+            Cpu.WriteData(TWBR, 72);
+            Cpu.WriteData(TWCR, TWINT | TWSTA | TWEN);
+            Run(10);
+            Cpu.Reset();
+            Run(1000);
+
+            Assert.That(TwintSet, Is.False);
+            Assert.That(_twi.Status, Is.EqualTo(0xf8));
+        }
+
+        [Test]
+        public void EmulateBusTimingFalseCompletesOnNextCycle()
+        {
+            Cpu.WriteData(TWBR, 72);
+            _twi.EmulateBusTiming = false;
+
+            Assert.That(CyclesUntilTwint(TWINT | TWSTA | TWEN), Is.EqualTo(1));
         }
     }
 
