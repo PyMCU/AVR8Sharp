@@ -735,7 +735,7 @@ public static class Opcodes
         }
 
         cpu.Mmio.DataView.SetUint16(93, (ushort)(sp - (cpu.Pc22Bits ? 3 : 2)), true);
-        cpu.Pc += (ushort)k;
+        cpu.Pc = (uint)((int)cpu.Pc + k);
         cpu.Cycles += cpu.Pc22Bits ? 3UL : 2UL;
     }
 
@@ -746,11 +746,13 @@ public static class Opcodes
         if (i >= cpu.Mmio.Data.Length)
             throw new AvrStackUnderflowException(cpu.Pc, i - (cpu.Pc22Bits ? 3 : 2));
         cpu.Mmio.DataView.SetUint16(93, (ushort)i, true);
-        cpu.Pc = (uint)((cpu.Mmio.Data[i - 1] << 8) + cpu.Mmio.Data[i] - 1);
+        var target = (cpu.Mmio.Data[i - 1] << 8) + cpu.Mmio.Data[i];
         if (cpu.Pc22Bits)
         {
-            cpu.Pc |= (uint)(cpu.Mmio.Data[i - 2] << 16);
+            target |= cpu.Mmio.Data[i - 2] << 16;
         }
+
+        cpu.Pc = (uint)(target - 1);
 
         cpu.Cycles += cpu.Pc22Bits ? 4UL : 3UL;
     }
@@ -762,11 +764,13 @@ public static class Opcodes
         if (i >= cpu.Mmio.Data.Length)
             throw new AvrStackUnderflowException(cpu.Pc, i - (cpu.Pc22Bits ? 3 : 2));
         cpu.Mmio.DataView.SetUint16(93, (ushort)i, true);
-        cpu.Pc = (uint)((cpu.Mmio.Data[i - 1] << 8) + cpu.Mmio.Data[i] - 1);
+        var target = (cpu.Mmio.Data[i - 1] << 8) + cpu.Mmio.Data[i];
         if (cpu.Pc22Bits)
         {
-            cpu.Pc |= (uint)(cpu.Mmio.Data[i - 2] << 16);
+            target |= cpu.Mmio.Data[i - 2] << 16;
         }
+
+        cpu.Pc = (uint)(target - 1);
 
         cpu.Cycles += cpu.Pc22Bits ? 4UL : 3UL;
         cpu.Mmio.Data[95] |= 0x80; // Enable interrupts
