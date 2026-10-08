@@ -393,6 +393,39 @@ public static unsafe class Exports
             s.Ports[portIdx].SetPinValue((byte)pin, value != 0);
         });
 
+    /// <summary>Drives only the pins in <paramref name="mask"/> of port <paramref name="portIdx"/> to the
+    /// matching bits of <paramref name="levels"/>; other pins are left as they were.</summary>
+    [UnmanagedCallersOnly(EntryPoint = "a8s_gpio_set_inputs")]
+    public static int GpioSetInputs(IntPtr h, int portIdx, int mask, int levels)
+        => Run(h, s =>
+        {
+            if (portIdx < 0 || portIdx >= s.Ports.Count)
+                throw new ArgumentOutOfRangeException(nameof(portIdx));
+            s.Ports[portIdx].SetInputs((byte)mask, (byte)levels);
+        });
+
+    /// <summary>Stops driving the pins in <paramref name="mask"/> of port <paramref name="portIdx"/>
+    /// (see <c>a8s_gpio_release_pin</c>), in one call.</summary>
+    [UnmanagedCallersOnly(EntryPoint = "a8s_gpio_release_inputs")]
+    public static int GpioReleaseInputs(IntPtr h, int portIdx, int mask)
+        => Run(h, s =>
+        {
+            if (portIdx < 0 || portIdx >= s.Ports.Count)
+                throw new ArgumentOutOfRangeException(nameof(portIdx));
+            s.Ports[portIdx].ReleaseInputs((byte)mask);
+        });
+
+    /// <summary>Sets the whole external state of port <paramref name="portIdx"/>: pins in
+    /// <paramref name="drivenMask"/> are driven to <paramref name="levels"/>, every other pin is released.</summary>
+    [UnmanagedCallersOnly(EntryPoint = "a8s_gpio_apply_inputs")]
+    public static int GpioApplyInputs(IntPtr h, int portIdx, int drivenMask, int levels)
+        => Run(h, s =>
+        {
+            if (portIdx < 0 || portIdx >= s.Ports.Count)
+                throw new ArgumentOutOfRangeException(nameof(portIdx));
+            s.Ports[portIdx].ApplyInputs((byte)drivenMask, (byte)levels);
+        });
+
     /// <summary>Stops driving <paramref name="pin"/> on port <paramref name="portIdx"/>, undoing
     /// <c>a8s_gpio_set_pin</c>: the line floats again, so an input pin with its PORT bit set reads
     /// 1 through the internal pull-up and any other floating input reads 0.</summary>

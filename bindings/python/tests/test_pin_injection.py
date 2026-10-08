@@ -162,3 +162,31 @@ def test_respond_to_rise_reports_the_wait_before_the_trigger():
 
     assert 9 <= waited <= 12
     uno.close()
+
+
+def test_set_inputs_drives_only_the_mask_and_release_inputs_undoes_it():
+    sim = a.Simulation.create()
+    port_d = sim.add_gpio(2)
+    sim.cpu.write(PORTD, 0x03)  # pull-ups on PD0, PD1
+
+    port_d.set_inputs(0xFF, 0x84)
+    assert sim.cpu.read(PIND) == 0x84
+
+    port_d.set_inputs(0x01, 0x01)  # PD1..PD7 untouched
+    assert sim.cpu.read(PIND) == 0x85
+
+    port_d.release_inputs(0xFC)  # PD0, PD1 stay driven
+    assert sim.cpu.read(PIND) == 0x01
+    port_d.release_inputs(0x03)
+    assert sim.cpu.read(PIND) == 0x03  # pull-ups
+
+
+def test_apply_inputs_sets_the_full_state():
+    sim = a.Simulation.create()
+    port_d = sim.add_gpio(2)
+    sim.cpu.write(PORTD, 0x03)
+    port_d.apply_inputs(0xFF, 0x00)
+    assert sim.cpu.read(PIND) == 0x00
+    port_d.apply_inputs(0xFC, 0xFC)
+    assert sim.cpu.read(PIND) == 0xFF  # PD0, PD1 released back to their pull-ups
+    sim.close()

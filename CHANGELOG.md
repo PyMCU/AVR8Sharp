@@ -66,6 +66,38 @@ Several change cycle counts or register values that a test may have pinned; each
 - `AvrRunner.Run(budget)`, `RunUntil(cycle)` and `RunCycles(budget)` carry the target across
   calls, so stepping in small slices no longer drifts. `Execute()` uses the same target.
 
+### New: the SiliconTwin.Abstractions contract
+
+The core implements [`SiliconTwin.Abstractions`](https://github.com/silicon-twin/abstractions),
+the shared embedder contract of the Silicon Twin emulators (MIT, no dependencies), so a host
+drives an AVR the same way it drives an RP2040.
+
+- `AvrBuilder.BuildMcu(name)` returns an `AvrMcu` (`IMcu`, `IGpio`, `IPwmSource`, `IAdcInput`,
+  `IPeripheralMap`) over everything the builder mounted. `runner.AsMcu(...)` covers machines
+  built by hand.
+- `IMcu`: `Run(budget)`/`RunUntil` without drift, `Reset(Soft | Power)`, `Load` of Intel HEX
+  (strict) or a raw binary.
+- One `IPinBank` per port: `SetInputs(mask, levels)`, `ReleaseInputs(mask)`,
+  `OutputEnableMask`, `OutputLevels`, `PullUpMask`, and `PinChanged` with the cycle of the
+  write and a `WatchMask`. It costs one null check when nobody subscribes.
+- `IPwmSource.TryGetPwm`: frequency and duty from the timer's clock select, waveform mode, TOP,
+  OCR and COM bits (fast, phase-correct and phase-and-frequency-correct, channels A to C).
+- `IAdcInput`: `ReadChannelVolts`, a callback the ADC calls only when a conversion samples its
+  input, instead of pushing `ChannelValues` every step.
+- UART (`TxByte`, `TryInjectRx`), SPI (`Transfer`, idle bus reads 0xFF) and I2C targets attached
+  by address.
+
+Underneath, also usable directly:
+
+- `AvrIoPort.SetInputs`, `ReleaseInputs`, `ApplyInputs` (full state in one PIN recompute),
+  `OutputEnableMask`, `OutputLevels`, `PullUpMask`, `PinChanged` and `WatchMask`.
+  `SetPinValue` and `ReleasePin` no longer recompute PIN when nothing changes.
+- `AvrAdc.ReadChannelVolts`, `AvrTimer.TryGetPwm`, `AvrClock.Changed`, `AvrBuilder.AddClock`.
+- C ABI `a8s_gpio_set_inputs`, `a8s_gpio_release_inputs`, `a8s_gpio_apply_inputs`; Python
+  `Port.set_inputs`, `release_inputs`, `apply_inputs`.
+- The core declares `IsTrimmable` and `IsAotCompatible`, and CI publishes and runs a Native AOT
+  smoke test.
+
 ---
 
 ## [v1.1.0] - 2026-10-07

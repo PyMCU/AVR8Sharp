@@ -459,11 +459,11 @@ public class AvrIoPort
 	public void SetPinValue (byte index, bool value)
 	{ 
 		var bitMask = 1 << index;
-		_pinValue &= ~bitMask;
-		if (value) {
-			_pinValue |= bitMask;
-		}
-		_driven |= bitMask;
+		var newPinValue = value ? _pinValue | bitMask : _pinValue & ~bitMask;
+		var newDriven = _driven | bitMask;
+		if (newPinValue == _pinValue && newDriven == _driven) return;
+		_pinValue = newPinValue;
+		_driven = newDriven;
 		UpdatePinRegister (_cpu.Mmio.Data[_portConfig.DDR]);
 	}
 
@@ -476,10 +476,105 @@ public class AvrIoPort
 	public void ReleasePin (byte index)
 	{
 		var bitMask = 1 << index;
+		if ((_driven & bitMask) == 0) return;
 		_driven &= ~bitMask;
 		UpdatePinRegister (_cpu.Mmio.Data[_portConfig.DDR]);
 	}
-	
+
+	/// <summary>
+	/// Drives only the pins in <paramref name="mask"/> from outside to the matching bits of
+	/// <paramref name="levels"/>; the other pins keep whatever they had (driven or released).
+	/// Equivalent to <see cref="SetPinValue"/> for each bit of the mask, but recomputes PIN once
+	/// and returns early when nothing changed.
+	/// </summary>
+	/// <param name="mask">Pins to drive from outside</param>
+	/// <param name="levels">Levels of the pins in the mask (other bits are ignored)</param>
+	public void SetInputs (byte mask, byte levels)
+	{
+		var newDriven = _driven | mask;
+		var newPinValue = (_pinValue & ~mask) | (levels & mask);
+		if (newDriven == _driven && newPinValue == _pinValue) return;
+		_driven = newDriven;
+		_pinValue = newPinValue;
+		UpdatePinRegister (_cpu.Mmio.Data[_portConfig.DDR]);
+	}
+
+	/// <summary>
+	/// Stops driving the pins in <paramref name="mask"/> from outside, as <see cref="ReleasePin"/>
+	/// does for one pin, with a single PIN recompute and an early return when none was driven.
+	/// </summary>
+	public void ReleaseInputs (byte mask)
+	{
+		if ((_driven & mask) == 0) return;
+		_driven &= ~mask;
+		UpdatePinRegister (_cpu.Mmio.Data[_portConfig.DDR]);
+	}
+
+	/// <summary>
+	/// Sets the full external state in one call: pins in <paramref name="drivenMask"/> are driven
+	/// to <paramref name="levels"/> and every other pin is released. Same result as
+	/// <c>SetInputs(drivenMask, levels)</c> followed by <c>ReleaseInputs(~drivenMask)</c>, with one
+	/// PIN recompute.
+	/// </summary>
+	public void ApplyInputs (byte drivenMask, byte levels)
+	{
+		var newPinValue = levels & drivenMask;
+		if (drivenMask == _driven && newPinValue == (_pinValue & drivenMask)) return;
+		_driven = drivenMask;
+		_pinValue = (_pinValue & ~drivenMask) | newPinValue;
+		UpdatePinRegister (_cpu.Mmio.Data[_portConfig.DDR]);
+	}
+
+	/// <summary>
+	/// Pins with the internal pull-up in effect, exactly the pins <see cref="GetPinState"/> reports
+	/// as <see cref="PinState.InputPullup"/>: inputs with the PORT bit set, plus open-collector
+	/// outputs that are released (high) with the PORT bit set.
+	/// </summary>
+	public byte PullUpMask {
+		get {
+			var port = _cpu.Mmio.Data[_portConfig.PORT];
+			var released = _cpu.Mmio.Data[_portConfig.DDR] & OpenCollector & _lastValue;
+			return (byte)(port & (~_cpu.Mmio.Data[_portConfig.DDR] | released));
+		}
+	}
+
+	/// <summary>The register layout this port was built with.</summary>
+	public AvrPortConfig Config => _portConfig;
+
+	private AvrPinChangeHandler? _pinChanged;
+
+	/// <summary>
+	/// Raised when the effective pad level or output enable of a pin in <see cref="WatchMask"/>
+	/// changes on the chip side (after timer overrides), with <see cref="Cpu.Cycles"/> at that
+	/// instant. Costs nothing while nobody subscribes. A change of <see cref="OpenCollector"/>
+	/// alone is not reported until the next write that moves a pin.
+	/// </summary>
+	public event AvrPinChangeHandler? PinChanged {
+		add { _pinChanged += value; }
+		remove { _pinChanged -= value; }
+	}
+
+	/// <summary>Pins that may raise <see cref="PinChanged"/>. All pins by default.</summary>
+	public byte WatchMask { get; set; } = 0xff;
+
+	/// <summary>
+	/// Pins the chip drives (as <see cref="PinState.Low"/> or <see cref="PinState.High"/> in
+	/// <see cref="GetPinState"/>): DDR bits, minus open-collector pins that are in their high
+	/// (released) state. Timer overrides only change the level, never the direction.
+	/// </summary>
+	public byte OutputEnableMask {
+		get {
+			var ddr = _cpu.Mmio.Data[_portConfig.DDR];
+			return (byte)(ddr & ~(OpenCollector & _lastValue));
+		}
+	}
+
+	/// <summary>
+	/// Driven level of the bits in <see cref="OutputEnableMask"/> (timer overrides included).
+	/// Bits outside the mask read 0.
+	/// </summary>
+	public byte OutputLevels => (byte)(_lastValue & OutputEnableMask);
+
 	private void UpdatePinRegister (byte ddr)
 	{
 		var pulled = _cpu.Mmio.Data[_portConfig.PORT] & ~_driven;
@@ -629,9 +724,20 @@ public class AvrIoPort
 		var newValue = (byte)((((value & _overrideMask) | _overrideValue) & ddr) | (value & ~ddr));
 		var prevValue = _lastValue;
 		if (newValue == prevValue && ddr == _lastDdr) return;
+		var pinChanged = _pinChanged;
+		if (pinChanged == null) {
+			_lastValue = newValue;
+			_lastDdr = ddr;
+			OnGpioChange?.Invoke(newValue, prevValue);
+			return;
+		}
+		var oldEnable = (byte)(_lastDdr & ~(OpenCollector & prevValue));
 		_lastValue = newValue;
 		_lastDdr = ddr;
+		var newEnable = (byte)(ddr & ~(OpenCollector & newValue));
+		var changed = (byte)(((oldEnable ^ newEnable) | ((prevValue ^ newValue) & oldEnable & newEnable)) & WatchMask);
 		OnGpioChange?.Invoke(newValue, prevValue);
+		if (changed != 0) pinChanged (changed, newEnable, (byte)(newValue & newEnable), _cpu.Cycles);
 	}
 }
 
@@ -667,6 +773,9 @@ public class AvrPortConfig (ushort pin, ushort ddr, ushort port, AvrPinChangeInt
 	public readonly AvrPinChangeInterrupt? PinChange = pinChange;
 	public readonly AvrExternalInterrupt?[]? ExternalInterrupts = externalInterrupts;
 }
+
+/// <summary>Chip-side pin change: pins that changed, the pins the chip drives and their levels afterwards.</summary>
+public delegate void AvrPinChangeHandler (byte changed, byte outputEnable, byte levels, ulong cycle);
 
 public enum PinState
 {

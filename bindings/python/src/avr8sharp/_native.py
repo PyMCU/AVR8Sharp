@@ -66,6 +66,9 @@ _SIGNATURES: dict[str, tuple[list, object]] = {
     "a8s_gpio_pin": ([c_void_p, c_int, c_int], c_int),
     "a8s_gpio_set_pin": ([c_void_p, c_int, c_int, c_int], c_int),
     "a8s_gpio_release_pin": ([c_void_p, c_int, c_int], c_int),
+    "a8s_gpio_set_inputs": ([c_void_p, c_int, c_int, c_int], c_int),
+    "a8s_gpio_release_inputs": ([c_void_p, c_int, c_int], c_int),
+    "a8s_gpio_apply_inputs": ([c_void_p, c_int, c_int, c_int], c_int),
     # analog / bus peripherals (Uno and Mega sessions)
     "a8s_adc_set_channel": ([c_void_p, c_int, c_double], c_int),
     "a8s_spi_queue_response": ([c_void_p, c_byte], c_int),
