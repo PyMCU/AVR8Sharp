@@ -259,4 +259,16 @@ public class Adc : AvrTestBase
 		Assert.That (result, Is.EqualTo (81),
 			"ADC result must reflect the configured TemperatureVoltage");
 	}
+
+	[Test (Description = "ATmega328P REFS1:0 selects AREF, AVCC, reserved, internal 1.1 V (datasheet table 28-3)")]
+	public void ReferenceSelection_FollowsDatasheetOrder ()
+	{
+		Cpu.Mmio.Data[ADMUX] = 0x00;
+		Assert.That (_adc.ReferenceVoltageType, Is.EqualTo (AdcReference.AREF), "REFS = 00");
+		Cpu.Mmio.Data[ADMUX] = REFS0;
+		Assert.That (_adc.ReferenceVoltageType, Is.EqualTo (AdcReference.AVCC), "REFS = 01");
+		Cpu.Mmio.Data[ADMUX] = 0xc0;
+		Assert.That (_adc.ReferenceVoltageType, Is.EqualTo (AdcReference.Internal1V1), "REFS = 11 (analogReference(INTERNAL))");
+		Assert.That (_adc.ReferenceVoltage, Is.EqualTo (1.1));
+	}
 }
