@@ -79,7 +79,10 @@ public static unsafe class Exports
         s.Ports.AddRange([uno.PortB, uno.PortC, uno.PortD]);
         s.Timers.AddRange([uno.Timer0, uno.Timer1, uno.Timer2]);
         s.Serials.Add(uno.Serial);
-        WireAtmega328Analog(uno, s);
+        s.Adc = uno.Adc;
+        s.Spi = uno.SpiBus;
+        s.Twi = uno.TwiBus;
+        s.Watchdog = uno.Watchdog;
         return Wrap(s);
     }
 
@@ -92,6 +95,10 @@ public static unsafe class Exports
                           m.PortG, m.PortH, m.PortJ, m.PortK, m.PortL]);
         s.Timers.AddRange([m.Timer0, m.Timer1, m.Timer2, m.Timer3, m.Timer4, m.Timer5]);
         s.Serials.AddRange([m.Serial0, m.Serial1, m.Serial2, m.Serial3]);
+        s.Adc = m.Adc;
+        s.Spi = m.SpiBus;
+        s.Twi = m.TwiBus;
+        s.Watchdog = m.Watchdog;
         return Wrap(s);
     }
 
@@ -385,6 +392,18 @@ public static unsafe class Exports
             s.Ports[portIdx].SetPinValue((byte)pin, value != 0);
         });
 
+    /// <summary>Stops driving <paramref name="pin"/> on port <paramref name="portIdx"/>, undoing
+    /// <c>a8s_gpio_set_pin</c>: the line floats again, so an input pin with its PORT bit set reads
+    /// 1 through the internal pull-up and any other floating input reads 0.</summary>
+    [UnmanagedCallersOnly(EntryPoint = "a8s_gpio_release_pin")]
+    public static int GpioReleasePin(IntPtr h, int portIdx, int pin)
+        => Run(h, s =>
+        {
+            if (portIdx < 0 || portIdx >= s.Ports.Count)
+                throw new ArgumentOutOfRangeException(nameof(portIdx));
+            s.Ports[portIdx].ReleasePin((byte)pin);
+        });
+
     // ── CPU / memory observation ──────────────────────────────────────────────
 
     [UnmanagedCallersOnly(EntryPoint = "a8s_cpu_pc")]
@@ -434,11 +453,34 @@ public static unsafe class Exports
             Array.Copy(s.Snapshot, s.Sim.Data, s.Snapshot.Length);
             foreach (var t in s.Timers) t.Reset();
             s.Sim.Cpu.Reset();
+            // The reset above would flag EXTRF; a restore rewinds to the power-on state instead.
+            s.Watchdog?.PowerOnReset();
             s.Sim.Cpu.Cycles = 0;
             foreach (var probe in s.Serials) probe.Clear();
             if (s.Spi is not null) { s.Spi.Mosi.Clear(); s.Spi.Responses.Clear(); }
             if (s.Twi is not null) { s.Twi.Writes.Clear(); s.Twi.Responses.Clear(); }
         });
+
+    // ── Strict mode ───────────────────────────────────────────────────────────
+
+    /// <summary>Sets how access to an unmounted GPIO port is treated: 0 = ignore (default),
+    /// 1 = record a warning, 2 = throw (the failing run call then reports the message).</summary>
+    [UnmanagedCallersOnly(EntryPoint = "a8s_set_strict")]
+    public static int SetStrict(IntPtr h, int mode)
+        => Run(h, s =>
+        {
+            if (mode < 0 || mode > 2) throw new ArgumentOutOfRangeException(nameof(mode));
+            s.Sim.UnmountedAccess = (UnmountedAccessMode)mode;
+        });
+
+    /// <summary>Copies the recorded unmounted-access warnings (UTF-8, one per line) into the caller
+    /// buffer; returns the full length.</summary>
+    [UnmanagedCallersOnly(EntryPoint = "a8s_read_warnings")]
+    public static int ReadWarnings(IntPtr h, byte* outBuf, int cap)
+    {
+        if (Get(h) is not { } s) return ErrBadHandle;
+        return CopyOut(Encoding.UTF8.GetBytes(string.Join("\n", s.Sim.Warnings)), outBuf, cap);
+    }
 
     // ── Errors ────────────────────────────────────────────────────────────────
 
@@ -450,25 +492,7 @@ public static unsafe class Exports
         return CopyOut(Encoding.UTF8.GetBytes(s.LastError), outBuf, cap);
     }
 
-    // ── Analog/bus peripherals (ATmega328P-family sessions) ───────────────────
-
-    /// <summary>Wires ADC, an SPI bus stub, and a single-address I²C slave stub onto an
-    /// ATmega328P-style simulation, using the 328P peripheral configs.</summary>
-    private static void WireAtmega328Analog(AvrTestSimulation sim, NativeSession s)
-    {
-        sim.AddAdc(AvrAdc.AdcConfig, out var adc);
-        s.Adc = adc;
-
-        sim.AddSpi(AvrSpi.SpiConfig, out var spi);
-        var spiStub = new SpiDeviceStub();
-        spi.OnTransfer = spiStub.Transfer;
-        s.Spi = spiStub;
-
-        sim.AddTwi(AvrTwi.TwiConfig, out var twi);
-        var twiStub = new TwiDeviceStub(twi);
-        twi.EventHandler = twiStub;
-        s.Twi = twiStub;
-    }
+    // ── Analog/bus peripherals (ATmega328P and ATmega2560 board sessions) ─────
 
     /// <summary>Sets the analog voltage (volts) presented on ADC <paramref name="channel"/>,
     /// so a firmware ADC read on that channel returns the corresponding value.</summary>

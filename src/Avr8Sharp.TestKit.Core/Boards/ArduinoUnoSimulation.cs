@@ -7,8 +7,9 @@ namespace Avr8Sharp.TestKit.Boards;
 /// Pre-configured simulation for the <b>Arduino Uno</b> (ATmega328P).
 /// <para>
 /// All standard peripherals are created automatically:
-/// three GPIO ports (B, C, D), three timers (0, 1, 2), and USART0.
-/// Serial output is captured in <see cref="Serial"/>.
+/// three GPIO ports (B, C, D), three timers (0, 1, 2), USART0, EEPROM, SPI, TWI, ADC and the watchdog.
+/// Serial output is captured in <see cref="Serial"/>. SPI and TWI are wired to scripted slaves
+/// (<see cref="SpiBus"/>, <see cref="TwiBus"/>) so transfers always complete.
 /// </para>
 /// </summary>
 /// <example>
@@ -53,6 +54,26 @@ public sealed class ArduinoUnoSimulation : AvrTestSimulation
     /// <summary>ATmega328P internal EEPROM — 1024 bytes, volatile (in-memory backend).</summary>
     public AvrEeprom Eeprom { get; }
 
+    // ── SPI / TWI / ADC / watchdog ────────────────────────────────────────────
+    /// <summary>SPI peripheral (SPCR/SPSR/SPDR at 0x4C-0x4E). Transfers are answered by <see cref="SpiBus"/>.</summary>
+    public AvrSpi Spi { get; }
+    /// <summary>
+    /// Scripted SPI slave: records every MOSI byte and answers with <see cref="SpiDeviceStub.Responses"/>,
+    /// or 0xFF (idle MISO) once the queue is empty, so a transfer always completes.
+    /// </summary>
+    public SpiDeviceStub SpiBus { get; }
+    /// <summary>TWI (I²C) peripheral (TWBR..TWAMR at 0xB8-0xBD). Transactions are answered by <see cref="TwiBus"/>.</summary>
+    public AvrTwi Twi { get; }
+    /// <summary>
+    /// Scripted I²C slave. With no address in <see cref="TwiDeviceStub.Addresses"/> every SLA+W/R is
+    /// NACKed, as on a bus with pull-ups and no device; add addresses to make it ACK.
+    /// </summary>
+    public TwiDeviceStub TwiBus { get; }
+    /// <summary>10-bit ADC. Every channel reads 0 V until set through <see cref="AvrAdc.ChannelValues"/>.</summary>
+    public AvrAdc Adc { get; }
+    /// <summary>Watchdog timer. It also owns MCUSR, which reads PORF (0x01) after construction.</summary>
+    public AvrWatchdog Watchdog { get; }
+
     public ArduinoUnoSimulation() : base(Flash, Sram)
     {
         WithFrequency(Frequency);
@@ -73,5 +94,17 @@ public sealed class ArduinoUnoSimulation : AvrTestSimulation
         AddUsart(AvrUsart.Usart0Config, out var serial); Serial = serial;
 
         AddEeprom(AvrEeprom.EepromConfig, out var eeprom); Eeprom = eeprom;
+
+        AddSpi(AvrSpi.SpiConfig, out var spi); Spi = spi;
+        SpiBus = new SpiDeviceStub();
+        spi.OnTransfer = SpiBus.Transfer;
+
+        AddTwi(AvrTwi.TwiConfig, out var twi); Twi = twi;
+        TwiBus = new TwiDeviceStub(twi);
+        twi.EventHandler = TwiBus;
+
+        AddAdc(AvrAdc.AdcConfig, out var adc); Adc = adc;
+
+        AddWatchdog(AvrWatchdog.WatchdogConfig, out var watchdog); Watchdog = watchdog;
     }
 }

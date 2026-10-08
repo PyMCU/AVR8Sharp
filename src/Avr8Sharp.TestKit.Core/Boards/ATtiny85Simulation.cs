@@ -140,6 +140,9 @@ public sealed class ATtiny85Simulation : AvrTestSimulation
     /// <summary>ATtiny85 internal EEPROM — 512 bytes, volatile (in-memory backend).</summary>
     public AvrEeprom Eeprom { get; }
 
+    // The low I/O space holds ADC/USI/timer registers here, so a missing ATmega port is not detectable.
+    protected override bool ChecksUnmountedPorts => false;
+
     public ATtiny85Simulation() : base(Flash, Sram)
     {
         WithFrequency(Frequency);

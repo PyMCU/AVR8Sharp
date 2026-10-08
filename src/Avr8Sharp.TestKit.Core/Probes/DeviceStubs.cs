@@ -1,13 +1,13 @@
 using AVR8Sharp.Core.Peripherals;
 
-namespace Avr8Sharp.Native;
+namespace Avr8Sharp.TestKit.Probes;
 
 /// <summary>
 /// A canned SPI slave on the bus. Captures every byte the firmware clocks out (MOSI) and replays
 /// a pre-loaded response queue back (MISO) — the standard way to test SPI sensor/display drivers
 /// without modelling a real device. Returns 0xFF once the queue is drained (idle MISO line).
 /// </summary>
-internal sealed class SpiDeviceStub
+public sealed class SpiDeviceStub
 {
     public readonly List<byte> Mosi = new();
     // Settable so a session can point both bus stubs at ONE queue -- the bench
@@ -27,7 +27,7 @@ internal sealed class SpiDeviceStub
 /// (0xFF when drained). The response queue is shared across addresses, the way a scripted
 /// bench with one responder per pin would be wired.
 /// </summary>
-internal sealed class TwiDeviceStub(AvrTwi twi) : ITwiEventHandler
+public sealed class TwiDeviceStub(AvrTwi twi) : ITwiEventHandler
 {
     /// <summary>7-bit slave addresses this device answers to.</summary>
     public readonly HashSet<byte> Addresses = new();

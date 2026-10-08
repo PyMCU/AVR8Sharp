@@ -22,6 +22,9 @@ public sealed class ATtiny13Simulation : AvrTestSimulation
     /// <summary>Port B — the only GPIO port (PB0–PB5).</summary>
     public AvrIoPort PortB { get; }
 
+    // The low I/O space holds ADC/USI/timer registers here, so a missing ATmega port is not detectable.
+    protected override bool ChecksUnmountedPorts => false;
+
     public ATtiny13Simulation() : base(Flash, Sram)
     {
         WithFrequency(Frequency);
