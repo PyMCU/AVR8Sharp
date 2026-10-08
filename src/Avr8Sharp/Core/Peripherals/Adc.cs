@@ -204,6 +204,15 @@ public class AvrAdc
     public double[] ChannelValues { get; }
 
     /// <summary>
+    /// Optional pull hook: when set, a conversion asks it for the input voltage at the instant it
+    /// samples (the same instant <see cref="ChannelValues"/> is read), instead of reading
+    /// <see cref="ChannelValues"/>. The argument is the single-ended input number (ADC0..ADC15 as
+    /// in <see cref="ChannelValues"/>); differential modes call it once per input. When null the
+    /// <see cref="ChannelValues"/> array is used.
+    /// </summary>
+    public Func<int, double>? ReadChannelVolts;
+
+    /// <summary>
     /// Voltage returned by the internal temperature sensor channel (mux input 8 on ATmega328P).
     /// Defaults to ~0.378 V which corresponds to approximately 25 °C.
     /// Set this to simulate a different ambient temperature.
@@ -320,13 +329,19 @@ public class AvrAdc
         StartConversion();
     }
 
+    private double SampleChannel(int channel)
+    {
+        var read = ReadChannelVolts;
+        return read != null ? read(channel) : ChannelValues[channel];
+    }
+
     public void OnADCRead(AdcMuxInput input)
     {
         var voltage = input.Type switch
         {
             AdcMuxInputType.Constant => input.Voltage,
-            AdcMuxInputType.SingleEnded => ChannelValues[input.Channel],
-            AdcMuxInputType.Differential => input.Gain * (ChannelValues[input.PositiveChannel] - ChannelValues[input.NegativeChannel]),
+            AdcMuxInputType.SingleEnded => SampleChannel(input.Channel),
+            AdcMuxInputType.Differential => input.Gain * (SampleChannel(input.PositiveChannel) - SampleChannel(input.NegativeChannel)),
             AdcMuxInputType.Temperature => TemperatureVoltage,
             _ => 0.0
         };

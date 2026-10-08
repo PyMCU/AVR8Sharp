@@ -5,6 +5,8 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <IsTrimmable>true</IsTrimmable>
+        <IsAotCompatible>true</IsAotCompatible>
         
         <!-- NuGet package metadata -->
         <PackageId>Avr8Sharp</PackageId>
@@ -24,6 +26,10 @@
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <LangVersion>default</LangVersion>
     </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="SiliconTwin.Abstractions" Version="0.1.0" />
+    </ItemGroup>
 
     <ItemGroup>
         <None Include="..\..\README.md" Pack="true" PackagePath="\"/>

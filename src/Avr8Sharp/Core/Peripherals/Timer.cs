@@ -491,6 +491,54 @@ public class AvrTimer
         }
     }
 
+    /// <summary>The register layout this timer was built with.</summary>
+    public AvrTimerConfig Config => _config;
+
+    /// <summary>
+    /// Describes the PWM waveform on compare channel <paramref name="channel"/> (0 = A, 1 = B, 2 = C)
+    /// from the current registers: fast PWM and phase correct / phase and frequency correct, with
+    /// COMnx = 2 (non-inverting) or 3 (inverting). Returns false when the channel does not exist.
+    /// <paramref name="enabled"/> is false when the channel is not producing PWM (other mode,
+    /// output disconnected, toggle mode, or clock stopped). Fast PWM high time is OCR + 1 counts,
+    /// phase correct is OCR counts out of TOP, as the waveform generator does.
+    /// </summary>
+    public bool TryGetPwm(int channel, uint clockHz, out bool enabled, out double frequencyHz, out double duty)
+    {
+        enabled = false;
+        frequencyHz = 0;
+        duty = 0;
+        int ocr;
+        byte comp;
+        switch (channel) {
+            case 0: ocr = _ocrA; comp = _compA; break;
+            case 1: ocr = _ocrB; comp = _compB; break;
+            case 2 when _hasOcrC: ocr = _ocrC; comp = _compC; break;
+            default: return false;
+        }
+        var divider = _config.Dividers != null && CS < _config.Dividers.Length ? _config.Dividers[CS] : 0;
+        var top = TOP;
+        // With TOP = OCRnA, channel A only toggles; it has no duty of its own
+        if (comp < 2 || divider <= 0 || top <= 0 || (channel == 0 && _topValue == TOP_OCRA)) return true;
+        double period, high;
+        switch (_timerMode) {
+            case TimerMode.FastPWM:
+                period = top + 1;
+                high = Math.Min(ocr, top) + 1;
+                break;
+            case TimerMode.PWMPhaseCorrect:
+            case TimerMode.PWMPhaseFrequencyCorrect:
+                period = 2.0 * top;
+                high = 2.0 * Math.Min(ocr, top);
+                break;
+            default:
+                return true;
+        }
+        enabled = true;
+        frequencyHz = clockHz / (divider * period);
+        duty = comp == 3 ? 1.0 - high / period : high / period;
+        return true;
+    }
+
     public int DebugTCNT
     {
         get { return _tcnt; }

@@ -114,6 +114,23 @@ class Port:
         lib = self._sim._lib
         _check(lib, self._sim._h, lib.a8s_gpio_release_pin(self._sim._h, self._index, pin), "gpio_release_pin")
 
+    def set_inputs(self, mask: int, levels: int) -> None:
+        """Drives only the pins in `mask` to the matching bits of `levels` in one call; the other
+        pins keep whatever they had (driven or released)."""
+        lib = self._sim._lib
+        _check(lib, self._sim._h, lib.a8s_gpio_set_inputs(self._sim._h, self._index, mask & 0xFF, levels & 0xFF), "gpio_set_inputs")
+
+    def release_inputs(self, mask: int) -> None:
+        """Stops driving the pins in `mask` in one call, undoing set_inputs()."""
+        lib = self._sim._lib
+        _check(lib, self._sim._h, lib.a8s_gpio_release_inputs(self._sim._h, self._index, mask & 0xFF), "gpio_release_inputs")
+
+    def apply_inputs(self, driven_mask: int, levels: int) -> None:
+        """Sets the whole external state in one call: pins in `driven_mask` are driven to `levels`,
+        every other pin is released."""
+        lib = self._sim._lib
+        _check(lib, self._sim._h, lib.a8s_gpio_apply_inputs(self._sim._h, self._index, driven_mask & 0xFF, levels & 0xFF), "gpio_apply_inputs")
+
 
 def _read_buffer(fn, sim: "Simulation", *args) -> bytes:
     """Two-pass read of a native length-prefixed byte buffer (call with cap, then size exactly)."""

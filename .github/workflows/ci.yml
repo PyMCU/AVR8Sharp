@@ -41,3 +41,12 @@ jobs:
           -c Release
           --no-build
           --logger "console;verbosity=normal"
+
+      # ── Native AOT smoke ──────────────────────────────────────────────────────
+      # Publishes the core with Native AOT and runs a blink program: fails if the
+      # core stops being AOT/trim compatible (IL2xxx/IL3xxx warnings are surfaced too).
+      - name: AOT smoke
+        run: |
+          sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+          dotnet publish tests/Avr8Sharp.AotSmoke -r linux-x64 -c Release -o aot-smoke
+          ./aot-smoke/Avr8Sharp.AotSmoke

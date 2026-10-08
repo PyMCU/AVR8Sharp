@@ -32,6 +32,9 @@ public class AvrClock
         get { return (uint)(_baseFreqHz / (_prescalerValue != 0 ? _prescalerValue : 1)); }
     }
 
+    /// <summary>Raised after a CLKPR write or a reset changes <see cref="Frequency"/>.</summary>
+    public event Action? Changed;
+
     public int Prescaler
     {
         get { return _prescalerValue; }
@@ -73,6 +76,7 @@ public class AvrClock
                 {
                     _cyclesDelta = (int)(((double)cpu.Cycles + _cyclesDelta) * (oldPrescaler / (double)_prescalerValue) -
                                          (double)cpu.Cycles);
+                    Changed?.Invoke();
                 }
             }
 
@@ -88,6 +92,7 @@ public class AvrClock
                 _cyclesDelta = (int)(((double)cpu.Cycles + _cyclesDelta) * (_prescalerValue / 1.0) -
                                      (double)cpu.Cycles);
                 _prescalerValue = 1;
+                Changed?.Invoke();
             }
         };
     }
