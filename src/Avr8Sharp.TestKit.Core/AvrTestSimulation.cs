@@ -336,6 +336,27 @@ public class AvrTestSimulation
     }
 
     /// <summary>
+    /// Wraps a text predicate so it is evaluated only when the captured output changed
+    /// since the last call. The step loop polls the predicate once per instruction;
+    /// rebuilding and scanning the whole text each time made long runs quadratic.
+    /// </summary>
+    private static Func<AvrTestSimulation, bool> OnSerialChange(
+        Probes.SerialProbe serial, Func<string, bool> predicate)
+    {
+        var version = -1;
+        var result = false;
+        return _ =>
+        {
+            if (serial.Version != version)
+            {
+                version = serial.Version;
+                result = predicate(serial.Text);
+            }
+            return result;
+        };
+    }
+
+    /// <summary>
     /// Runs until the captured <paramref name="serial"/> text satisfies <paramref name="predicate"/>,
     /// or until <paramref name="maxMs"/> of simulated time elapses.
     /// </summary>
@@ -343,7 +364,7 @@ public class AvrTestSimulation
         Probes.SerialProbe serial,
         Func<string, bool> predicate,
         double maxMs = 2000)
-        => RunUntilMs(_ => predicate(serial.Text), maxMs);
+        => RunUntilMs(OnSerialChange(serial, predicate), maxMs);
 
     /// <summary>
     /// Runs until <paramref name="serial"/> contains the given <paramref name="text"/> as a substring,
@@ -353,7 +374,7 @@ public class AvrTestSimulation
         Probes.SerialProbe serial,
         string text,
         double maxMs = 2000)
-        => RunUntilMs(_ => serial.Text.Contains(text), maxMs);
+        => RunUntilMs(OnSerialChange(serial, t => t.Contains(text)), maxMs);
 
     /// <summary>
     /// Runs until <paramref name="serial"/> has received at least <paramref name="byteCount"/> bytes,
