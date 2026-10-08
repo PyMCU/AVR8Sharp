@@ -65,7 +65,8 @@ _SIGNATURES: dict[str, tuple[list, object]] = {
     # gpio observation and injection
     "a8s_gpio_pin": ([c_void_p, c_int, c_int], c_int),
     "a8s_gpio_set_pin": ([c_void_p, c_int, c_int, c_int], c_int),
-    # analog / bus peripherals (ATmega328P-family sessions)
+    "a8s_gpio_release_pin": ([c_void_p, c_int, c_int], c_int),
+    # analog / bus peripherals (Uno and Mega sessions)
     "a8s_adc_set_channel": ([c_void_p, c_int, c_double], c_int),
     "a8s_spi_queue_response": ([c_void_p, c_byte], c_int),
     "a8s_spi_read_mosi": ([c_void_p, c_char_p, c_int], c_int),
@@ -75,6 +76,9 @@ _SIGNATURES: dict[str, tuple[list, object]] = {
     "a8s_twi_read_writes": ([c_void_p, c_char_p, c_int], c_int),
     "a8s_twi_read_events": ([c_void_p, c_char_p, c_int], c_int),
     "a8s_twi_read_reads": ([c_void_p, c_char_p, c_int], c_int),
+    # strict mode (unmounted GPIO ports)
+    "a8s_set_strict": ([c_void_p, c_int], c_int),
+    "a8s_read_warnings": ([c_void_p, c_char_p, c_int], c_int),
     # cpu / memory
     "a8s_cpu_pc": ([c_void_p], c_uint),
     "a8s_cpu_sp": ([c_void_p], c_uint),

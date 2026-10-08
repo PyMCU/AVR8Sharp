@@ -96,7 +96,7 @@ public class Watchdog : AvrTestBase
         Assert.Multiple(() =>
         {
             Assert.That(Cpu.Pc, Is.EqualTo(0));
-            Assert.That(Cpu.ReadData(MCUSR), Is.EqualTo(WDRF));
+            Assert.That(Cpu.ReadData(MCUSR) & WDRF, Is.EqualTo(WDRF));
         });
     }
 
@@ -262,7 +262,7 @@ public class Watchdog : AvrTestBase
        Assert.Multiple(() =>
        {
            Assert.That(Cpu.Pc, Is.EqualTo(0), "CPU should reset on timeout");
-           Assert.That(Cpu.ReadData(MCUSR), Is.EqualTo(WDRF), "WDRF flag must be set on Watchdog reset");
+           Assert.That(Cpu.ReadData(MCUSR) & WDRF, Is.EqualTo(WDRF), "WDRF flag must be set on Watchdog reset");
        });
     }
 
@@ -300,7 +300,7 @@ public class Watchdog : AvrTestBase
 		Assert.Multiple(() =>
 		{
 			Assert.That(Cpu.Pc, Is.EqualTo(0), "CPU should have reset because 20ms > new 16ms timeout");
-			Assert.That(Cpu.ReadData(MCUSR), Is.EqualTo(WDRF), "WDRF flag must be set");
+			Assert.That(Cpu.ReadData(MCUSR) & WDRF, Is.EqualTo(WDRF), "WDRF flag must be set");
 		});
 	}
 }

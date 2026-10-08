@@ -27,6 +27,9 @@ public sealed class ATtinyX4Simulation : AvrTestSimulation
     /// <summary>Port B — PB0–PB3.</summary>
     public AvrIoPort PortB { get; }
 
+    // The low I/O space holds ADC/USI/timer registers here, so a missing ATmega port is not detectable.
+    protected override bool ChecksUnmountedPorts => false;
+
     public ATtinyX4Simulation(int flash, int sram) : base(flash, sram)
     {
         WithFrequency(Frequency);

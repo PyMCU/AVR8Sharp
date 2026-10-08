@@ -162,4 +162,33 @@ public class ArduinoUnoSamples
         uno.Serial.Should().Contain("Hello from Uno!");
         uno.Serial.Should().ContainLine("Hello from Uno!");
     }
+
+    /// <summary>
+    /// Regression for issue #25: <c>RunUntilSerial</c> polls its predicate once per
+    /// instruction and used to rebuild the whole captured text each time, so long runs
+    /// slowed down in proportion to the output. The predicate must now run only when
+    /// the captured output changes.
+    /// </summary>
+    [Test]
+    public void RunUntilSerial_ShouldEvaluatePredicateOnlyWhenOutputChanges()
+    {
+        var uno = new ArduinoUnoSimulation();
+        uno.WithAsm(@"
+            ldi r16, 8
+            sts 0xc1, r16       ; UCSR0B = TXEN0
+            ldi r21, 0x78
+            sts 0xc6, r21       ; UDR0 = 'x'
+        loop:
+            inc r17
+            rjmp loop
+        ");
+
+        var calls = 0;
+        Assert.Throws<TimeoutException>(() => uno.RunUntilSerial(uno.Serial, t => { calls++; return t == "never"; }, 5));
+
+        // 5 ms is 80000 cycles, about 40000 instructions. One evaluation per distinct text
+        // (empty, then "x") is enough.
+        Assert.That(uno.Serial.ByteCount, Is.EqualTo(1));
+        Assert.That(calls, Is.LessThanOrEqualTo(2));
+    }
 }

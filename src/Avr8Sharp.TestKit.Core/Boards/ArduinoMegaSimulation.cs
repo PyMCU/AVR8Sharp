@@ -164,6 +164,28 @@ public sealed class ArduinoMegaSimulation : AvrTestSimulation
         eecr: 0x3F, eedr: 0x40, eearl: 0x41, eearh: 0x42,
         eraseCycles: 28800, writeCycles: 28800, atomicCycles: 54400);
 
+    // SPI — same I/O registers as ATmega328P (0x4C-0x4E); SPI STC is avr-libc vector 24 -> word 0x30
+    private static readonly AvrSpiConfig Mega2560SpiConfig = new AvrSpiConfig
+    {
+        SpiInterrupt = 0x30,
+        SPCR = 0x4c, SPSR = 0x4d, SPDR = 0x4e,
+    };
+
+    // TWI — same I/O registers as ATmega328P (0xB8-0xBD); TWI is avr-libc vector 39 -> word 0x4E
+    private static readonly AvrTwiConfig Mega2560TwiConfig = new()
+    {
+        TwiInterrupt = 0x4e,
+        TWBR = 0xb8, TWSR = 0xb9, TWAR = 0xba, TWDR = 0xbb, TWCR = 0xbc, TWAMR = 0xbd,
+    };
+
+    // Watchdog — MCUSR 0x54 and WDTCSR 0x60 as on the ATmega328P; WDT is avr-libc vector 12 -> word 0x18
+    private static readonly AvrWatchdogConfig Mega2560WatchdogConfig = new AvrWatchdogConfig
+    {
+        WatchdogInterrupt = 0x18,
+        MCUSR = 0x54,
+        WDTCSR = 0x60,
+    };
+
     // ── GPIO ports ────────────────────────────────────────────────────────────
     /// <summary>Port A — digital pins 22–29.</summary>
     public AvrIoPort PortA { get; }
@@ -216,6 +238,23 @@ public sealed class ArduinoMegaSimulation : AvrTestSimulation
     /// <summary>ATmega2560 internal EEPROM — 4096 bytes, volatile (in-memory backend).</summary>
     public AvrEeprom Eeprom { get; }
 
+    // ── SPI / TWI / ADC / watchdog ────────────────────────────────────────────
+    /// <summary>SPI peripheral (MOSI = PB2, MISO = PB3, SCK = PB1). Transfers are answered by <see cref="SpiBus"/>.</summary>
+    public AvrSpi Spi { get; }
+    /// <summary>Scripted SPI slave: records MOSI bytes, answers with queued responses or 0xFF.</summary>
+    public SpiDeviceStub SpiBus { get; }
+    /// <summary>TWI (I²C) peripheral (SCL = PD0, SDA = PD1). Transactions are answered by <see cref="TwiBus"/>.</summary>
+    public AvrTwi Twi { get; }
+    /// <summary>Scripted I²C slave; NACKs every address until one is added to <see cref="TwiDeviceStub.Addresses"/>.</summary>
+    public TwiDeviceStub TwiBus { get; }
+    /// <summary>
+    /// 10-bit ADC with 16 single-ended channels (A0-A15; channels 8-15 via MUX5), the 1.1 V bandgap
+    /// and GND. Differential inputs are not modelled. Channels read 0 V until set via <see cref="AvrAdc.ChannelValues"/>.
+    /// </summary>
+    public AvrAdc Adc { get; }
+    /// <summary>Watchdog timer. It also owns MCUSR, which reads PORF (0x01) after construction.</summary>
+    public AvrWatchdog Watchdog { get; }
+
     public ArduinoMegaSimulation() : base(Flash, Sram)
     {
         WithFrequency(Frequency);
@@ -249,5 +288,17 @@ public sealed class ArduinoMegaSimulation : AvrTestSimulation
         AddUsart(Mega2560Usart3Config,     out var s3); Serial3 = s3;
 
         AddEeprom(Mega2560EepromConfig, out var eeprom, EepromSize); Eeprom = eeprom;
+
+        AddSpi(Mega2560SpiConfig, out var spi); Spi = spi;
+        SpiBus = new SpiDeviceStub();
+        spi.OnTransfer = SpiBus.Transfer;
+
+        AddTwi(Mega2560TwiConfig, out var twi); Twi = twi;
+        TwiBus = new TwiDeviceStub(twi);
+        twi.EventHandler = TwiBus;
+
+        AddAdc(AvrAdc.Atmega2560AdcConfig, out var adc); Adc = adc;
+
+        AddWatchdog(Mega2560WatchdogConfig, out var watchdog); Watchdog = watchdog;
     }
 }

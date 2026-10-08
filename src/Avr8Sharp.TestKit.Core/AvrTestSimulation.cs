@@ -42,6 +42,57 @@ public class AvrTestSimulation
 
     private LutDecoder _decoder;
 
+    private AvrClock? _clock;
+
+    // PORT register addresses of the GPIO ports mounted through AddGpio.
+    private readonly HashSet<ushort> _mountedPorts = new();
+    private UnmountedAccessMode _unmountedAccess = UnmountedAccessMode.Ignore;
+    private bool _unmountedHooksInstalled;
+    private readonly List<string> _warnings = new();
+
+    // Low-I/O ports whose registers never overlap another peripheral on the ATmega parts.
+    private static readonly (char Letter, AvrPortConfig Config)[] KnownPorts =
+    [
+        ('A', AvrIoPort.PortAConfig), ('B', AvrIoPort.PortBConfig), ('C', AvrIoPort.PortCConfig),
+        ('D', AvrIoPort.PortDConfig), ('E', AvrIoPort.PortEConfig), ('F', AvrIoPort.PortFConfig),
+        ('G', AvrIoPort.PortGConfig),
+    ];
+
+    /// <summary>
+    /// Whether <see cref="UnmountedAccess"/> checks the GPIO register block of the ATmega ports. Boards
+    /// whose low I/O space holds other peripherals (ATtiny) turn it off, since an address in that
+    /// range is not necessarily a missing port there.
+    /// </summary>
+    protected virtual bool ChecksUnmountedPorts => true;
+
+    /// <summary>
+    /// What happens when firmware reads or writes PIN/DDR/PORT of a port that was never mounted with
+    /// <see cref="AddGpio"/>. Defaults to <see cref="UnmountedAccessMode.Ignore"/>, which leaves the core
+    /// untouched; the checking hooks are only installed once the mode is changed.
+    /// </summary>
+    public UnmountedAccessMode UnmountedAccess
+    {
+        get => _unmountedAccess;
+        set
+        {
+            _unmountedAccess = value;
+            if (value != UnmountedAccessMode.Ignore) InstallUnmountedHooks();
+        }
+    }
+
+    /// <summary>Messages recorded in <see cref="UnmountedAccessMode.Warn"/> mode, one per distinct register and access kind.</summary>
+    public IReadOnlyList<string> Warnings => _warnings;
+
+    /// <summary>
+    /// Strict mode: accessing a register of an unmounted GPIO port throws
+    /// <see cref="UnmountedIoAccessException"/> naming the register and address. Pass <c>false</c> to turn it off.
+    /// </summary>
+    public AvrTestSimulation WithStrict(bool strict = true)
+    {
+        UnmountedAccess = strict ? UnmountedAccessMode.Throw : UnmountedAccessMode.Ignore;
+        return this;
+    }
+
     public byte[] Data => Runner.Cpu.Mmio.Data;
     public AvrMemoryView Memory => new(Runner.Cpu.Mmio.Data);
 
@@ -91,8 +142,8 @@ public class AvrTestSimulation
     }
 
     /// <summary>
-    /// Resets the CPU to its power-on state: PC=0, SP=RAMEND, SREG=0, pending interrupts cleared.
-    /// Does not clear the loaded program.
+    /// Resets the CPU as the RESET pin would: PC=0, SP=RAMEND, SREG=0, pending interrupts cleared.
+    /// Does not clear the loaded program. With a watchdog mounted, MCUSR keeps its flags and EXTRF is set.
     /// Returns <c>this</c> for chaining.
     /// </summary>
     public AvrTestSimulation Reset()
@@ -107,6 +158,7 @@ public class AvrTestSimulation
     public AvrTestSimulation AddGpio(AvrPortConfig config, out AvrIoPort port)
     {
         port = new AvrIoPort(Runner.Cpu, config);
+        _mountedPorts.Add(config.PORT);
         return this;
     }
 
@@ -174,6 +226,54 @@ public class AvrTestSimulation
     {
         adc = new AvrAdc(Runner.Cpu, config);
         return this;
+    }
+
+    /// <summary>
+    /// Adds the watchdog together with its system clock. The peripheral owns MCUSR, so MCUSR reads
+    /// PORF after this call and a CPU reset sets EXTRF (a watchdog reset sets WDRF).
+    /// </summary>
+    public AvrTestSimulation AddWatchdog(AvrWatchdogConfig config, out AvrWatchdog watchdog)
+    {
+        _clock ??= new AvrClock(Runner.Cpu, Runner.Speed, AvrClock.ClockConfig);
+        watchdog = new AvrWatchdog(Runner.Cpu, config, _clock);
+        return this;
+    }
+
+    private void InstallUnmountedHooks()
+    {
+        if (_unmountedHooksInstalled || !ChecksUnmountedPorts) return;
+        _unmountedHooksInstalled = true;
+        var mmio = Runner.Cpu.Mmio;
+        foreach (var (letter, config) in KnownPorts)
+        {
+            if (_mountedPorts.Contains(config.PORT)) continue;
+            foreach (var (reg, address) in new[] { ("PIN", config.PIN), ("DDR", config.DDR), ("PORT", config.PORT) })
+            {
+                var name = $"{reg}{letter}";
+                var portAddress = config.PORT;
+                var portLetter = letter;
+                // A port mounted later replaces the read hook and is skipped by the write hook.
+                mmio.RegisterRead(address, a =>
+                {
+                    CheckUnmounted(portAddress, name, a, false, portLetter);
+                    return mmio.Data[a];
+                });
+                mmio.RegisterWrite(address, (_, _, a, _) =>
+                {
+                    CheckUnmounted(portAddress, name, a, true, portLetter);
+                    return false;
+                });
+            }
+        }
+    }
+
+    private void CheckUnmounted(ushort portAddress, string name, ushort address, bool isWrite, char letter)
+    {
+        if (_unmountedAccess == UnmountedAccessMode.Ignore || _mountedPorts.Contains(portAddress)) return;
+        var message = $"{name} (0x{address:X2}) {(isWrite ? "written" : "read")} but port {letter} is not mounted (use AddGpio)";
+        if (_unmountedAccess == UnmountedAccessMode.Throw)
+            throw new UnmountedIoAccessException(message, address, isWrite);
+        if (!_warnings.Contains(message)) _warnings.Add(message);
     }
 
     // ── Execution ────────────────────────────────────────────────────────────
@@ -336,6 +436,27 @@ public class AvrTestSimulation
     }
 
     /// <summary>
+    /// Wraps a text predicate so it is evaluated only when the captured output changed
+    /// since the last call. The step loop polls the predicate once per instruction;
+    /// rebuilding and scanning the whole text each time made long runs quadratic.
+    /// </summary>
+    private static Func<AvrTestSimulation, bool> OnSerialChange(
+        Probes.SerialProbe serial, Func<string, bool> predicate)
+    {
+        var version = -1;
+        var result = false;
+        return _ =>
+        {
+            if (serial.Version != version)
+            {
+                version = serial.Version;
+                result = predicate(serial.Text);
+            }
+            return result;
+        };
+    }
+
+    /// <summary>
     /// Runs until the captured <paramref name="serial"/> text satisfies <paramref name="predicate"/>,
     /// or until <paramref name="maxMs"/> of simulated time elapses.
     /// </summary>
@@ -343,7 +464,7 @@ public class AvrTestSimulation
         Probes.SerialProbe serial,
         Func<string, bool> predicate,
         double maxMs = 2000)
-        => RunUntilMs(_ => predicate(serial.Text), maxMs);
+        => RunUntilMs(OnSerialChange(serial, predicate), maxMs);
 
     /// <summary>
     /// Runs until <paramref name="serial"/> contains the given <paramref name="text"/> as a substring,
@@ -353,7 +474,7 @@ public class AvrTestSimulation
         Probes.SerialProbe serial,
         string text,
         double maxMs = 2000)
-        => RunUntilMs(_ => serial.Text.Contains(text), maxMs);
+        => RunUntilMs(OnSerialChange(serial, t => t.Contains(text)), maxMs);
 
     /// <summary>
     /// Runs until <paramref name="serial"/> has received at least <paramref name="byteCount"/> bytes,

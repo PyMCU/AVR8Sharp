@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Runtime.InteropServices;
 using System.Text;
 using AVR8Sharp.Core.Peripherals;
 
@@ -13,6 +14,7 @@ public class SerialProbe
     private readonly List<byte> _rawBytes = new();
     private readonly AvrUsart _usart;
     private ReadOnlyCollection<string>? _linesCache;
+    private string? _textCache;
 
     internal SerialProbe(AvrUsart usart)
     {
@@ -21,11 +23,23 @@ public class SerialProbe
         {
             _rawBytes.Add(b);
             _linesCache = null;
+            _textCache = null;
+            Version++;
         };
     }
 
-    /// <summary>All characters received so far as a single string (Latin-1 encoded).</summary>
-    public string Text => Encoding.Latin1.GetString(_rawBytes.ToArray());
+    /// <summary>
+    /// Bumped on every received byte and on <see cref="Clear"/>. Lets run helpers skip
+    /// re-evaluating a text predicate while the captured output is unchanged.
+    /// </summary>
+    internal int Version { get; private set; }
+
+    /// <summary>
+    /// All characters received so far as a single string (Latin-1 encoded).
+    /// The string is cached until the next byte arrives, so polling it between
+    /// instructions does not allocate.
+    /// </summary>
+    public string Text => _textCache ??= Encoding.Latin1.GetString(CollectionsMarshal.AsSpan(_rawBytes));
 
     /// <summary>All received bytes as a raw byte array (useful for binary-protocol tests).</summary>
     public byte[] Bytes => _rawBytes.ToArray();
@@ -45,6 +59,8 @@ public class SerialProbe
     {
         _rawBytes.Clear();
         _linesCache = null;
+        _textCache = null;
+        Version++;
     }
 
     /// <summary>

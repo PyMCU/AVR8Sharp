@@ -108,6 +108,12 @@ class Port:
     def set_low(self, pin: int) -> None:
         self.set(pin, False)
 
+    def release(self, pin: int) -> None:
+        """Stops driving `pin`, undoing set(): the line floats again, so an input pin whose PORT bit
+        is set reads 1 through the internal pull-up and any other floating input reads 0."""
+        lib = self._sim._lib
+        _check(lib, self._sim._h, lib.a8s_gpio_release_pin(self._sim._h, self._index, pin), "gpio_release_pin")
+
 
 def _read_buffer(fn, sim: "Simulation", *args) -> bytes:
     """Two-pass read of a native length-prefixed byte buffer (call with cap, then size exactly)."""
@@ -357,6 +363,32 @@ class Simulation:
         _check(self._lib, self._h, idx, "add_timer")
         return idx
 
+    # ── strict mode ───────────────────────────────────────────────────────────
+
+    def with_strict(self, strict: bool | str = True) -> "Simulation":
+        """Make firmware access to the PIN/DDR/PORT registers of a GPIO port that was never
+        mounted visible instead of silently reading 0. ``True`` raises (the failing run call
+        reports e.g. ``PIND (0x29) read but port D is not mounted``), ``"warn"`` records one
+        message per register in :attr:`warnings`, ``False`` restores the default."""
+        mode = {False: 0, "warn": 1, True: 2}.get(strict)
+        if mode is None:
+            raise ValueError("strict must be True, False or 'warn'")
+        _check(self._lib, self._h, self._lib.a8s_set_strict(self._h, mode), "set_strict")
+        return self
+
+    @property
+    def warnings(self) -> list[str]:
+        """Messages recorded while ``with_strict("warn")`` is active."""
+        raw = _read_buffer(self._lib.a8s_read_warnings, self)
+        return raw.decode("utf-8", "replace").split("\n") if raw else []
+
+    def share_bus_responses(self) -> None:
+        """Point the SPI and TWI stubs at ONE response queue: a byte queued through
+        either stub answers whichever bus the firmware reads next -- the bench wiring
+        of a single scripted responder feeding both buses."""
+        _check(self._lib, self._h, self._lib.a8s_bus_share_responses(self._h),
+               "bus_share_responses")
+
     # ── reset / snapshot ──────────────────────────────────────────────────────
 
     def reset(self) -> "Simulation":
@@ -396,7 +428,7 @@ class Simulation:
 
 
 class ArduinoUno(Simulation):
-    """ATmega328P: ports B/C/D, timers 0/1/2, USART0, plus ADC and SPI/I²C device stubs.
+    """ATmega328P: ports B/C/D, timers 0/1/2, USART0, plus ADC, watchdog and SPI/I²C device stubs.
     16 MHz, 32 KB flash, 2 KB SRAM."""
 
     def __init__(self) -> None:
@@ -409,16 +441,10 @@ class ArduinoUno(Simulation):
         self.spi = Spi(self)
         self.twi = Twi(self)
 
-    def share_bus_responses(self) -> None:
-        """Point the SPI and TWI stubs at ONE response queue: a byte queued through
-        either stub answers whichever bus the firmware reads next -- the bench wiring
-        of a single scripted responder feeding both buses."""
-        _check(self._lib, self._h, self._lib.a8s_bus_share_responses(self._h),
-               "bus_share_responses")
-
 
 class ArduinoMega(Simulation):
-    """ATmega2560: ports A..L, timers 0..5, USART0..3."""
+    """ATmega2560: ports A..L, timers 0..5, USART0..3, plus ADC (16 channels) and SPI/I²C
+    device stubs."""
 
     _PORT_LETTERS = "ABCDEFGHJKL"
 
@@ -431,6 +457,9 @@ class ArduinoMega(Simulation):
         self.serial1 = Serial(self, 1)
         self.serial2 = Serial(self, 2)
         self.serial3 = Serial(self, 3)
+        self.adc = Adc(self)
+        self.spi = Spi(self)
+        self.twi = Twi(self)
 
 
 class ATtiny85(Simulation):

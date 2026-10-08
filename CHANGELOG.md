@@ -4,6 +4,63 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+## [Unreleased]
+
+### Bug Fixes
+
+Two of these change what an existing test reads (the pull-up and the TWI timing), so a suite
+that pinned the old values will need updating.
+
+- **Backward RCALL on 22-bit-PC parts** (#21). `RCALL` added its signed offset as an unsigned
+  16-bit value, so on an ATmega2560 every backward `rcall` landed 0x10000 words too high and
+  the firmware never came back. The ATmega328P hid it because its flash length divides
+  0x10000. `RET`/`RETI` had a second bug on the same parts: a return address whose low 16
+  bits are zero (a call at word 0xFFFF) lost its high byte. Both now do the arithmetic on the
+  full address.
+- **PINx reads the internal pull-up** (#22). An input pin whose PORT bit is set reads 1 while
+  nothing drives it, as the datasheet says, and enabling the pull-up on a floating pin raises
+  the same pin-change edge as on the chip. A pin is driven from the first `SetPinValue` until
+  the new `AvrIoPort.ReleasePin` lets it float again, so an embedder that injects every input
+  on every step sees no change. Tests that read a floating pull-up as 0 now read 1.
+- **TWI transfers take their wire time** (#24). START and STOP take one SCL period and an
+  address or data byte nine (8 bits plus ACK), at `16 + 2 * TWBR * prescaler` CPU cycles per
+  period, before TWINT is raised. The time counts from the moment the event reaches the
+  `ITwiEventHandler`, so a handler that completes later than that adds no extra delay.
+  `AvrTwi.EmulateBusTiming = false` brings back the old next-cycle completion.
+- **ADC reference selection on the ATmega328P.** REFS1:0 mapped to AVCC, AREF, 1.1 V, 2.56 V;
+  the datasheet order is AREF, AVCC, reserved, 1.1 V, so `analogReference(INTERNAL)`
+  converted against 2.56 V instead of 1.1 V.
+- **`RunUntilSerial` no longer slows down as output accumulates** (#25). The predicate ran on
+  every instruction against a string rebuilt from all the bytes received so far, so long runs
+  that print were quadratic. The text is now cached and the predicate runs only when a byte
+  arrives. The core was checked across the 2^31 and 2^32 cycle boundaries and was not the
+  cause; tests now cover both.
+- **MCUSR reports the reset cause** (#27). `AvrWatchdog` owns MCUSR: it starts with PORF set,
+  a CPU reset other than the watchdog's sets EXTRF, a watchdog reset sets WDRF, and firmware
+  clears a flag by writing a zero to it (writing a one never sets it).
+
+### New: complete Uno and Mega presets (#27)
+
+- `ArduinoUnoSimulation` and `ArduinoMegaSimulation` mount SPI, TWI, ADC and the watchdog,
+  exposed as `Spi`/`SpiBus`, `Twi`/`TwiBus`, `Adc` and `Watchdog`. With no device configured a
+  SPI transfer reads 0xFF, an I2C address is NACKed, and every ADC input reads 0 V. The
+  `SpiDeviceStub` and `TwiDeviceStub` behind them are now public, in `Avr8Sharp.TestKit.Probes`.
+- `AvrAdc.Atmega2560AdcConfig` covers the 16 channels of the ATmega2560 (MUX5 selects ADC8 to
+  ADC15) with its reference order. MUX5 is ignored on 8-channel configs, as on the 328P.
+
+### New: strict mode for unmounted ports (#26)
+
+- **TestKit**: `UnmountedAccess` (`Ignore` by default, `Warn`, `Throw`) and the `WithStrict()`
+  shortcut. A read or write of PINx, DDRx or PORTx of a port that was never added throws
+  `UnmountedIoAccessException` ("PIND (0x29) read but port D is not mounted") or adds one
+  entry per register to `Warnings`. The hooks are installed only when the mode leaves
+  `Ignore`, so the default run costs nothing.
+- **C ABI**: `a8s_set_strict`, `a8s_read_warnings` and `a8s_gpio_release_pin`.
+- **Python**: `Simulation.with_strict(True | "warn" | False)`, `Simulation.warnings`,
+  `Port.release(pin)`, and `.adc`/`.spi`/`.twi` on `ArduinoMega`.
+
+---
+
 ## [v2.0.0-beta1] — unreleased
 
 ### Renamed: the TestKit is now `SiliconTwin.AVR`

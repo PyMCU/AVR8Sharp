@@ -65,7 +65,39 @@ public class AvrTwi
 
     private bool _busy = false;
 
+    // Wire timing of the event being processed. The event "starts" when it is dispatched
+    // to the handler; TWINT is raised no earlier than _eventStartCycle + _eventWireCycles.
+    private ulong _eventStartCycle;
+    private ulong _eventWireCycles;
+    // Incremented whenever a deferred completion is scheduled or invalidated (reset), so a
+    // stale clock event can never touch the state of a later event.
+    private int _sequence;
+    private Action? _deferred;
+
+    // Bus time of each event, in SCL periods. START and STOP are one period each (the
+    // setup/hold times of the datasheet SCL timing are about half a period apiece). An
+    // address or data byte is 8 bits plus the ACK/NACK bit, so 9 SCL periods.
+    const int START_SCL_PERIODS = 1;
+    const int STOP_SCL_PERIODS = 1;
+    const int BYTE_SCL_PERIODS = 9;
+
     public ITwiEventHandler EventHandler { get; set; }
+
+    /// <summary>
+    /// When true (default), each bus event (START, address, data byte, STOP) takes its wire
+    /// time at <see cref="SclFrequency"/> before TWINT is raised, as on silicon. The time is
+    /// counted from the moment the event is dispatched to <see cref="EventHandler"/>, so a
+    /// handler that completes late (for example from an external circuit solver) is not
+    /// delayed any further once the wire time has already elapsed. Set to false to complete
+    /// every event as soon as the handler reports it.
+    /// </summary>
+    public bool EmulateBusTiming { get; set; } = true;
+
+    /// <summary>
+    /// CPU cycles of one SCL period: CPU clock / SCL frequency = 16 + 2 * TWBR * prescaler
+    /// (ATmega328P datasheet, "Bit Rate Generator Unit").
+    /// </summary>
+    public int SclPeriodCycles => 16 + 2 * _cpu.Mmio.Data[_config.TWBR] * Prescaler;
 
     public int Prescaler
     {
@@ -122,6 +154,15 @@ public class AvrTwi
 
         UpdateStatus(STATUS_TWI_IDLE);
 
+        cpu.OnPeripheralReset += () =>
+        {
+            // Cpu.Reset already dropped the pending clock events
+            _sequence++;
+            _deferred = null;
+            _busy = false;
+            _eventWireCycles = 0;
+        };
+
         cpu.Mmio.RegisterWrite(_config.TWAR, (value, _, _, _) =>
         {
             _cpu.Mmio.Data[_config.TWAR] = value;
@@ -142,27 +183,27 @@ public class AvrTwi
                 {
                     if ((value & TWCR_TWSTA) != 0)
                     {
-                        _busy = true;
+                        BeginEvent(START_SCL_PERIODS);
                         EventHandler.Start(Status != STATUS_TWI_IDLE);
                     }
                     else if ((value & TWCR_TWSTO) != 0)
                     {
-                        _busy = true;
+                        BeginEvent(STOP_SCL_PERIODS);
                         EventHandler.Stop();
                     }
                     else if (Status == STATUS_START || Status == STATUS_REPEATED_START)
                     {
-                        _busy = true;
+                        BeginEvent(BYTE_SCL_PERIODS);
                         EventHandler.ConnectToSlave((byte)(twdrValue >> 1), (twdrValue & 0x1) == 0);
                     }
                     else if (Status == STATUS_SLAW_ACK || Status == STATUS_DATA_SENT_ACK)
                     {
-                        _busy = true;
+                        BeginEvent(BYTE_SCL_PERIODS);
                         EventHandler.WriteByte(twdrValue);
                     }
                     else if (Status == STATUS_SLAR_ACK || Status == STATUS_DATA_RECEIVED_ACK)
                     {
-                        _busy = true;
+                        BeginEvent(BYTE_SCL_PERIODS);
                         var ack = (value & TWCR_TWEA) != 0;
                         EventHandler.ReadByte(ack);
                     }
@@ -174,17 +215,53 @@ public class AvrTwi
         });
     }
 
+    private void BeginEvent(int sclPeriods)
+    {
+        _busy = true;
+        _eventStartCycle = _cpu.Cycles;
+        _eventWireCycles = EmulateBusTiming ? (ulong)sclPeriods * (ulong)SclPeriodCycles : 0;
+    }
+
+    /// <summary>
+    /// Runs <paramref name="apply"/> now if the wire time of the current event has elapsed
+    /// (or the bus is not busy with a dispatched event), otherwise at the end of the wire time.
+    /// </summary>
+    private void Finish(Action apply)
+    {
+        var remaining = _busy ? (long)(_eventStartCycle + _eventWireCycles) - (long)_cpu.Cycles : 0;
+        if (remaining <= 0)
+        {
+            _sequence++;
+            _deferred = null;
+            _busy = false;
+            apply();
+            return;
+        }
+
+        var sequence = ++_sequence;
+        _deferred = apply;
+        _cpu.AddClockEvent(() =>
+        {
+            if (sequence != _sequence || _deferred == null) return;
+            var action = _deferred;
+            _deferred = null;
+            _busy = false;
+            action();
+        }, (int)remaining);
+    }
+
     public void CompleteStart()
     {
-        _busy = false;
-        UpdateStatus(Status == STATUS_TWI_IDLE ? STATUS_START : STATUS_REPEATED_START);
+        Finish(() => UpdateStatus(Status == STATUS_TWI_IDLE ? STATUS_START : STATUS_REPEATED_START));
     }
 
     public void CompleteStop()
     {
-        _busy = false;
-        _cpu.Mmio.Data[_config.TWCR] &= ~TWCR_TWSTO & 0xff;
-        UpdateStatus(STATUS_TWI_IDLE);
+        Finish(() =>
+        {
+            _cpu.Mmio.Data[_config.TWCR] &= ~TWCR_TWSTO & 0xff;
+            UpdateStatus(STATUS_TWI_IDLE);
+        });
     }
 
     /// <summary>
@@ -197,29 +274,32 @@ public class AvrTwi
 
     public void CompleteConnect(bool ack)
     {
-        _busy = false;
-        if ((_cpu.Mmio.Data[_config.TWDR] & 0x1) != 0)
+        Finish(() =>
         {
-            UpdateStatus(ack ? STATUS_SLAR_ACK : STATUS_SLAR_NACK);
-        }
-        else
-        {
-            UpdateStatus(ack ? STATUS_SLAW_ACK : STATUS_SLAW_NACK);
-        }
+            if ((_cpu.Mmio.Data[_config.TWDR] & 0x1) != 0)
+            {
+                UpdateStatus(ack ? STATUS_SLAR_ACK : STATUS_SLAR_NACK);
+            }
+            else
+            {
+                UpdateStatus(ack ? STATUS_SLAW_ACK : STATUS_SLAW_NACK);
+            }
+        });
     }
 
     public void CompleteWrite(bool ack)
     {
-        _busy = false;
-        UpdateStatus(ack ? STATUS_DATA_SENT_ACK : STATUS_DATA_SENT_NACK);
+        Finish(() => UpdateStatus(ack ? STATUS_DATA_SENT_ACK : STATUS_DATA_SENT_NACK));
     }
 
     public void CompleteRead(byte data)
     {
-        _busy = false;
-        var ack = (_cpu.Mmio.Data[_config.TWCR] & TWCR_TWEA) != 0;
-        _cpu.Mmio.Data[_config.TWDR] = data;
-        UpdateStatus(ack ? STATUS_DATA_RECEIVED_ACK : STATUS_DATA_RECEIVED_NACK);
+        Finish(() =>
+        {
+            var ack = (_cpu.Mmio.Data[_config.TWCR] & TWCR_TWEA) != 0;
+            _cpu.Mmio.Data[_config.TWDR] = data;
+            UpdateStatus(ack ? STATUS_DATA_RECEIVED_ACK : STATUS_DATA_RECEIVED_NACK);
+        });
     }
 
     /// <summary>

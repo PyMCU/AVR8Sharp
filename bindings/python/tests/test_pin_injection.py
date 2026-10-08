@@ -13,6 +13,7 @@ PINB = 0x23
 PORTB_OUT = 0x25  # data address of PORTB (I/O address 0x05)
 DDRB = 0x24  # data address of DDRB (I/O address 0x04)
 PIND = 0x29
+PORTD = 0x2b
 UDR0 = 0xC6
 UCSRA0 = 0xC0
 UCSRA_RXC = 0x80
@@ -53,6 +54,19 @@ def test_set_pin_has_no_effect_on_an_output_pin():
     uno.port_b.set_low(0)
     assert uno.cpu.read(PINB) & 0x01, "an output pin ignores external injection"
     uno.close()
+
+
+def test_release_returns_an_input_pin_to_its_pull_up():
+    sim = a.Simulation.create()
+    port_d = sim.add_gpio(2)
+
+    port_d.set_low(2)
+    sim.cpu.write(PORTD, 0x04)  # pull-up on, but the line is driven low
+    assert not (sim.cpu.read(PIND) & 0x04)
+
+    port_d.release(2)
+    assert sim.cpu.read(PIND) & 0x04  # floating, the pull-up wins
+    sim.close()
 
 
 def test_serial_inject_arrives_in_udr_after_settling_time():

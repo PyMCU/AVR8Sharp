@@ -144,6 +144,7 @@ public class AvrIoPort
 	private readonly Cpu _cpu;
 	private readonly AvrPortConfig _portConfig;
 	private int _pinValue;
+	private int _driven;
 	private byte _overrideMask = 0xff;
 	private byte _overrideValue = 0;
 	private byte _lastValue = 0;
@@ -332,7 +333,8 @@ public class AvrIoPort
 
 	/// <summary>
 	/// Sets the input value for the given pin. This is the value that
-	/// will be returned when reading from the PIN register.
+	/// will be returned when reading from the PIN register. The pin counts as
+	/// externally driven until <see cref="ReleasePin"/> is called.
 	/// </summary>
 	/// <param name="index">Pin index to set from 0 to 7</param>
 	/// <param name="value">The value to set</param>
@@ -343,12 +345,27 @@ public class AvrIoPort
 		if (value) {
 			_pinValue |= bitMask;
 		}
+		_driven |= bitMask;
+		UpdatePinRegister (_cpu.Mmio.Data[_portConfig.DDR]);
+	}
+
+	/// <summary>
+	/// Releases the given pin back to floating, undoing <see cref="SetPinValue"/>.
+	/// While an input pin floats, the PIN register reads the internal pull-up
+	/// (the PORT bit): 1 with the pull-up enabled, 0 without it.
+	/// </summary>
+	/// <param name="index">Pin index to release from 0 to 7</param>
+	public void ReleasePin (byte index)
+	{
+		var bitMask = 1 << index;
+		_driven &= ~bitMask;
 		UpdatePinRegister (_cpu.Mmio.Data[_portConfig.DDR]);
 	}
 	
 	private void UpdatePinRegister (byte ddr)
 	{
-		var newPin = (byte)(((_pinValue & ~ddr) | (_lastValue & ddr)) & 0xff);
+		var pulled = _cpu.Mmio.Data[_portConfig.PORT] & ~_driven;
+		var newPin = (byte)(((((_pinValue & _driven) | pulled) & ~ddr) | (_lastValue & ddr)) & 0xff);
 		_cpu.Mmio.Data[_portConfig.PIN] = newPin;
 		if (_lastPin == newPin) return;
 		for (var index = 0; index < 8; index++)

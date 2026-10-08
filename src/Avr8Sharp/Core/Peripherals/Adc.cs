@@ -20,6 +20,47 @@ public class AvrAdc
         { 15, new AdcMuxInput(type: AdcMuxInputType.Constant, voltage: 0) },
     };
 
+    /// <summary>
+    /// ATmega2560 mux: single-ended ADC0..ADC7 (MUX5=0, MUX 0..7) and ADC8..ADC15 (MUX5=1,
+    /// MUX 0..7, index 0x20..0x27), 1.1 V bandgap (0x1E) and GND (0x1F). Differential inputs are
+    /// not modelled and read as 0 V.
+    /// </summary>
+    public static ADCMuxConfiguration Atmega2560Channels { get; } = BuildAtmega2560Channels();
+
+    private static ADCMuxConfiguration BuildAtmega2560Channels()
+    {
+        var map = new ADCMuxConfiguration();
+        for (var i = 0; i < 8; i++)
+        {
+            map[i] = new AdcMuxInput(type: AdcMuxInputType.SingleEnded, channel: i);
+            map[0x20 + i] = new AdcMuxInput(type: AdcMuxInputType.SingleEnded, channel: 8 + i);
+        }
+        map[0x1e] = new AdcMuxInput(type: AdcMuxInputType.Constant, voltage: 1.1);
+        map[0x1f] = new AdcMuxInput(type: AdcMuxInputType.Constant, voltage: 0);
+        return map;
+    }
+
+    /// <summary>ATmega2560 ADC: same register block as the ATmega328P, 16 channels, ADC vector 29.</summary>
+    public static readonly AvrAdcConfig Atmega2560AdcConfig = new AvrAdcConfig(
+        admux: 0x7c,
+        adcsra: 0x7a,
+        adcsrb: 0x7b,
+        adcl: 0x78,
+        adch: 0x79,
+        didr0: 0x7e,
+        adcInterrupt: 0x3a,
+        numChannels: 16,
+        muxInputMask: 0x1f,
+        muxChannels: Atmega2560Channels,
+        adcReferences:
+        [
+            AdcReference.AREF,
+            AdcReference.AVCC,
+            AdcReference.Internal1V1,
+            AdcReference.Internal2V56
+        ]
+    );
+
     public static readonly AdcMuxInput FallbackMuxInput = new AdcMuxInput(type: AdcMuxInputType.Constant, voltage: 0);
 
     public static readonly AvrAdcConfig AdcConfig = new AvrAdcConfig(
@@ -33,12 +74,13 @@ public class AvrAdc
         numChannels: 8,
         muxInputMask: 0xf,
         muxChannels: Atmega328Channels,
+        // REFS1:0 = 00 AREF, 01 AVCC, 10 reserved, 11 internal 1.1 V (datasheet table 28-3)
         adcReferences:
         [
-            AdcReference.AVCC,
             AdcReference.AREF,
-            AdcReference.Internal1V1,
-            AdcReference.Internal2V56
+            AdcReference.AVCC,
+            null,
+            AdcReference.Internal1V1
         ]
     );
 
@@ -67,7 +109,7 @@ public class AvrAdc
     
     private int _cachedSampleCycles;
     private double _cachedReferenceVoltage;
-    private readonly AdcMuxInput[] _muxArray = new AdcMuxInput[32];
+    private readonly AdcMuxInput[] _muxArray = new AdcMuxInput[64];
     private int _pendingAdcResult;
     private readonly Action _completeAdcAction;
 
@@ -160,7 +202,7 @@ public class AvrAdc
         );
         ChannelValues = new double[config.NumChannels];
         
-        for (var i = 0; i < 32; i++)
+        for (var i = 0; i < _muxArray.Length; i++)
         {
             _muxArray[i] = config.MuxChannels.GetValueOrDefault(i, FallbackMuxInput);
         }
@@ -213,12 +255,14 @@ public class AvrAdc
         _converting = true;
         _cpu.Mmio.Data[_config.ADCSRA] |= ADSC;
         var channel = _cpu.Mmio.Data[_config.ADMUX] & MUX_MASK;
-        if ((_cpu.Mmio.Data[_config.ADCSRB] & MUX5) != 0)
+        // MUX5 only selects an input on chips with more than 8 channels (ATmega2560); on the
+        // ATmega328P that ADCSRB bit is reserved.
+        if (_config.NumChannels > 8 && (_cpu.Mmio.Data[_config.ADCSRB] & MUX5) != 0)
         {
             channel |= 0x20;
         }
 
-        OnADCRead(_muxArray[channel & 0x1F]);
+        OnADCRead(_muxArray[channel & 0x3F]);
     }
 
     /// <summary>

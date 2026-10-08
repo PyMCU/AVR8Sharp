@@ -5,7 +5,10 @@ namespace AVR8Sharp.Core.Peripherals;
 public class AvrWatchdog
 {
     // Register Bits
+    const int MCUSR_PORF = 0x1; // Power-on Reset Flag
+    const int MCUSR_EXTRF = 0x2; // External Reset Flag
     const int MCUSR_WDRF = 0x8; // Watchdog System Reset Flag
+    const int MCUSR_FLAGS_MASK = 0x0f; // PORF | EXTRF | BORF | WDRF; bits 7:4 are reserved
 
     const int WDTCSR_WDIF = 0x80; // Watchdog Interrupt Flag
     const int WDTCSR_WDIE = 0x40; // Watchdog Interrupt Enable
@@ -37,6 +40,7 @@ public class AvrWatchdog
     private ulong _watchdogTimeout = 0;
     private bool _enabledValue = false;
     private bool _scheduled = false;
+    private bool _watchdogReset = false;
 
     private readonly AvrInterruptConfig _watchdog;
 
@@ -74,6 +78,24 @@ public class AvrWatchdog
 
         _cpu.OnWatchdogReset = ResetWatchdog;
 
+        // MCUSR is owned here because the watchdog is the peripheral that reports reset causes.
+        // Constructing the peripheral models the power-on of the chip, so PORF starts set.
+        PowerOnReset();
+
+        // A flag is cleared by writing a logic zero to it; writing a one never sets it.
+        _cpu.Mmio.RegisterWrite(config.MCUSR, (value, oldValue, _, _) =>
+        {
+            _cpu.Mmio.Data[config.MCUSR] = (byte)(oldValue & value & MCUSR_FLAGS_MASK);
+            return true;
+        });
+
+        // Any CPU reset that is not the watchdog's own is seen by the chip as an external
+        // reset (RESET pin), which sets EXTRF. MCUSR itself survives the reset, as on silicon.
+        _cpu.OnPeripheralReset += () =>
+        {
+            if (!_watchdogReset) _cpu.Mmio.Data[config.MCUSR] |= MCUSR_EXTRF;
+        };
+
         _cpu.Mmio.RegisterWrite(config.WDTCSR, (value, oldValue, _, _) =>
         {
             if ((value & WDTCSR_WDCE) != 0 && (value & WDTCSR_WDE) != 0)
@@ -110,6 +132,15 @@ public class AvrWatchdog
         });
     }
 
+    /// <summary>
+    /// Puts MCUSR in its power-on state: only PORF set. Does not reset the CPU. The constructor
+    /// already does this; call it again to rewind a restored machine to a fresh power-on.
+    /// </summary>
+    public void PowerOnReset()
+    {
+        _cpu.Mmio.Data[_config.MCUSR] = MCUSR_PORF;
+    }
+
     private void ResetWatchdog()
     {
         var cycles = (int)Math.Floor((_clock.Frequency / _clockFrequency) * Prescaler);
@@ -135,7 +166,9 @@ public class AvrWatchdog
                 }
                 else
                 {
-                    _cpu.Reset();
+                    _watchdogReset = true;
+                    try { _cpu.Reset(); }
+                    finally { _watchdogReset = false; }
                     _scheduled = false;
                     _cpu.Mmio.Data[_config.MCUSR] |= MCUSR_WDRF;
                     return;

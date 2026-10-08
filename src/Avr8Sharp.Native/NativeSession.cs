@@ -17,7 +17,7 @@ internal sealed class NativeSession(AvrTestSimulation sim)
     public readonly List<SerialProbe> Serials = new();
     public readonly List<AvrTimer> Timers = new();
 
-    /// <summary>ADC peripheral (ATmega328P-family sessions only); null otherwise.</summary>
+    /// <summary>ADC peripheral (Uno and Mega board sessions only); null otherwise.</summary>
     public AvrAdc? Adc;
 
     /// <summary>SPI master-bus stub: captures MOSI, replays a canned response queue.</summary>
@@ -25,6 +25,9 @@ internal sealed class NativeSession(AvrTestSimulation sim)
 
     /// <summary>I²C single-address slave stub: ACKs its address, logs writes, replays reads.</summary>
     public TwiDeviceStub? Twi;
+
+    /// <summary>Watchdog (owns MCUSR); present on the Uno and Mega board sessions.</summary>
+    public AvrWatchdog? Watchdog;
 
     /// <summary>Power-on snapshot of the Data array, captured by <c>a8s_snapshot</c>.</summary>
     public byte[]? Snapshot;
