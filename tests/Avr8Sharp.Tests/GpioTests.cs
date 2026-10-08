@@ -64,7 +64,8 @@ public class Gpio : AvrTestBase
 
 		Cpu.WriteData (PORTB, 0x55);
 
-		Assert.That (Cpu.Mmio.Data[0x23], Is.EqualTo (0x5));
+		// PINB.7:4 are floating inputs with the pull-up on, so they read the PORT bits (0x50)
+		Assert.That (Cpu.Mmio.Data[0x23], Is.EqualTo (0x55));
 	}
 
 	[Test (Description = "Should invoke the listeners when DDR changes (issue #28)")]
@@ -109,7 +110,8 @@ public class Gpio : AvrTestBase
 
         Assert.Multiple(() =>
         {
-            Assert.That(Cpu.Mmio.Data[PINB], Is.EqualTo(0x4));
+            // PINB.7:4 are floating inputs with the pull-up on, so they read the PORT bits (0x50)
+            Assert.That(Cpu.Mmio.Data[PINB], Is.EqualTo(0x54));
             Assert.That(calledCorrectly, Is.True);
         });
     }
@@ -301,6 +303,75 @@ public class Gpio : AvrTestBase
 			Cpu.WriteData (DDRB, 0x0);
 
 			Assert.That (Cpu.Mmio.Data[PINB], Is.EqualTo (0x10));
+		}
+	}
+
+	[TestFixture]
+	public class PinPullUp : AvrTestBase
+	{
+		private AvrIoPort portB;
+
+		protected override void SetupPeripherals()
+		{
+			portB = new AvrIoPort (Cpu, AvrIoPort.PortBConfig);
+		}
+
+		[Test (Description = "A floating input with the pull-up enabled should read 1")]
+		public void FloatingPullUpReadsHigh ()
+		{
+			Cpu.WriteData (DDRB, 0);
+			Assert.That (Cpu.Mmio.Data[PINB], Is.EqualTo (0));
+
+			Cpu.WriteData (PORTB, 1 << PB4);
+			Assert.That (Cpu.Mmio.Data[PINB], Is.EqualTo (1 << PB4));
+
+			Cpu.WriteData (PORTB, 0);
+			Assert.That (Cpu.Mmio.Data[PINB], Is.EqualTo (0));
+		}
+
+		[Test (Description = "A driven input should keep reading the injected level whatever PORT says")]
+		public void DrivenPinIgnoresPullUp ()
+		{
+			Cpu.WriteData (DDRB, 0);
+			Cpu.WriteData (PORTB, 1 << PB4);
+			portB.SetPinValue (PB4, false);
+			Assert.That (Cpu.Mmio.Data[PINB], Is.EqualTo (0));
+
+			portB.ReleasePin (PB4);
+			Assert.That (Cpu.Mmio.Data[PINB], Is.EqualTo (1 << PB4));
+		}
+
+		[Test (Description = "Releasing a pin without the pull-up should read 0")]
+		public void ReleasedPinWithoutPullUpReadsLow ()
+		{
+			Cpu.WriteData (DDRB, 0);
+			portB.SetPinValue (PB4, true);
+			Assert.That (Cpu.Mmio.Data[PINB], Is.EqualTo (1 << PB4));
+
+			portB.ReleasePin (PB4);
+			Assert.That (Cpu.Mmio.Data[PINB], Is.EqualTo (0));
+		}
+
+		[Test (Description = "Switching a floating pulled-up pin from output low to input should read 1")]
+		public void DdrChangeToInputReadsPullUp ()
+		{
+			Cpu.WriteData (PORTB, 1 << PB4);
+			Cpu.WriteData (DDRB, 1 << PB4);
+			Cpu.WriteData (PORTB, 0);
+			Cpu.WriteData (PORTB, 1 << PB4);
+			Cpu.WriteData (DDRB, 0);
+			Assert.That (Cpu.Mmio.Data[PINB], Is.EqualTo (1 << PB4));
+		}
+
+		[Test (Description = "Enabling the pull-up on a floating pin should raise a pin change interrupt")]
+		public void EnablingPullUpRaisesPinChange ()
+		{
+			Cpu.WriteData (PCICR, 1 << PCIE0);
+			Cpu.WriteData (PCMSK0, 1 << PB4);
+			Assert.That (Cpu.Mmio.Data[PCIFR], Is.EqualTo (0));
+
+			Cpu.WriteData (PORTB, 1 << PB4);
+			Assert.That (Cpu.Mmio.Data[PCIFR], Is.EqualTo (1 << PCIE0));
 		}
 	}
 
